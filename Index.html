@@ -131,6 +131,11 @@
     padding:22px 16px; display:flex; flex-direction:column; animation:fadeUp .45s ease both;
   }
   .sb-brand{ display:flex; align-items:center; gap:10px; padding:0 6px 22px; font-weight:700; letter-spacing:0.4px; font-size:15px; }
+  .sidebar-close-btn{
+    display:none; margin-left:auto; width:30px; height:30px; border-radius:8px; background:var(--grey-1);
+    border:none; color:var(--text-1); align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  .sidebar-close-btn svg{ width:15px; height:15px; }
   .sb-cube{
     width:20px; height:20px; background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
     border:1px solid var(--border); border-radius:5px; transform:rotate(45deg);
@@ -949,6 +954,7 @@
   @media (max-width: 700px){
     .mobile-topbar{ display:flex; }
     .mobile-bottom-nav{ display:flex; }
+    .sidebar-close-btn{ display:flex; }
   }
 </style>
 </head>
@@ -1024,7 +1030,12 @@
   </div>
   <div class="sidebar-drawer-overlay" id="sidebarDrawerOverlay"></div>
   <div class="sidebar">
-    <div class="sb-brand"><div class="sb-cube"></div><span>BlockVerse</span></div>
+    <div class="sb-brand">
+      <div class="sb-cube"></div><span>BlockVerse</span>
+      <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
 
     <div class="sb-user" id="hubUserRow" style="cursor:pointer;" title="Customize your character">
       <div id="hubAvatar" style="width:32px;height:32px;border-radius:50%;background:var(--grey-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:1px solid var(--border);">?</div>
@@ -3615,8 +3626,20 @@
     document.querySelector(".sidebar").classList.remove("mobile-open");
     document.getElementById("sidebarDrawerOverlay").classList.remove("show");
   }
-  document.getElementById("mobileMenuBtn").addEventListener("click", openMobileDrawer);
+  function toggleMobileDrawer(){
+    if(document.querySelector(".sidebar").classList.contains("mobile-open")) closeMobileDrawer();
+    else openMobileDrawer();
+  }
+  closeMobileDrawer(); // always start closed, regardless of any stale state
+  document.getElementById("mobileMenuBtn").addEventListener("click", toggleMobileDrawer);
+  document.getElementById("sidebarCloseBtn").addEventListener("click", closeMobileDrawer);
   document.getElementById("sidebarDrawerOverlay").addEventListener("click", closeMobileDrawer);
+  // tapping any nav item inside the drawer should also close it (showPage()
+  // already calls closeMobileDrawer(), but sb-items that don't call
+  // showPage directly - like the user row / logout - need it too)
+  document.querySelectorAll(".sidebar .sb-item, .sidebar .sb-user, .sidebar .logout-btn").forEach(el => {
+    el.addEventListener("click", closeMobileDrawer);
+  });
   document.querySelectorAll(".mbn-item").forEach(item => {
     item.addEventListener("click", () => {
       const p = item.getAttribute("data-page");
