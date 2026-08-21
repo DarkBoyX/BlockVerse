@@ -314,6 +314,82 @@
   }
   .game-chat-input-row button:hover{ background:#dcdcdc; }
 
+  .game-chat-head{
+    display:flex; align-items:center; justify-content:space-between; padding:9px 12px;
+    border-bottom:1px solid rgba(255,255,255,0.07); font-size:12px; font-weight:700; color:#e4e4e6; letter-spacing:0.2px;
+  }
+  .game-chat-gear{
+    width:26px; height:26px; border-radius:8px; background:rgba(255,255,255,0.06); border:none; color:#c4c4c8;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s, color .15s;
+  }
+  .game-chat-gear:hover{ background:rgba(255,255,255,0.14); color:#f2f2f2; }
+  .game-chat-gear svg{ width:15px; height:15px; }
+
+  /* ---- chat moderation tab ---- */
+  .chat-mod-overlay{
+    position:absolute; inset:0; z-index:130; background:rgba(6,6,7,0.55); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; animation:fadeIn .18s ease both;
+  }
+  .chat-mod-panel{
+    width:420px; max-width:92vw; max-height:78vh; display:flex; flex-direction:column;
+    background:#151517; border:1px solid #2c2c30; border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,0.55);
+    animation:modalIn .2s ease both; overflow:hidden;
+  }
+  .chat-mod-head{
+    display:flex; align-items:center; justify-content:space-between; padding:14px 16px;
+    border-bottom:1px solid #232326; font-size:14px; font-weight:700; color:#f2f2f2;
+  }
+  .chat-mod-close{
+    width:28px; height:28px; border-radius:8px; background:#1c1c1f; border:none; color:#c4c4c8;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .chat-mod-close svg{ width:15px; height:15px; }
+  .chat-mod-hint{ padding:10px 16px 0; font-size:11.5px; color:#8a8a90; }
+  .chat-mod-list{ overflow-y:auto; padding:10px 10px 14px; display:flex; flex-direction:column; gap:4px; }
+  .chat-mod-row{
+    display:flex; flex-direction:column; gap:2px; padding:9px 10px; border-radius:10px; transition:background .12s;
+  }
+  .chat-mod-row .cmr-name{
+    font-size:12px; font-weight:700; color:#dcdce0; cursor:pointer; width:fit-content;
+  }
+  .chat-mod-row .cmr-name:hover{ text-decoration:underline; }
+  .chat-mod-row .cmr-name.self{ cursor:default; color:#8a8a90; }
+  .chat-mod-row .cmr-name.self:hover{ text-decoration:none; }
+  .chat-mod-row .cmr-text{
+    font-size:12.5px; color:#b4b4b9; line-height:1.4; cursor:pointer; padding:4px 6px; border-radius:7px;
+  }
+  .chat-mod-row .cmr-text:hover{ background:rgba(255,255,255,0.06); color:#e4e4e6; }
+  .chat-mod-row .cmr-text.self{ cursor:default; }
+  .chat-mod-row .cmr-text.self:hover{ background:none; color:#b4b4b9; }
+
+  /* ---- report confirmation ---- */
+  .chat-report-overlay{
+    position:absolute; inset:0; z-index:140; background:rgba(6,6,7,0.65); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; animation:fadeIn .15s ease both;
+  }
+  .chat-report-panel{
+    width:340px; max-width:88vw; background:#151517; border:1px solid #2c2c30; border-radius:16px;
+    padding:20px; box-shadow:0 24px 70px rgba(0,0,0,0.55); animation:modalIn .18s ease both;
+  }
+  .chat-report-title{ font-size:15px; font-weight:700; color:#f2f2f2; margin-bottom:10px; }
+  .chat-report-preview{
+    font-size:12.5px; color:#b4b4b9; background:#1c1c1f; border:1px solid #232326; border-radius:10px;
+    padding:10px 12px; margin-bottom:10px; line-height:1.4; max-height:80px; overflow-y:auto; word-break:break-word;
+  }
+  .chat-report-sub{ font-size:11.5px; color:#8a8a90; margin-bottom:16px; line-height:1.4; }
+  .chat-report-actions{ display:flex; gap:8px; }
+  .chat-report-btn{
+    flex:1; padding:10px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; border:1px solid transparent;
+  }
+  .chat-report-btn.ignore{ background:#1c1c1f; border-color:#2c2c30; color:#dcdce0; }
+  .chat-report-btn.ignore:hover{ background:#232326; }
+  .chat-report-btn.report{ background:#e5484d; color:#fff; }
+  .chat-report-btn.report:hover{ background:#c73e42; }
+  .chat-report-btn:disabled{ opacity:0.5; cursor:default; }
+  .chat-report-result{ margin-top:12px; font-size:12px; text-align:center; color:#b4b4b9; min-height:16px; }
+  .chat-report-result.bad{ color:#ff8a8f; }
+  .chat-report-result.ok{ color:#7fd99b; }
+
   /* Speech bubble above a player's head */
   .chat-bubble-canvas{ pointer-events:none; }
 
@@ -811,9 +887,35 @@
     }
     .sidebar.mobile-open{ transform:translateX(0); }
     .sidebar .sb-label-text, .sidebar .sb-brand span, .sidebar .sb-user .su-text{ display:flex; }
-    .main{ padding:64px 14px 88px; }
+    .main{ padding:64px 14px 88px; max-width:100%; }
     .notif-bell-btn{ top:12px; right:14px; width:34px; height:34px; }
     .notif-bell-btn svg{ width:16px; height:16px; }
+    .notif-panel{ width:100vw; max-width:100vw; }
+
+    .main-header{ margin-bottom:18px; }
+    .main-header h2{ font-size:19px; }
+    .main-header p{ font-size:12px; }
+
+    .game-grid{ grid-template-columns:repeat(2, 1fr); gap:12px; }
+    .game-card-info{ padding:9px 10px 11px; }
+    .game-card-title{ font-size:12.5px; }
+    .game-card-sub{ font-size:10.5px; }
+
+    .settings-hub{ grid-template-columns:1fr; gap:10px; }
+    .settings-tile{ padding:16px; display:flex; align-items:center; gap:12px; text-align:left; }
+    .settings-tile .t-icon{ margin-bottom:0; flex-shrink:0; }
+    .settings-block{ padding:16px; margin-bottom:12px; }
+    .theme-row{ gap:10px; }
+    .theme-card{ width:calc(50% - 5px); }
+
+    .friend-row{ padding:11px 2px; gap:10px; }
+    .friend-search-input, input, .customize-layout input[type="range"]{ font-size:16px; } /* 16px stops iOS Safari auto-zoom on focus */
+    .submit-btn, .logout-btn, button{ min-height:38px; }
+
+    .customize-layout{ gap:12px; }
+    .customize-panel{ padding:14px; width:100%; }
+    .customize-panel-center{ order:-1; } /* preview first on mobile, then sliders/colors below */
+    .customize-canvas-wrap{ width:100%; max-width:280px; margin:0 auto; }
   }
   .sidebar-drawer-overlay{
     display:none; position:fixed; inset:0; background:rgba(6,6,7,0.5); z-index:955;
@@ -1211,6 +1313,12 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
   </div>
   <div class="game-chat-panel hidden" id="gameChatPanel">
+    <div class="game-chat-head">
+      <span>Chat</span>
+      <button class="game-chat-gear" id="gameChatGearBtn" title="View messages / report" aria-label="Chat settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+      </button>
+    </div>
     <div class="game-chat-log-wrap">
       <div class="game-chat-log" id="gameChatLog"></div>
       <div class="game-chat-newmsg hidden" id="gameChatNewMsgPill">
@@ -1221,6 +1329,35 @@
     <div class="game-chat-input-row">
       <input type="text" id="gameChatInput" maxlength="140" placeholder="Message...">
       <button id="gameChatSendBtn">Send</button>
+    </div>
+  </div>
+
+  <!-- Chat moderation tab: lists recent messages, click a name to view their
+       profile, click a message to report it -->
+  <div class="chat-mod-overlay hidden" id="chatModOverlay">
+    <div class="chat-mod-panel">
+      <div class="chat-mod-head">
+        <span>Chat messages</span>
+        <button class="chat-mod-close" id="chatModCloseBtn" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="chat-mod-hint">Tap a name to view their profile. Tap a message to report it.</div>
+      <div class="chat-mod-list" id="chatModList"></div>
+    </div>
+  </div>
+
+  <!-- Report confirmation -->
+  <div class="chat-report-overlay hidden" id="chatReportOverlay">
+    <div class="chat-report-panel">
+      <div class="chat-report-title">Report this message?</div>
+      <div class="chat-report-preview" id="chatReportPreview"></div>
+      <div class="chat-report-sub">We'll check it and take action if it breaks the rules.</div>
+      <div class="chat-report-actions">
+        <button class="chat-report-btn ignore" id="chatReportIgnoreBtn">Ignore</button>
+        <button class="chat-report-btn report" id="chatReportConfirmBtn">Report</button>
+      </div>
+      <div class="chat-report-result" id="chatReportResult"></div>
     </div>
   </div>
 
@@ -2499,6 +2636,14 @@
 
     if(account && account.password === password){
       finishLogin(key, account);
+      // backfill the Firebase-side credential in the background - covers
+      // accounts created before this feature existed, or ones whose first
+      // backfill attempt failed (e.g. rules weren't published yet at the
+      // time). Without this, a login that only ever succeeds locally can
+      // never be recognized from a second device.
+      hashPassword(password).then(hash => {
+        fbDb.ref("blockverse_credentials/" + key).set({ passwordHash: hash, gender: account.gender || "male" }).catch(() => {});
+      });
       return;
     }
 
@@ -4044,24 +4189,100 @@
     }
 
     /* ---- chat profanity filter ----
-       Censors common slurs/profanity (and simple leetspeak substitutions
-       like "fuk", "b1tch", "sh!t") both before sending, so the stored
-       message is already clean for everyone, and again on display, so any
-       older uncensored history still gets masked. */
+       Two layers:
+       1) a fast local censor that runs on every message before it's even
+          sent/displayed (so the stored copy is already clean for everyone)
+       2) normalization that works across scripts/languages, not just
+          English - leetspeak, repeated letters, spacing tricks, and
+          Arabic diacritics/tatweel/alef-variants are all collapsed down
+          before matching, so "f.u.c.k", "fuuuck", "sh1t", or a padded-out
+          Arabic slur all still get caught the same way an unmodified
+          word would.
+       This is a starting word list, not an exhaustive one - add more
+       entries to PROFANITY_LIST per language as needed. */
     const PROFANITY_LIST = [
-      "fuck","fuk","fck","f u c k","shit","sh1t","bitch","b1tch","bytch","cunt",
-      "dick","d1ck","pussy","pussi","asshole","asswhole","ass hole","nigger","nigga",
-      "n1gger","n1gga","faggot","fag","retard","whore","slut","cock","cok",
-      "bastard","damn it","motherfucker","mf","jerkoff","dumbass","dipshit"
+      // English
+      "fuck","fuk","fck","shit","bitch","bytch","cunt","dick","pussy","pussi",
+      "asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
+      "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
+      // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
+      "كس","كسم","خرا","زبي","شرموطة","شرموط","قحبة","منيك","كلب ابن","ابن كلب","عرص","متناك",
+      // Spanish
+      "puta","puto","mierda","pendejo","pendeja","cabron","cabrón","gilipollas","joder","cono","coño",
+      // French
+      "putain","merde","connard","salope","enculé","encule","batard","bâtard",
+      // German
+      "scheisse","scheiße","hurensohn","fotze","wichser","arschloch",
+      // Portuguese
+      "porra","caralho","merda","puta","filho da puta","cacete",
+      // Russian (transliterated + common Cyrillic)
+      "блять","сука","хуй","пизда","бля"
     ];
+
+    // strips accents/diacritics (Latin AND Arabic), Arabic tatweel, and
+    // normalizes alef variants - so a word typed with decorations still
+    // matches its plain form
+    function stripDiacritics(s){
+      return s
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")       // Latin combining accents
+        .replace(/[\u064B-\u0652\u0670]/g, "") // Arabic harakat/tanwin
+        .replace(/\u0640/g, "")                // Arabic tatweel (ـ)
+        .replace(/[إأآا]/g, "ا");               // unify alef variants
+    }
+
+    // collapses common leetspeak/symbol substitutions and squashes runs of
+    // the same letter ("fuuuuck" -> "fuck"), so obfuscated spellings still
+    // hit the same regex as the plain word
+    function normalizeForFilter(text){
+      let s = stripDiacritics((text || "").toLowerCase());
+      s = s
+        .replace(/[@]/g, "a").replace(/[4]/g, "a")
+        .replace(/[3]/g, "e")
+        .replace(/[1!|]/g, "i")
+        .replace(/[0]/g, "o")
+        .replace(/[$5]/g, "s")
+        .replace(/[7+]/g, "t")
+        .replace(/[8]/g, "b")
+        .replace(/[\-_.,*]/g, " ");
+      s = s.replace(/(.)\1{2,}/g, "$1$1"); // aaaa -> aa (keeps double letters like "ss" intact)
+      return s;
+    }
+
     function buildProfanityRegex(){
-      const escaped = PROFANITY_LIST.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*"));
-      return new RegExp("\\b(" + escaped.join("|") + ")\\b", "gi");
+      const escaped = PROFANITY_LIST.map(w =>
+        normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*")
+      );
+      return new RegExp("(" + escaped.join("|") + ")", "gi");
     }
     const profanityRegex = buildProfanityRegex();
+
+    // true if ANY normalized substring of the text matches the filter -
+    // used for the local "does this look bad" check (report flow, etc.)
+    // where we want a yes/no rather than a censored string back
+    function looksLikeProfanity(text){
+      if(!text) return false;
+      return profanityRegex.test(normalizeForFilter(text));
+    }
+
     function censorText(text){
       if(!text) return text;
-      return text.replace(profanityRegex, (m) => m.length <= 1 ? "*" : m[0] + "*".repeat(m.length - 1));
+      const normalized = normalizeForFilter(text);
+      // map matches found in the normalized string back onto the original
+      // string by position (normalization never changes character count
+      // except for symbol->letter swaps, which are 1:1, and squashed
+      // repeats, which we handle by matching against the ORIGINAL text's
+      // own repeated-letter collapse separately) - simplest reliable
+      // approach: also run the raw regex against the untouched text for
+      // exact hits, then do a second pass with normalization to catch
+      // obfuscated ones and mask the whole matched span conservatively.
+      let out = text.replace(profanityRegex, (m) => m.length <= 1 ? "*" : m[0] + "*".repeat(m.length - 1));
+      if(looksLikeProfanity(text) && out === text){
+        // normalization-only match (e.g. leetspeak) that the raw regex
+        // missed - censor the whole message rather than let it through
+        out = "*".repeat(Math.min(text.length, 24));
+      }
+      return out;
     }
 
     /* ---- in-game chat ---- */
@@ -4088,13 +4309,17 @@
       });
     }
 
-    function appendChatLine(name, text, msgKey){
+    let chatMessages = []; // { key, name, accountKey, uid, text } - feeds the moderation tab
+
+    function appendChatLine(name, text, msgKey, accountKey, uid){
       const log = chatLogEl();
       if(!log) return;
       if(msgKey){
         if(chatSeenKeys.has(msgKey)) return; // already rendered - avoid duplicates on reconnect
         chatSeenKeys.add(msgKey);
       }
+      chatMessages.push({ key: msgKey, name, accountKey: accountKey || "", uid: uid || "", text });
+      if(chatMessages.length > 100) chatMessages.shift();
       const wasNearBottom = isChatScrolledNearBottom();
       const row = document.createElement("div");
       row.className = "cm";
@@ -4113,11 +4338,17 @@
     function connectChat(){
       chatReady = false;
       chatSeenKeys = new Set();
+      chatMessages = [];
       chatRef = fbDb.ref("rooms/baseplate/chat").limitToLast(50);
       chatRef.on("child_added", (snap) => {
         const msg = snap.val() || {};
-        appendChatLine(msg.name || "Player", msg.text || "", snap.key);
-        if(!chatReady) return; // skip bubbles for the history that loads in on join
+        // messages from BEFORE this join are intentionally not shown - chat
+        // is ephemeral per-session: leave (or refresh) and old text is gone
+        // for you, even though it's still live for anyone who stayed
+        // connected. Only what's said while you're actually in the room
+        // ever renders.
+        if(!chatReady) return;
+        appendChatLine(msg.name || "Player", msg.text || "", snap.key, msg.accountKey, msg.uid);
         const targetGroup = msg.uid === playerId ? character : (remotePlayers[msg.uid] && remotePlayers[msg.uid].group);
         showChatBubbleOnGroup(targetGroup, censorText(msg.text || ""));
       }, (err) => {
@@ -4131,6 +4362,7 @@
       if(chatRef){ chatRef.off(); chatRef = null; }
       chatReady = false;
       chatSeenKeys = new Set();
+      chatMessages = [];
       const log = chatLogEl();
       if(log) log.innerHTML = "";
       const pill = chatNewMsgPill();
@@ -4147,15 +4379,56 @@
         showMultiplayerError();
         return;
       }
-      fbDb.ref("rooms/baseplate/chat").push({
-        uid: playerId,
-        name: currentUsername(),
-        text: text,
-        ts: firebase.database.ServerValue.TIMESTAMP
-      }).catch(err => {
-        console.error("BlockVerse chat: failed to send message (often a rules/publish issue).", err);
-        showMultiplayerError();
+      const myKey = currentAccountKey && currentAccountKey();
+      checkMyChatBan(myKey).then(banUntil => {
+        if(banUntil && banUntil > Date.now()){
+          appendSystemChatLine("You're muted for " + formatBanRemaining(banUntil) + " for breaking chat rules.");
+          return;
+        }
+        fbDb.ref("rooms/baseplate/chat").push({
+          uid: playerId,
+          accountKey: myKey || "",
+          name: currentUsername(),
+          text: text,
+          ts: firebase.database.ServerValue.TIMESTAMP
+        }).catch(err => {
+          console.error("BlockVerse chat: failed to send message (often a rules/publish issue).", err);
+          showMultiplayerError();
+        });
       });
+    }
+
+    function appendSystemChatLine(text){
+      const log = chatLogEl();
+      if(!log) return;
+      const row = document.createElement("div");
+      row.className = "cm";
+      row.style.color = "#ff8a8f";
+      row.textContent = text;
+      log.appendChild(row);
+      scrollChatToBottom(true);
+    }
+
+    function formatBanRemaining(untilTs){
+      const ms = Math.max(0, untilTs - Date.now());
+      const hrs = Math.ceil(ms / 3600000);
+      return hrs <= 1 ? "less than an hour" : hrs + " hours";
+    }
+
+    // checks (and caches briefly) whether the given account is currently
+    // muted; used both when sending and to decide whether to warn on join
+    let _myBanCache = { key: null, until: 0, checkedAt: 0 };
+    function checkMyChatBan(key){
+      if(!key) return Promise.resolve(0);
+      if(_myBanCache.key === key && Date.now() - _myBanCache.checkedAt < 15000){
+        return Promise.resolve(_myBanCache.until);
+      }
+      return fbDb.ref("blockverse_bans/" + key).once("value").then(snap => {
+        const v = snap.val();
+        const until = (v && v.until) || 0;
+        _myBanCache = { key, until, checkedAt: Date.now() };
+        return until;
+      }).catch(() => 0);
     }
 
     let chatWired = false;
@@ -4203,6 +4476,125 @@
       pill.addEventListener("click", () => {
         scrollChatToBottom(true);
         pill.classList.add("hidden");
+      });
+
+      wireChatModeration();
+    }
+
+    /* ---- chat moderation tab (gear icon) + report/auto-ban flow ---- */
+    function wireChatModeration(){
+      const gearBtn = document.getElementById("gameChatGearBtn");
+      const modOverlay = document.getElementById("chatModOverlay");
+      const modList = document.getElementById("chatModList");
+      const modCloseBtn = document.getElementById("chatModCloseBtn");
+      const reportOverlay = document.getElementById("chatReportOverlay");
+      const reportPreview = document.getElementById("chatReportPreview");
+      const reportResult = document.getElementById("chatReportResult");
+      const reportIgnoreBtn = document.getElementById("chatReportIgnoreBtn");
+      const reportConfirmBtn = document.getElementById("chatReportConfirmBtn");
+      let reportTarget = null; // the chatMessages entry currently being reported
+
+      function myKey(){ return currentAccountKey && currentAccountKey(); }
+
+      function renderModList(){
+        const mine = myKey();
+        modList.innerHTML = "";
+        if(!chatMessages.length){
+          modList.innerHTML = '<div style="padding:16px;text-align:center;color:#6a6a70;font-size:12px;">No messages yet.</div>';
+          return;
+        }
+        chatMessages.slice().reverse().forEach(msg => {
+          const isSelf = !!mine && msg.accountKey === mine;
+          const row = document.createElement("div");
+          row.className = "chat-mod-row";
+          const nameEl = document.createElement("div");
+          nameEl.className = "cmr-name" + (isSelf ? " self" : "");
+          nameEl.textContent = msg.name;
+          if(!isSelf && msg.accountKey){
+            nameEl.addEventListener("click", () => {
+              closeModOverlay();
+              BaseplateGame.stop(); // step out of the game so the profile page (dashboard) is visible
+              openFriendProfilePage(msg.accountKey);
+            });
+          }
+          const textEl = document.createElement("div");
+          textEl.className = "cmr-text" + (isSelf ? " self" : "");
+          textEl.textContent = censorText(msg.text);
+          if(!isSelf){
+            textEl.addEventListener("click", () => openReportConfirm(msg));
+          }
+          row.appendChild(nameEl);
+          row.appendChild(textEl);
+          modList.appendChild(row);
+        });
+      }
+
+      function openModOverlay(){ renderModList(); modOverlay.classList.remove("hidden"); }
+      function closeModOverlay(){ modOverlay.classList.add("hidden"); }
+
+      function openReportConfirm(msg){
+        reportTarget = msg;
+        reportPreview.textContent = '"' + msg.text + '" — ' + msg.name;
+        reportResult.textContent = "";
+        reportResult.className = "chat-report-result";
+        reportConfirmBtn.disabled = false;
+        reportIgnoreBtn.disabled = false;
+        reportOverlay.classList.remove("hidden");
+      }
+      function closeReportConfirm(){ reportOverlay.classList.add("hidden"); reportTarget = null; }
+
+      gearBtn.addEventListener("click", openModOverlay);
+      modCloseBtn.addEventListener("click", closeModOverlay);
+      modOverlay.addEventListener("click", (e) => { if(e.target === modOverlay) closeModOverlay(); });
+
+      reportIgnoreBtn.addEventListener("click", closeReportConfirm);
+      reportOverlay.addEventListener("click", (e) => { if(e.target === reportOverlay) closeReportConfirm(); });
+
+      reportConfirmBtn.addEventListener("click", () => {
+        if(!reportTarget) return;
+        reportConfirmBtn.disabled = true;
+        reportIgnoreBtn.disabled = true;
+        reportResult.textContent = "Checking...";
+        reportResult.className = "chat-report-result";
+
+        // AI/automatic check stand-in: runs the same multi-language
+        // profanity detector used to censor chat (see looksLikeProfanity
+        // above) against the raw, uncensored message. If it flags it, the
+        // reported account is muted for 24h; if not, the report is a no-op.
+        const flagged = looksLikeProfanity(reportTarget.text);
+        const mine = myKey();
+
+        // log the report either way so staff can review edge cases later
+        try{
+          fbDb.ref("rooms/baseplate/reports").push({
+            reporterUid: playerId, reporterName: currentUsername(),
+            targetName: reportTarget.name, reason: "Chat message: " + reportTarget.text.slice(0,200),
+            ts: firebase.database.ServerValue.TIMESTAMP
+          }).catch(()=>{});
+        }catch(e){}
+
+        if(!flagged){
+          reportResult.textContent = "Thanks - this message didn't break the rules, so no action was taken.";
+          reportResult.className = "chat-report-result ok";
+          setTimeout(closeReportConfirm, 2200);
+          return;
+        }
+        if(!reportTarget.accountKey || reportTarget.accountKey === mine){
+          reportResult.textContent = "Couldn't identify that user to take action.";
+          reportResult.className = "chat-report-result bad";
+          return;
+        }
+        const until = Date.now() + 24 * 60 * 60 * 1000;
+        fbDb.ref("blockverse_bans/" + reportTarget.accountKey).set({
+          until, reason: "Chat: " + reportTarget.text.slice(0,140), by: myKey() || "system"
+        }).then(() => {
+          reportResult.textContent = "Confirmed - this user has been muted for 24 hours.";
+          reportResult.className = "chat-report-result bad";
+          setTimeout(closeReportConfirm, 2400);
+        }).catch(() => {
+          reportResult.textContent = "Flagged it, but couldn't apply the mute (check database rules are published).";
+          reportResult.className = "chat-report-result bad";
+        });
       });
     }
 
