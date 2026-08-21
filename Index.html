@@ -500,6 +500,21 @@
     display:none; align-items:center; justify-content:center; color:#f2f2f2; touch-action:none;
   }
   .game-jump-btn svg{ width:26px; height:26px; }
+  @media (pointer:coarse), (max-width:640px){
+    .game-joystick, .game-jump-btn{ display:flex; }
+    .game-topbar, .game-chat-btn{ width:32px; height:32px; top:12px; }
+    .game-chat-btn{ left:54px; }
+    .game-chat-panel{ width:72vw; max-width:300px; top:52px; left:12px; border-radius:12px; }
+    .game-chat-log{ height:140px; padding:8px 10px; gap:4px; }
+    .game-chat-log .cm{ font-size:11.5px; line-height:1.35; }
+    .game-chat-input-row{ padding:8px; gap:5px; }
+    .game-chat-input-row input{ font-size:12px; padding:7px 9px; }
+    .game-chat-input-row button{ padding:0 10px; font-size:11.5px; }
+    .game-tab{ width:94vw; max-height:80vh; border-radius:13px; }
+    .game-tab.wide{ width:94vw; }
+    .game-tab-head{ padding:12px 14px; }
+    .game-tab-head h3{ font-size:13px; }
+  }
   @media (pointer:coarse){
     .game-joystick, .game-jump-btn{ display:flex; }
   }
@@ -789,9 +804,49 @@
   .lang-overlay p{ font-size:14px; color:var(--text-1); letter-spacing:0.3px; }
 
   @media (max-width: 700px){
-    .sidebar{ width:72px; padding:18px 8px; }
-    .sidebar .sb-label-text, .sb-brand span, .sb-user .su-text{ display:none; }
-    .main{ padding:22px 16px 32px; }
+    .sidebar{
+      position:fixed; top:0; left:0; bottom:0; width:78vw; max-width:270px; z-index:960;
+      padding:18px 14px; transform:translateX(-100%); transition:transform .22s ease;
+      box-shadow:20px 0 50px rgba(0,0,0,0.5);
+    }
+    .sidebar.mobile-open{ transform:translateX(0); }
+    .sidebar .sb-label-text, .sidebar .sb-brand span, .sidebar .sb-user .su-text{ display:flex; }
+    .main{ padding:64px 14px 88px; }
+    .notif-bell-btn{ top:12px; right:14px; width:34px; height:34px; }
+    .notif-bell-btn svg{ width:16px; height:16px; }
+  }
+  .sidebar-drawer-overlay{
+    display:none; position:fixed; inset:0; background:rgba(6,6,7,0.5); z-index:955;
+  }
+  .sidebar-drawer-overlay.show{ display:block; }
+  .mobile-topbar{
+    display:none; position:fixed; top:0; left:0; right:0; height:52px; z-index:940;
+    align-items:center; gap:10px; padding:0 14px; background:var(--bg-1); border-bottom:1px solid var(--border-soft);
+  }
+  .mobile-topbar .mt-brand{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; }
+  .mobile-menu-btn{
+    width:34px; height:34px; border-radius:9px; background:var(--grey-1); border:none; color:var(--text-0);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  .mobile-menu-btn svg{ width:18px; height:18px; }
+  .mobile-bottom-nav{
+    display:none; position:fixed; bottom:0; left:0; right:0; height:64px; z-index:940;
+    background:var(--bg-1); border-top:1px solid var(--border-soft); align-items:center; justify-content:space-around;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .mbn-item{
+    display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--text-2); font-size:10px;
+    cursor:pointer; padding:6px 10px; border-radius:10px; position:relative; flex:1; max-width:80px;
+  }
+  .mbn-item.active{ color:var(--text-0); }
+  .mbn-item svg{ width:20px; height:20px; }
+  .mbn-item .mbn-badge{
+    position:absolute; top:2px; right:14px; background:var(--danger); color:#fff; font-size:9px; font-weight:700;
+    min-width:14px; height:14px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px;
+  }
+  @media (max-width: 700px){
+    .mobile-topbar{ display:flex; }
+    .mobile-bottom-nav{ display:flex; }
   }
 </style>
 </head>
@@ -859,6 +914,13 @@
 
 <!-- ================= DASHBOARD SCREEN ================= -->
 <div class="dash hidden" id="dashScreen">
+  <div class="mobile-topbar">
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+    </button>
+    <div class="mt-brand"><div class="sb-cube" style="width:16px;height:16px;"></div><span>BlockVerse</span></div>
+  </div>
+  <div class="sidebar-drawer-overlay" id="sidebarDrawerOverlay"></div>
   <div class="sidebar">
     <div class="sb-brand"><div class="sb-cube"></div><span>BlockVerse</span></div>
 
@@ -887,6 +949,26 @@
 
     <div class="sb-spacer"></div>
     <button class="logout-btn" id="logoutBtn" data-i18n="logout">Log out</button>
+  </div>
+
+  <div class="mobile-bottom-nav">
+    <div class="mbn-item active" data-page="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      <span data-i18n="home">Home</span>
+    </div>
+    <div class="mbn-item" data-page="friends">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><path d="M16 4.2c1.7.4 3 2 3 3.8s-1.3 3.4-3 3.8"/><path d="M22 20c0-2.6-1.8-4.8-4.5-5.6"/></svg>
+      <span data-i18n="friends">Friends</span>
+      <span class="mbn-badge hidden" id="friendReqBadgeMobile">0</span>
+    </div>
+    <div class="mbn-item" data-page="customize">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+      <span>You</span>
+    </div>
+    <div class="mbn-item" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+      <span data-i18n="settings">Settings</span>
+    </div>
   </div>
 
   <button class="notif-bell-btn" id="notifBellBtn">
@@ -2268,6 +2350,20 @@
   function getSession(){ return localStorage.getItem(SESSION_KEY); }
   function clearSession(){ localStorage.removeItem(SESSION_KEY); }
 
+  // password hashing (SHA-256) so we can keep a server-side backup of
+  // accounts in Firebase without ever storing/reading a readable password.
+  // This exists because accounts otherwise live ONLY in this browser's
+  // localStorage - if that ever gets cleared (private browsing, a
+  // different browser, the site's storage getting wiped, etc.) a "log out
+  // then log in" would look broken even though nothing was actually wrong,
+  // since the account record would simply be gone locally. The Firebase
+  // copy lets login self-heal the local copy in that case.
+  async function hashPassword(pw){
+    const enc = new TextEncoder().encode(pw);
+    const buf = await crypto.subtle.digest("SHA-256", enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+
   const tabLogin = document.getElementById("tabLogin");
   const tabSignup = document.getElementById("tabSignup");
   const tabSlider = document.getElementById("tabSlider");
@@ -2370,6 +2466,12 @@
 
     accounts[key] = { username, password, gender: selectedGender, friends: [], incoming: [], outgoing: [] };
     saveAccounts(accounts);
+    // back up a hashed copy server-side so login can self-heal on this
+    // account if this browser's local copy is ever lost (see hashPassword)
+    try{
+      const hash = await hashPassword(password);
+      await fbDb.ref("blockverse_credentials/" + key).set({ passwordHash: hash, gender: selectedGender });
+    }catch(err){ console.warn("BlockVerse: couldn't back up account credentials to Firebase:", err); }
     showMsg(signupMsg, "Account created. Logging you in...", "success");
     setSession(key);
     setTimeout(enterApp, 550);
@@ -2377,7 +2479,7 @@
 
   const loginMsg = document.getElementById("loginMsg");
   const loginSubmitBtn = document.getElementById("loginSubmitBtn");
-  loginForm.addEventListener("submit", function(e){
+  loginForm.addEventListener("submit", async function(e){
     e.preventDefault();
     clearMsg(loginMsg);
     const usernameEl = document.getElementById("loginUsername");
@@ -2391,20 +2493,55 @@
       if(!password) shakeField(passwordEl);
       return;
     }
-    const accounts = getAccounts();
     const key = username.toLowerCase();
-    const account = accounts[key];
-    if(!account || account.password !== password){
-      showMsg(loginMsg, "Wrong username or password.", "error");
-      shakeField(passwordEl);
+    const accounts = getAccounts();
+    let account = accounts[key];
+
+    if(account && account.password === password){
+      finishLogin(key, account);
       return;
     }
+
+    // not found locally (or password didn't match a stale local copy) -
+    // check the Firebase-backed credential as a fallback, and if it
+    // matches, rebuild the local account record so this device works
+    // exactly like it did before
+    loginSubmitBtn.classList.add("loading");
+    try{
+      await fbReady;
+      const hash = await hashPassword(password);
+      const [credSnap, dirSnap] = await Promise.all([
+        fbDb.ref("blockverse_credentials/" + key).once("value"),
+        fbDb.ref("blockverse_usernames/" + key).once("value")
+      ]);
+      const cred = credSnap.val();
+      const dir = dirSnap.val();
+      if(cred && cred.passwordHash === hash){
+        account = {
+          username: (dir && dir.username) || username,
+          password, gender: cred.gender || "male",
+          friends: [], incoming: [], outgoing: []
+        };
+        accounts[key] = account;
+        saveAccounts(accounts);
+        finishLogin(key, account);
+        return;
+      }
+    }catch(err){
+      console.error("BlockVerse: login fallback check failed:", err);
+    }
+    loginSubmitBtn.classList.remove("loading");
+    showMsg(loginMsg, "Wrong username or password.", "error");
+    shakeField(passwordEl);
+  });
+
+  function finishLogin(key, account){
     showMsg(loginMsg, "Welcome back, " + account.username + "!", "success");
     loginSubmitBtn.classList.add("loading");
     setSession(key);
     publishUsernameToDirectory(key, account.username); // backfill directory for accounts made before this existed
     setTimeout(enterApp, 450);
-  });
+  }
 
   /* ============ friends system (Firebase Realtime Database) ============ */
   // Friend data now lives in Firebase under blockverse_users/{usernameKey}, so
@@ -2585,12 +2722,17 @@
 
   function updateFriendBadge(){
     const badge = document.getElementById("friendReqBadge");
+    const badgeMobile = document.getElementById("friendReqBadgeMobile");
     const dot = document.getElementById("notifBellDot");
     const reqCount = fbFriendMirror.incoming.length;
     const totalCount = reqCount + fbInvites.length;
     if(badge){
       badge.textContent = reqCount > 9 ? "9+" : String(reqCount);
       badge.classList.toggle("hidden", reqCount === 0);
+    }
+    if(badgeMobile){
+      badgeMobile.textContent = reqCount > 9 ? "9+" : String(reqCount);
+      badgeMobile.classList.toggle("hidden", reqCount === 0);
     }
     if(dot) dot.classList.toggle("hidden", totalCount === 0);
     if(notifPanelOpen) renderNotifPanel();
@@ -3308,11 +3450,34 @@
       const p = i.getAttribute("data-page");
       i.classList.toggle("active", p === name || (p === "settings" && settingsPages.includes(name)) || (p === "friends" && name === "friendProfile"));
     });
+    document.querySelectorAll(".mbn-item").forEach(i => {
+      const p = i.getAttribute("data-page");
+      i.classList.toggle("active", p === name || (p === "settings" && settingsPages.includes(name)) || (p === "friends" && name === "friendProfile"));
+    });
+    closeMobileDrawer();
     if(name === "account"){ renderThemeRow(); applyTranslations(); }
     if(name === "security"){ renderDevices(); }
     if(name === "friends"){ renderFriendsPage(); }
     if(name === "customize" && typeof openCustomizePage === "function") openCustomizePage();
   }
+
+  /* ---- mobile drawer (hamburger sidebar) ---- */
+  function openMobileDrawer(){
+    document.querySelector(".sidebar").classList.add("mobile-open");
+    document.getElementById("sidebarDrawerOverlay").classList.add("show");
+  }
+  function closeMobileDrawer(){
+    document.querySelector(".sidebar").classList.remove("mobile-open");
+    document.getElementById("sidebarDrawerOverlay").classList.remove("show");
+  }
+  document.getElementById("mobileMenuBtn").addEventListener("click", openMobileDrawer);
+  document.getElementById("sidebarDrawerOverlay").addEventListener("click", closeMobileDrawer);
+  document.querySelectorAll(".mbn-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const p = item.getAttribute("data-page");
+      if(p === "settings") showPage("settingsHub"); else showPage(p);
+    });
+  });
   document.querySelectorAll(".sb-item").forEach(item => {
     item.addEventListener("click", () => {
       const page = item.getAttribute("data-page");
@@ -4008,7 +4173,12 @@
         const opening = panel.classList.contains("hidden");
         panel.classList.toggle("hidden");
         if(opening){
-          input.focus();
+          // only auto-focus (and pop the keyboard) on devices with a real
+          // pointer - on touch/mobile, opening chat should just show the
+          // log; the input only focuses once the person actually taps it
+          if(window.matchMedia && window.matchMedia("(pointer: fine)").matches){
+            input.focus();
+          }
           scrollChatToBottom(false);
           pill.classList.add("hidden");
         }
