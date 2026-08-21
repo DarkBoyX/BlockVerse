@@ -1,0 +1,3609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlockVerse</title>
+<style>
+  :root{
+    --bg-0:#0a0a0b;
+    --bg-1:#131315;
+    --bg-2:#1a1a1d;
+    --bg-3:#212124;
+    --grey-1:#2a2a2e;
+    --grey-2:#38383d;
+    --grey-3:#48484e;
+    --border:#333338;
+    --border-soft:#242428;
+    --text-0:#f2f2f2;
+    --text-1:#b4b4b9;
+    --text-2:#7a7a80;
+    --text-3:#55555a;
+    --danger:#e5484d;
+    font-family:'Segoe UI',Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 20% 0%, #19191c 0%, transparent 45%),
+      radial-gradient(circle at 80% 100%, #16161a 0%, transparent 45%),
+      var(--bg-0);
+    color:var(--text-0);
+    overflow-x:hidden;
+    transition:background .3s;
+  }
+  .center-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .hidden{ display:none !important; }
+
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
+  @keyframes popIn{ 0%{opacity:0; transform:scale(0.94);} 100%{opacity:1; transform:scale(1);} }
+  @keyframes floatCube{ 0%,100%{transform:rotate(45deg) translateY(0);} 50%{transform:rotate(45deg) translateY(-6px);} }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
+  @keyframes shimmer{ 0%{background-position:-200px 0;} 100%{background-position:200px 0;} }
+  @keyframes pulseDot{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  @keyframes spin{ to{transform:rotate(360deg);} }
+  @keyframes modalIn{ from{opacity:0; transform:translateY(10px) scale(0.97);} to{opacity:1; transform:translateY(0) scale(1);} }
+
+  /* ---------- Auth card ---------- */
+  .auth-wrap{
+    width:100%; max-width:420px; background:var(--bg-2);
+    border:1px solid var(--border-soft); border-radius:16px; padding:34px 30px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6); animation:fadeUp .5s ease both;
+  }
+  .logo{ text-align:center; margin-bottom:24px; }
+  .logo .cube{
+    display:inline-block; width:40px; height:40px;
+    background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
+    border:1px solid var(--border); border-radius:9px; margin-bottom:10px;
+    transform:rotate(45deg); animation:floatCube 3.2s ease-in-out infinite;
+  }
+  .logo h1{ margin:0; font-size:23px; letter-spacing:1px; color:var(--text-0); }
+  .logo p{ margin:5px 0 0; font-size:12px; color:var(--text-2); letter-spacing:0.3px; }
+
+  .tabs{
+    position:relative; display:flex; background:var(--grey-1); border-radius:10px;
+    padding:4px; margin-bottom:24px; border:1px solid var(--border-soft);
+  }
+  .tab-slider{
+    position:absolute; top:4px; bottom:4px; left:4px; width:calc(50% - 4px);
+    background:var(--grey-3); border-radius:8px;
+    transition:transform .28s cubic-bezier(.65,0,.35,1); z-index:0;
+  }
+  .tab-btn{
+    position:relative; z-index:1; flex:1; background:transparent; border:none;
+    color:var(--text-1); padding:10px 0; border-radius:8px;
+    font-size:14px; font-weight:600; cursor:pointer; transition:color .2s;
+  }
+  .tab-btn.active{ color:var(--text-0); }
+
+  .field{ animation:fadeUp .4s ease both; }
+  label{ display:block; font-size:12px; color:var(--text-1); margin:14px 0 6px; letter-spacing:0.2px; }
+  input[type="text"], input[type="password"]{
+    width:100%; padding:12px 13px; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:14px; outline:none;
+    transition:border-color .18s, background .18s, box-shadow .18s;
+  }
+  input::placeholder{ color:var(--text-3); }
+  input:hover{ border-color:var(--grey-3); }
+  input:focus{ border-color:var(--grey-3); background:var(--bg-2); box-shadow:0 0 0 3px rgba(255,255,255,0.05); }
+  input.shake-error{ animation:shake .35s ease; border-color:var(--danger); }
+
+  .gender-options{ display:flex; gap:10px; margin-top:6px; }
+  .gender-btn{
+    flex:1; padding:15px 8px; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:11px; color:var(--text-2); cursor:pointer; text-align:center;
+    transition:border-color .18s, background .18s, color .18s, transform .12s;
+  }
+  .gender-btn:hover{ border-color:var(--grey-3); color:var(--text-1); transform:translateY(-1px); }
+  .gender-btn .g-icon{ display:block; font-size:21px; margin-bottom:5px; transition:transform .18s; }
+  .gender-btn.selected{ border-color:var(--grey-3); background:var(--grey-1); color:var(--text-0); }
+  .gender-btn.selected .g-icon{ transform:scale(1.15); }
+
+  .submit-btn{
+    position:relative; width:100%; margin-top:24px; padding:13px;
+    background:var(--grey-2); border:1px solid var(--border); border-radius:9px;
+    color:var(--text-0); font-size:15px; font-weight:600; cursor:pointer; overflow:hidden;
+    transition:background .18s, border-color .18s, transform .08s;
+  }
+  .submit-btn:hover{ background:var(--grey-3); border-color:var(--grey-3); }
+  .submit-btn:active{ transform:scale(0.98); }
+  .submit-btn::after{
+    content:""; position:absolute; top:0; left:-60%; width:40%; height:100%;
+    background:linear-gradient(120deg, transparent, rgba(255,255,255,0.08), transparent);
+    transform:skewX(-20deg);
+  }
+  .submit-btn.loading::after{ animation:shimmer 1s linear infinite; }
+
+  .msg{ margin-top:14px; font-size:13px; padding:10px 12px; border-radius:9px; display:none; align-items:center; gap:8px; }
+  .msg.show{ display:flex; animation:popIn .25s ease both; }
+  .msg.error{ background:rgba(229,72,77,0.1); color:#ff9a9d; border:1px solid rgba(229,72,77,0.35); }
+  .msg.success{ background:rgba(255,255,255,0.05); color:var(--text-0); border:1px solid var(--border); }
+  .msg-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; animation:pulseDot 1.2s ease-in-out infinite; }
+
+  /* ---------- Dashboard ---------- */
+  .dash{ min-height:100vh; display:flex; animation:fadeIn .4s ease both; }
+  .sidebar{
+    width:220px; flex-shrink:0; background:var(--bg-1); border-right:1px solid var(--border-soft);
+    padding:22px 16px; display:flex; flex-direction:column; animation:fadeUp .45s ease both;
+  }
+  .sb-brand{ display:flex; align-items:center; gap:10px; padding:0 6px 22px; font-weight:700; letter-spacing:0.4px; font-size:15px; }
+  .sb-cube{
+    width:20px; height:20px; background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
+    border:1px solid var(--border); border-radius:5px; transform:rotate(45deg);
+  }
+  .sb-section-label{ font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-3); margin:14px 8px 8px; }
+  .sb-item{
+    display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:9px;
+    color:var(--text-1); font-size:13.5px; cursor:pointer; margin-bottom:3px;
+    transition:background .15s, color .15s, padding-left .15s;
+  }
+  .sb-item:hover{ background:var(--grey-1); color:var(--text-0); padding-left:15px; }
+  .sb-item.active{ background:var(--grey-2); color:var(--text-0); }
+  .sb-icon{ width:18px; text-align:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .sb-icon svg{ width:16px; height:16px; }
+  .sb-badge{
+    margin-left:auto; background:var(--danger); color:#fff; font-size:10.5px; font-weight:700;
+    min-width:17px; height:17px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    padding:0 5px; flex-shrink:0;
+  }
+  .sb-spacer{ flex:1; }
+
+  /* ---------- Notification bell ---------- */
+  .notif-bell-btn{
+    position:fixed; top:22px; right:30px; z-index:850;
+    width:38px; height:38px; border-radius:50%; background:var(--bg-2); border:1px solid var(--border-soft);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-1);
+    transition:background .15s, color .15s, border-color .15s; box-shadow:0 4px 14px rgba(0,0,0,0.35);
+  }
+  .notif-bell-btn:hover{ background:var(--grey-1); color:var(--text-0); border-color:var(--grey-3); }
+  .notif-bell-btn svg{ width:18px; height:18px; }
+  .notif-bell-dot{
+    position:absolute; top:6px; right:7px; width:9px; height:9px; border-radius:50%;
+    background:var(--danger); border:2px solid var(--bg-0);
+  }
+  .notif-panel-overlay{
+    position:fixed; inset:0; background:rgba(6,6,7,0.35); z-index:900;
+  }
+  .notif-panel{
+    position:fixed; top:0; right:0; height:100vh; width:340px; max-width:88vw;
+    background:var(--bg-2); border-left:1px solid var(--border-soft); z-index:901;
+    display:flex; flex-direction:column; box-shadow:-14px 0 40px rgba(0,0,0,0.5);
+    animation:panelSlideIn .22s ease both;
+  }
+  @keyframes panelSlideIn{ from{ transform:translateX(100%);} to{ transform:translateX(0);} }
+  .notif-panel-head{
+    display:flex; align-items:center; justify-content:space-between; padding:18px 18px 14px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .notif-panel-head h3{ margin:0; font-size:15px; color:var(--text-0); }
+  .notif-panel-list{ overflow-y:auto; flex:1; padding:6px 10px; }
+  .notif-row{
+    display:flex; align-items:center; gap:11px; padding:12px 8px; border-radius:10px;
+    cursor:pointer; transition:background .15s;
+  }
+  .notif-row:hover{ background:var(--grey-1); }
+  .notif-row .friend-avatar{ width:34px; height:34px; font-size:13px; }
+  .notif-row .n-text{ flex:1; min-width:0; font-size:12.5px; color:var(--text-1); }
+  .notif-row .n-text b{ color:var(--text-0); }
+  .notif-row .friend-actions{ flex-shrink:0; }
+  .notif-panel-empty{ text-align:center; color:var(--text-3); font-size:12.5px; padding:40px 14px; }
+  .sb-user{
+    display:flex; align-items:center; gap:10px; padding:10px; border-radius:10px;
+    border:1px solid var(--border-soft); background:var(--bg-2); margin-bottom:8px;
+  }
+  .logout-btn{
+    width:100%; background:var(--bg-2); border:1px solid var(--border); color:var(--text-2);
+    padding:9px 0; border-radius:8px; font-size:12.5px; cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .logout-btn:hover{ color:var(--text-0); border-color:var(--grey-3); background:var(--grey-1); }
+
+  .main{ flex:1; padding:30px 36px 40px; max-width:1100px; }
+  .main-header{ margin-bottom:26px; animation:fadeUp .5s ease .05s both; }
+  .main-header h2{ margin:0 0 4px; font-size:24px; color:var(--text-0); }
+  .main-header p{ margin:0; font-size:13px; color:var(--text-2); }
+
+  .empty-state{
+    border:1px dashed var(--border); border-radius:14px; padding:60px 20px; text-align:center;
+    color:var(--text-2); animation:fadeUp .5s ease .1s both;
+  }
+  .empty-state .e-title{ font-size:15px; color:var(--text-1); margin-bottom:4px; }
+  .empty-state .e-sub{ font-size:12.5px; color:var(--text-3); }
+
+  /* ---------- Game grid / card ---------- */
+  .game-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:18px;
+    animation:fadeUp .5s ease .1s both;
+  }
+  .game-card{
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:14px; overflow:hidden;
+    cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s;
+  }
+  .game-card:hover{ transform:translateY(-3px); border-color:var(--grey-3); box-shadow:0 10px 30px rgba(0,0,0,0.4); }
+  .game-card-thumb{ aspect-ratio:5/3; background:var(--bg-1); }
+  .game-card-thumb svg{ width:100%; height:100%; display:block; }
+  .game-card-info{ padding:12px 14px 14px; }
+  .game-card-title{ font-size:14px; font-weight:700; color:var(--text-0); }
+  .game-card-sub{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
+
+  /* ---------- Game screen (3D) ---------- */
+  .game-screen{
+    position:fixed; inset:0; background:#0a0a0b; z-index:2000;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #gameCanvas{
+    position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none;
+    -webkit-user-drag:none; user-select:none; -webkit-user-select:none;
+  }
+  .game-loading{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; background:#0a0a0b; z-index:50; transition:opacity .25s ease;
+  }
+  .game-loading.fade-out{ opacity:0; pointer-events:none; }
+  .game-loading .gl-cube{
+    width:46px; height:46px; border-radius:11px; background:linear-gradient(135deg,#48484e,#2a2a2e);
+    border:1px solid #333338; transform:rotate(45deg); animation:floatCube 1.1s ease-in-out infinite;
+  }
+  .game-loading p{ color:#b4b4b9; font-size:13.5px; letter-spacing:0.4px; }
+  .game-loading .gl-bar{ width:200px; height:4px; border-radius:3px; background:#242428; overflow:hidden; }
+  .game-loading .gl-bar-fill{
+    height:100%; width:0%; background:#f2f2f2; border-radius:3px; transition:width .25s ease;
+  }
+  .game-topbar{
+    position:absolute; top:16px; left:16px; z-index:20; display:flex; align-items:center; gap:9px;
+    background:rgba(20,20,22,0.55); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(6px);
+    padding:8px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s;
+    width:38px; height:38px; box-sizing:border-box;
+  }
+  .game-topbar:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+  .game-topbar .gt-cube{
+    width:20px; height:20px; border-radius:6px; background:linear-gradient(135deg,#48484e,#2a2a2e);
+    border:1px solid #333338; transform:rotate(45deg); flex-shrink:0;
+  }
+
+  /* ---------- In-game chat ---------- */
+  .game-chat-btn{
+    position:absolute; top:16px; left:64px; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,20,22,0.55); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(6px);
+    width:38px; height:38px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s; color:#e4e4e6;
+  }
+  .game-chat-btn:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+  .game-chat-btn svg{ width:17px; height:17px; }
+  .game-chat-panel{
+    position:absolute; top:64px; left:16px; z-index:25; width:270px; max-width:75vw;
+    background:rgba(16,16,18,0.86); border:1px solid rgba(255,255,255,0.08); border-radius:14px;
+    backdrop-filter:blur(6px); display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 14px 34px rgba(0,0,0,0.4); animation:modalIn .18s ease both;
+  }
+  .game-chat-log-wrap{ position:relative; }
+  .game-chat-log{
+    height:230px; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:5px;
+    scroll-behavior:smooth;
+  }
+  .game-chat-log .cm{ font-size:12.5px; line-height:1.4; color:#d4d4d8; word-break:break-word; }
+  .game-chat-log .cm b{ color:#f2f2f2; }
+  .game-chat-newmsg{
+    position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+    background:#f2f2f2; color:#0a0a0b; font-size:11.5px; font-weight:700;
+    padding:6px 12px; border-radius:20px; cursor:pointer; display:flex; align-items:center; gap:5px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.4); animation:fadeIn .15s ease both;
+  }
+  .game-chat-newmsg svg{ width:12px; height:12px; }
+  .game-chat-input-row{ display:flex; gap:6px; padding:10px; border-top:1px solid rgba(255,255,255,0.07); }
+  .game-chat-input-row input{
+    flex:1; background:#1c1c1f; border:1px solid #2c2c30; border-radius:8px; color:#f2f2f2;
+    font-size:13px; padding:9px 11px; outline:none; font-family:inherit; min-width:0;
+  }
+  .game-chat-input-row input:focus{ border-color:#48484e; }
+  .game-chat-input-row button{
+    background:#f2f2f2; color:#0a0a0b; border:none; border-radius:8px; padding:0 14px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .game-chat-input-row button:hover{ background:#dcdcdc; }
+
+  /* Speech bubble above a player's head */
+  .chat-bubble-canvas{ pointer-events:none; }
+
+  /* ---------- In-game menu tabs ---------- */
+  .game-tab-overlay{
+    position:absolute; inset:0; z-index:120; background:rgba(6,6,7,0.55); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; animation:fadeIn .18s ease both;
+  }
+  .game-tab{
+    width:560px; max-width:92vw; max-height:88vh; overflow-y:auto;
+    background:#151517; border:1px solid #2c2c30; border-radius:16px;
+    box-shadow:0 24px 70px rgba(0,0,0,0.55); animation:modalIn .2s ease both;
+  }
+  .game-tab-head{
+    display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid #242428;
+  }
+  .game-tab-head .gt-cube-sm{
+    width:18px; height:18px; border-radius:5px; background:linear-gradient(135deg,#48484e,#2a2a2e);
+    border:1px solid #333338; transform:rotate(45deg); flex-shrink:0;
+  }
+  .game-tab-head h3{ margin:0; font-size:14.5px; color:#f2f2f2; flex:1; }
+  .game-tab-back{
+    width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:#232326; color:#b4b4b9; cursor:pointer; font-size:14px; transition:background .15s, color .15s;
+  }
+  .game-tab-back:hover{ background:#2e2e32; color:#f2f2f2; }
+  .game-tab-body{ padding:14px 16px 18px; }
+
+  .game-tab-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:14px 16px; }
+  .game-tab-grid + .game-tab-grid{ padding-top:0; }
+  .game-tab-btn{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
+    background:#1d1d20; border:1px solid #2a2a2e; border-radius:12px; padding:14px 6px;
+    color:#e4e4e6; font-size:11.5px; font-weight:600; letter-spacing:0.2px; cursor:pointer;
+    transition:background .15s, border-color .15s, transform .1s;
+  }
+  .game-tab-btn:hover{ background:#26262a; border-color:#3a3a40; }
+  .game-tab-btn:active{ transform:scale(0.96); }
+  .game-tab-btn svg{ width:19px; height:19px; }
+  .game-tab-btn.danger{ color:#ff9a9d; }
+  .game-tab-btn.danger:hover{ background:rgba(229,72,77,0.1); border-color:rgba(229,72,77,0.35); }
+
+  .game-player-row{
+    display:flex; align-items:center; gap:11px; padding:10px 8px; border-radius:10px; cursor:pointer;
+    transition:background .15s;
+  }
+  .game-player-row:hover{ background:#202023; }
+  .game-player-row .gp-avatar{
+    width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#4a5fd6,#2a2a2e);
+    flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff;
+  }
+  .game-player-row .gp-name{ font-size:13.5px; color:#f2f2f2; font-weight:600; }
+  .game-player-row .gp-tag{ font-size:11px; color:#7a7a80; margin-top:1px; }
+  .game-player-row.self{ cursor:default; }
+  .game-player-row.self:hover{ background:transparent; }
+  .game-empty-state{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:8px; padding:34px 16px; color:#7a7a80; font-size:12.5px;
+  }
+  .game-empty-state strong{ color:#b4b4b9; font-size:13.5px; font-weight:600; }
+
+  .game-settings-row{ padding:12px 4px; }
+  .game-settings-row label{ display:flex; justify-content:space-between; font-size:12.5px; color:#b4b4b9; margin-bottom:8px; }
+  .game-settings-row input[type="range"]{
+    width:100%; accent-color:#8a8a90; cursor:pointer;
+  }
+
+  .game-report-user{
+    display:flex; align-items:center; gap:12px; padding:10px 4px 16px; border-bottom:1px solid #242428; margin-bottom:14px;
+  }
+  .game-report-user .gp-avatar{
+    width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg,#4a5fd6,#2a2a2e);
+    display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:#fff;
+  }
+  .game-report-user .gp-name{ font-size:14.5px; color:#f2f2f2; font-weight:700; }
+  .game-report-textarea{
+    width:100%; min-height:100px; resize:vertical; background:#1a1a1d; border:1px solid #2a2a2e;
+    border-radius:10px; color:#f2f2f2; font-size:13px; padding:10px 12px; outline:none; font-family:inherit;
+  }
+  .game-report-textarea:focus{ border-color:#48484e; }
+
+  /* ---------- Character preview (View tab -> click a player) ---------- */
+  .char-preview-overlay{
+    position:absolute; inset:0; z-index:130; background:rgba(6,6,7,0.65); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; animation:fadeIn .18s ease both;
+  }
+  .char-preview-card{
+    width:300px; max-width:90vw; background:#151517; border:1px solid #2c2c30; border-radius:16px;
+    box-shadow:0 24px 70px rgba(0,0,0,0.55); animation:modalIn .2s ease both; overflow:hidden;
+  }
+  .char-preview-canvas-wrap{ width:100%; height:230px; background:radial-gradient(circle at 50% 30%,#26262b,#101012); position:relative; }
+  .char-preview-canvas-wrap canvas{ width:100%; height:100%; display:block; }
+  .char-preview-close{
+    position:absolute; top:10px; right:10px; width:26px; height:26px; border-radius:50%;
+    background:rgba(20,20,22,0.75); color:#b4b4b9; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:14px; border:1px solid #333338;
+  }
+  .char-preview-close:hover{ background:rgba(30,30,33,0.9); color:#f2f2f2; }
+  .char-preview-info{ padding:16px 18px 18px; text-align:center; }
+  .char-preview-name{ font-size:16px; font-weight:700; color:#f2f2f2; margin-bottom:2px; }
+  .char-preview-tag{ font-size:11.5px; color:#7a7a80; margin-bottom:14px; }
+  .char-preview-action{
+    width:100%; padding:10px 0; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer;
+    background:#f2f2f2; color:#0a0a0b; border:1px solid #f2f2f2; transition:background .15s, opacity .15s;
+  }
+  .char-preview-action:hover{ background:#dcdcdc; }
+  .char-preview-action.disabled{ background:#232326; color:#7a7a80; border-color:#2a2a2e; cursor:default; pointer-events:none; }
+
+  /* ---------- In-game friend request toasts (bottom-right) ---------- */
+  .ingame-toast-stack{
+    position:fixed; right:16px; bottom:16px; z-index:3000; display:flex; flex-direction:column-reverse; gap:10px;
+    max-width:300px; pointer-events:none;
+  }
+  .ingame-toast{
+    pointer-events:auto; display:flex; align-items:center; gap:11px; padding:12px 13px;
+    background:#151517; border:1px solid #2c2c30; border-radius:13px; box-shadow:0 14px 34px rgba(0,0,0,0.5);
+    animation:toastIn .22s ease both;
+  }
+  @keyframes toastIn{ from{opacity:0; transform:translateX(24px);} to{opacity:1; transform:translateX(0);} }
+  @keyframes toastOut{ from{opacity:1; transform:translateX(0);} to{opacity:0; transform:translateX(24px);} }
+  .ingame-toast.out{ animation:toastOut .18s ease both; }
+  .ingame-toast .friend-avatar{ width:36px; height:36px; flex-shrink:0; font-size:14px; }
+  .ingame-toast .it-body{ flex:1; min-width:0; }
+  .ingame-toast .it-text{ font-size:12.5px; color:#b4b4b9; line-height:1.35; }
+  .ingame-toast .it-text b{ color:#f2f2f2; }
+  .ingame-toast .it-actions{ display:flex; gap:7px; margin-top:8px; }
+  .ingame-toast .it-btn{
+    flex:1; padding:6px 0; border-radius:7px; font-size:11.5px; font-weight:600; cursor:pointer; text-align:center;
+    background:#232326; color:#e4e4e6; border:1px solid #2c2c30; transition:background .15s;
+  }
+  .ingame-toast .it-btn:hover{ background:#2c2c30; }
+  .ingame-toast .it-btn.primary{ background:#f2f2f2; color:#0a0a0b; border-color:#f2f2f2; }
+  .ingame-toast .it-btn.primary:hover{ background:#dcdcdc; }
+
+  .game-report-submit{
+    width:100%; margin-top:12px; padding:11px; background:#e5484d; border:none; border-radius:9px;
+    color:#fff; font-size:13.5px; font-weight:700; cursor:pointer; transition:background .15s;
+  }
+  .game-report-submit:hover{ background:#c93f44; }
+  .game-report-note{ font-size:11.5px; color:#7a7a80; margin-top:8px; text-align:center; }
+
+  /* mobile controls */
+  .game-joystick{
+    position:absolute; left:26px; bottom:26px; width:120px; height:120px; border-radius:50%;
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); z-index:20;
+    touch-action:none; display:none;
+  }
+  .game-joystick .gj-nub{
+    position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px;
+    border-radius:50%; background:rgba(255,255,255,0.22); border:1px solid rgba(255,255,255,0.3);
+  }
+  .game-jump-btn{
+    position:absolute; right:30px; bottom:34px; width:74px; height:74px; border-radius:50%;
+    background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.22); z-index:20;
+    display:none; align-items:center; justify-content:center; color:#f2f2f2; touch-action:none;
+  }
+  .game-jump-btn svg{ width:26px; height:26px; }
+  @media (pointer:coarse){
+    .game-joystick, .game-jump-btn{ display:flex; }
+  }
+
+  .back-link{
+    display:inline-flex; align-items:center; gap:6px; color:var(--text-2); font-size:13px;
+    cursor:pointer; margin-bottom:16px; transition:color .15s;
+  }
+  .back-link:hover{ color:var(--text-0); }
+
+  /* ---------- Settings hub (3 buttons) ---------- */
+  .settings-hub{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px;
+  }
+  .settings-tile{
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:14px;
+    padding:22px; cursor:pointer; text-align:left;
+    transition:border-color .18s, transform .15s, background .18s;
+    animation:fadeUp .5s ease both;
+  }
+  .settings-tile:hover{ border-color:var(--grey-3); transform:translateY(-3px); background:var(--bg-3); }
+  .settings-tile .t-icon{
+    width:38px; height:38px; border-radius:10px; background:var(--grey-1);
+    display:flex; align-items:center; justify-content:center; margin-bottom:14px;
+    border:1px solid var(--border);
+  }
+  .settings-tile .t-icon svg{ width:19px; height:19px; }
+  .settings-tile .t-title{ font-size:14.5px; font-weight:600; color:var(--text-0); margin-bottom:4px; }
+  .settings-tile .t-sub{ font-size:12px; color:var(--text-2); }
+  .settings-tile.danger:hover{ border-color:rgba(229,72,77,0.5); }
+
+  /* ---------- Settings sub-blocks ---------- */
+  .settings-block{
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:14px;
+    padding:22px 24px; margin-bottom:18px; animation:fadeUp .45s ease both;
+  }
+  .settings-block h3{ margin:0 0 4px; font-size:15px; color:var(--text-0); }
+  .settings-block .s-desc{ margin:0 0 16px; font-size:12.5px; color:var(--text-2); }
+
+  .theme-row{ display:flex; gap:14px; flex-wrap:wrap; }
+  .theme-card{
+    width:150px; border:1px solid var(--border); border-radius:12px; padding:10px;
+    cursor:pointer; transition:border-color .15s, transform .15s;
+  }
+  .theme-card:hover{ transform:translateY(-2px); }
+  .theme-card.selected{ border-color:var(--text-0); }
+  .theme-preview{
+    height:60px; border-radius:8px; margin-bottom:8px; display:flex; overflow:hidden; border:1px solid var(--border-soft);
+  }
+  .theme-preview span{ flex:1; }
+  .theme-card .t-name{ font-size:12.5px; color:var(--text-1); display:flex; align-items:center; justify-content:space-between; }
+  .theme-card.selected .t-name{ color:var(--text-0); }
+
+  .lang-open-btn{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:13px 15px; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:10px; color:var(--text-0); cursor:pointer; font-size:13.5px;
+    transition:border-color .15s, background .15s;
+  }
+  .lang-open-btn:hover{ border-color:var(--grey-3); background:var(--grey-1); }
+  .lang-open-btn .cur-lang{ display:flex; align-items:center; gap:8px; color:var(--text-1); font-size:12.5px; }
+
+  /* ---------- Devices / sessions ---------- */
+  .device-row{
+    display:flex; align-items:center; gap:14px; padding:14px 4px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .device-row:last-child{ border-bottom:none; }
+  .device-icon{
+    width:36px; height:36px; border-radius:9px; background:var(--grey-1);
+    border:1px solid var(--border); display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .device-icon svg{ width:17px; height:17px; }
+  .device-info{ flex:1; min-width:0; }
+  .device-info .d-name{ font-size:13.5px; color:var(--text-0); font-weight:600; }
+  .device-info .d-meta{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
+  .device-current{
+    font-size:10.5px; padding:3px 8px; border-radius:6px; background:var(--grey-1);
+    color:var(--text-1); border:1px solid var(--border); flex-shrink:0;
+  }
+
+  /* ---------- Friends page ---------- */
+  .friend-search-wrap{ position:relative; margin-bottom:22px; }
+  .friend-search-wrap svg{
+    position:absolute; left:14px; top:50%; transform:translateY(-50%);
+    width:16px; height:16px; color:var(--text-2); pointer-events:none;
+  }
+  .friend-search-input{
+    width:100%; padding:13px 14px 13px 42px !important; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:11px; color:var(--text-0); font-size:14px; outline:none;
+    transition:border-color .18s, background .18s, box-shadow .18s;
+  }
+  .friend-search-input::placeholder{ color:var(--text-3); }
+  .friend-search-input:focus{ border-color:var(--grey-3); background:var(--bg-2); box-shadow:0 0 0 3px rgba(255,255,255,0.05); }
+  .friend-section{ margin-bottom:28px; }
+  .friend-section h3{
+    margin:0 0 4px; font-size:14px; color:var(--text-0); display:flex; align-items:center; gap:8px;
+  }
+  .friend-section .fs-count{
+    font-size:11px; color:var(--text-2); background:var(--grey-1); border:1px solid var(--border-soft);
+    border-radius:20px; padding:1px 8px;
+  }
+  .friend-row{
+    display:flex; align-items:center; gap:12px; padding:12px 4px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .friend-row:last-child{ border-bottom:none; }
+  .friend-avatar{
+    width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
+    border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:14px; color:var(--text-0); flex-shrink:0;
+  }
+  .friend-info{ flex:1; min-width:0; }
+  .friend-info .f-name{ font-size:13.5px; color:var(--text-0); font-weight:600; }
+  .friend-info .f-sub{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
+  .friend-actions{ display:flex; gap:8px; flex-shrink:0; }
+  .friend-btn{
+    padding:7px 13px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;
+    border:1px solid var(--border); background:var(--grey-1); color:var(--text-0);
+    transition:background .15s, border-color .15s;
+    white-space:nowrap;
+  }
+  .friend-btn:hover{ background:var(--grey-2); }
+  .friend-btn.primary{ background:var(--text-0); color:var(--bg-0); border-color:var(--text-0); }
+  .friend-btn.primary:hover{ background:var(--text-1); }
+  .friend-btn.danger{ color:var(--danger); }
+  .friend-btn.disabled{ opacity:0.55; cursor:default; pointer-events:none; }
+  .friend-empty{ text-align:center; color:var(--text-3); font-size:12.5px; padding:22px 10px; }
+
+  /* ---------- Language modal ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(6,6,7,0.7); z-index:900;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    animation:fadeIn .18s ease both;
+  }
+  .lang-modal{
+    width:100%; max-width:380px; max-height:78vh; display:flex; flex-direction:column;
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:16px;
+    box-shadow:0 24px 70px rgba(0,0,0,0.6); animation:modalIn .22s cubic-bezier(.2,.9,.3,1.1) both;
+    overflow:hidden;
+  }
+  .lang-modal-head{ padding:18px 18px 12px; border-bottom:1px solid var(--border-soft); }
+  .lang-modal-head h3{ margin:0 0 12px; font-size:15px; color:var(--text-0); }
+  .lang-search{
+    width:100%; padding:10px 12px; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:13.5px; outline:none;
+    transition:border-color .18s;
+  }
+  .lang-search::placeholder{ color:var(--text-3); }
+  .lang-search:focus{ border-color:var(--grey-3); }
+  .lang-modal-list{ overflow-y:auto; padding:8px; flex:1; }
+  .lang-modal-item{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:11px 12px; border-radius:9px; cursor:pointer; color:var(--text-1); font-size:13.5px;
+    transition:background .15s, color .15s;
+  }
+  .lang-modal-item:hover{ background:var(--grey-1); color:var(--text-0); }
+  .lang-modal-item.selected{ background:var(--grey-2); color:var(--text-0); }
+  .lang-modal-item .li-native{ font-size:11.5px; color:var(--text-2); }
+  .lang-modal-empty{ text-align:center; color:var(--text-3); font-size:12.5px; padding:30px 10px; }
+  .modal-close{
+    background:none; border:none; color:var(--text-2); font-size:18px; cursor:pointer;
+    line-height:1; padding:4px; float:right; margin-top:-4px;
+  }
+  .modal-close:hover{ color:var(--text-0); }
+
+  /* ---------- Language loading overlay ---------- */
+  .lang-overlay{
+    position:fixed; inset:0; background:rgba(8,8,9,0.9);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    z-index:999; animation:fadeIn .2s ease both;
+  }
+  .lang-spinner{
+    width:34px; height:34px; border-radius:50%; border:3px solid var(--grey-1);
+    border-top-color:var(--text-1); animation:spin .7s linear infinite; margin-bottom:16px;
+  }
+  .lang-overlay p{ font-size:14px; color:var(--text-1); letter-spacing:0.3px; }
+
+  @media (max-width: 700px){
+    .sidebar{ width:72px; padding:18px 8px; }
+    .sidebar .sb-label-text, .sb-brand span, .sb-user .su-text{ display:none; }
+    .main{ padding:22px 16px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= AUTH SCREEN ================= -->
+<div class="center-screen" id="authScreenWrap">
+<div class="auth-wrap" id="authScreen">
+  <div class="logo">
+    <div class="cube"></div>
+    <h1>BlockVerse</h1>
+    <p data-i18n="tagline">build. play. imagine.</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab-slider" id="tabSlider"></div>
+    <button class="tab-btn active" id="tabLogin" data-i18n="login">Log in</button>
+    <button class="tab-btn" id="tabSignup" data-i18n="signup">Sign up</button>
+  </div>
+
+  <form id="loginForm">
+    <div class="field">
+      <label for="loginUsername" data-i18n="username">Username</label>
+      <input type="text" id="loginUsername" autocomplete="username" data-i18n-ph="usernamePh" placeholder="Enter your username">
+    </div>
+    <div class="field">
+      <label for="loginPassword" data-i18n="password">Password</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" data-i18n-ph="passwordPh" placeholder="Enter your password">
+    </div>
+    <button type="submit" class="submit-btn" id="loginSubmitBtn" data-i18n="login">Log in</button>
+    <div class="msg" id="loginMsg"></div>
+  </form>
+
+  <form id="signupForm" class="hidden">
+    <div class="field">
+      <label for="suUsername" data-i18n="username">Username</label>
+      <input type="text" id="suUsername" autocomplete="username" data-i18n-ph="usernameChoosePh" placeholder="Choose a username">
+    </div>
+    <div class="field">
+      <label for="suPassword" data-i18n="password">Password</label>
+      <input type="password" id="suPassword" autocomplete="new-password" data-i18n-ph="passwordChoosePh" placeholder="Choose a password">
+    </div>
+    <div class="field">
+      <label for="suConfirm" data-i18n="confirmPassword">Confirm password</label>
+      <input type="password" id="suConfirm" autocomplete="new-password" data-i18n-ph="confirmPh" placeholder="Re-enter your password">
+    </div>
+
+    <label data-i18n="gender">Gender</label>
+    <div class="gender-options">
+      <div class="gender-btn" id="genderMale" data-gender="male">
+        <span class="g-icon">&#9794;</span>
+        <span data-i18n="male">Male</span>
+      </div>
+      <div class="gender-btn" id="genderFemale" data-gender="female">
+        <span class="g-icon">&#9792;</span>
+        <span data-i18n="female">Female</span>
+      </div>
+    </div>
+
+    <button type="submit" class="submit-btn" id="signupSubmitBtn" data-i18n="createAccount">Create account</button>
+    <div class="msg" id="signupMsg"></div>
+  </form>
+</div>
+</div>
+
+<!-- ================= DASHBOARD SCREEN ================= -->
+<div class="dash hidden" id="dashScreen">
+  <div class="sidebar">
+    <div class="sb-brand"><div class="sb-cube"></div><span>BlockVerse</span></div>
+
+    <div class="sb-user">
+      <div id="hubAvatar" style="width:32px;height:32px;border-radius:50%;background:var(--grey-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:1px solid var(--border);">?</div>
+      <div class="su-text" style="overflow:hidden;">
+        <div id="hubUsername" style="font-size:13px;font-weight:600;color:var(--text-0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        <div style="font-size:11px;color:var(--text-2);" data-i18n="online">Online</div>
+      </div>
+    </div>
+
+    <div class="sb-section-label" data-i18n="menu">Menu</div>
+    <div class="sb-item active" data-page="home">
+      <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></span>
+      <span class="sb-label-text" data-i18n="home">Home</span>
+    </div>
+    <div class="sb-item" data-page="friends">
+      <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><path d="M16 4.2c1.7.4 3 2 3 3.8s-1.3 3.4-3 3.8"/><path d="M22 20c0-2.6-1.8-4.8-4.5-5.6"/></svg></span>
+      <span class="sb-label-text" data-i18n="friends">Friends</span>
+      <span class="sb-badge hidden" id="friendReqBadge">0</span>
+    </div>
+    <div class="sb-item" data-page="settings">
+      <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></span>
+      <span class="sb-label-text" data-i18n="settings">Settings</span>
+    </div>
+
+    <div class="sb-spacer"></div>
+    <button class="logout-btn" id="logoutBtn" data-i18n="logout">Log out</button>
+  </div>
+
+  <button class="notif-bell-btn" id="notifBellBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+    <span class="notif-bell-dot hidden" id="notifBellDot"></span>
+  </button>
+  <div id="notifPanelRoot"></div>
+
+  <div class="main">
+
+    <!-- HOME PAGE -->
+    <div id="pageHome">
+      <div class="main-header">
+        <h2><span data-i18n="welcomeBack">Welcome back</span><span id="welcomeName"></span></h2>
+        <p data-i18n="homeSub">Here's what's happening in your BlockVerse.</p>
+      </div>
+      <div class="game-grid">
+        <div class="game-card" id="playBaseplateBtn">
+          <div class="game-card-thumb">
+            <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="100" height="60" fill="#173b1f"/>
+              <polygon points="0,60 50,28 100,60" fill="#1f6e33"/>
+              <circle cx="50" cy="20" r="7" fill="#e8e0c8"/>
+              <rect x="44" y="27" width="12" height="14" rx="2" fill="#4a5fd6"/>
+            </svg>
+          </div>
+          <div class="game-card-info">
+            <div class="game-card-title" data-i18n="baseplateTitle">Baseplate</div>
+            <div class="game-card-sub" data-i18n="baseplateSub">Run, jump and look around.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS HUB (3 buttons) -->
+    <div id="pageSettingsHub" class="hidden">
+      <div class="main-header">
+        <h2 data-i18n="settings">Settings</h2>
+        <p data-i18n="settingsSub">Manage your account, security, and session.</p>
+      </div>
+      <div class="settings-hub">
+        <div class="settings-tile" id="openSecurity">
+          <div class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z"/></svg></div>
+          <div class="t-title" data-i18n="security">Security</div>
+          <div class="t-sub" data-i18n="securitySub">Devices and sign-in activity</div>
+        </div>
+        <div class="settings-tile" id="openAccount">
+          <div class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></div>
+          <div class="t-title" data-i18n="account">Account</div>
+          <div class="t-sub" data-i18n="accountSub">Appearance and language</div>
+        </div>
+        <div class="settings-tile danger" id="openLogoutTile">
+          <div class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></div>
+          <div class="t-title" data-i18n="logout">Log out</div>
+          <div class="t-sub" data-i18n="logoutSub">End your current session</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECURITY PAGE -->
+    <div id="pageSecurity" class="hidden">
+      <div class="back-link" data-back="settingsHub">&#8592; <span data-i18n="backToSettings">Back to settings</span></div>
+      <div class="main-header">
+        <h2 data-i18n="security">Security</h2>
+        <p data-i18n="securityPageSub">Devices that are currently signed in to your account.</p>
+      </div>
+      <div class="settings-block">
+        <h3 data-i18n="activeSessions">Active sessions</h3>
+        <p class="s-desc" data-i18n="activeSessionsDesc">If you see a device you don't recognize, sign out and change your password.</p>
+        <div id="deviceList"></div>
+      </div>
+    </div>
+
+    <!-- ACCOUNT PAGE -->
+    <div id="pageAccount" class="hidden">
+      <div class="back-link" data-back="settingsHub">&#8592; <span data-i18n="backToSettings">Back to settings</span></div>
+      <div class="main-header">
+        <h2 data-i18n="account">Account</h2>
+        <p data-i18n="accountPageSub">Customize how BlockVerse looks and speaks to you.</p>
+      </div>
+
+      <div class="settings-block">
+        <h3 data-i18n="bgColorTitle">Background color</h3>
+        <p class="s-desc" data-i18n="bgColorDesc">Choose the theme for the whole app.</p>
+        <div class="theme-row" id="themeRow"></div>
+      </div>
+
+      <div class="settings-block">
+        <h3 data-i18n="langTitle">Language</h3>
+        <p class="s-desc" data-i18n="langDesc">Choose the language for the whole platform.</p>
+        <div class="lang-open-btn" id="openLangModal">
+          <span data-i18n="changeLanguage">Change language</span>
+          <span class="cur-lang" id="curLangLabel"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FRIENDS PAGE -->
+    <div id="pageFriends" class="hidden">
+      <div class="main-header">
+        <h2 data-i18n="friends">Friends</h2>
+        <p data-i18n="friendsPageSub">Search for people and manage your requests.</p>
+      </div>
+
+      <div class="friend-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" class="friend-search-input" id="friendSearchInput" data-i18n-ph="searchUsernamePh" placeholder="Search by username...">
+      </div>
+
+      <div id="friendSearchResults"></div>
+
+      <div class="friend-section" id="friendRequestsSection">
+        <h3><span data-i18n="friendRequests">Friend requests</span><span class="fs-count" id="friendReqCount">0</span></h3>
+        <div id="friendRequestsList"></div>
+      </div>
+
+      <div class="friend-section" id="friendSuggestSection">
+        <h3><span data-i18n="peopleYouMayKnow">People you may know</span></h3>
+        <div id="friendSuggestList"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- GAME SCREEN (3D Baseplate) -->
+<div class="game-screen hidden" id="gameScreen">
+  <canvas id="gameCanvas"></canvas>
+
+  <div class="game-loading" id="gameLoading">
+    <div class="gl-cube"></div>
+    <p id="gameLoadingText" data-i18n="loadingGame">Loading Baseplate...</p>
+    <div class="gl-bar"><div class="gl-bar-fill" id="gameLoadBar"></div></div>
+  </div>
+
+  <div class="game-topbar" id="gameMenuBtn">
+    <div class="gt-cube"></div>
+  </div>
+
+  <div class="game-chat-btn" id="gameChatBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+  </div>
+  <div class="game-chat-panel hidden" id="gameChatPanel">
+    <div class="game-chat-log-wrap">
+      <div class="game-chat-log" id="gameChatLog"></div>
+      <div class="game-chat-newmsg hidden" id="gameChatNewMsgPill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 9l7 7 7-7"/></svg>
+        New messages
+      </div>
+    </div>
+    <div class="game-chat-input-row">
+      <input type="text" id="gameChatInput" maxlength="140" placeholder="Message...">
+      <button id="gameChatSendBtn">Send</button>
+    </div>
+  </div>
+
+  <!-- Main in-game menu -->
+  <div class="game-tab-overlay hidden" id="gameMenuOverlay">
+
+    <div class="game-tab" id="tabMain">
+      <div class="game-tab-head"><div class="gt-cube-sm"></div><h3>Menu</h3></div>
+      <div class="game-tab-grid">
+        <button class="game-tab-btn" id="btnView">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          View
+        </button>
+        <button class="game-tab-btn" id="btnSettings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 005 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Settings
+        </button>
+        <button class="game-tab-btn danger" id="btnReport">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          Report
+        </button>
+      </div>
+      <div class="game-tab-grid">
+        <button class="game-tab-btn" id="btnResume">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Resume
+        </button>
+        <button class="game-tab-btn" id="btnRespawn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Respawn
+        </button>
+        <button class="game-tab-btn danger" id="btnLeaveGame">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Leave
+        </button>
+      </div>
+    </div>
+
+    <!-- View: players in server -->
+    <div class="game-tab hidden" id="tabView">
+      <div class="game-tab-head">
+        <div class="game-tab-back" data-back="tabMain">←</div>
+        <h3>Players</h3>
+      </div>
+      <div class="game-tab-body" id="viewPlayerList"></div>
+    </div>
+
+    <!-- Settings -->
+    <div class="game-tab hidden" id="tabSettings">
+      <div class="game-tab-head">
+        <div class="game-tab-back" data-back="tabMain">←</div>
+        <h3>Settings</h3>
+      </div>
+      <div class="game-tab-body">
+        <div class="game-settings-row">
+          <label><span>Mouse sensitivity</span><span id="sensValue">1.0x</span></label>
+          <input type="range" id="sensRange" min="0.2" max="3" step="0.1" value="1">
+        </div>
+      </div>
+    </div>
+
+    <!-- Report: pick a player -->
+    <div class="game-tab hidden" id="tabReportSelect">
+      <div class="game-tab-head">
+        <div class="game-tab-back" data-back="tabMain">←</div>
+        <h3>Report a player</h3>
+      </div>
+      <div class="game-tab-body" id="reportPlayerList"></div>
+    </div>
+
+    <!-- Report: reason form -->
+    <div class="game-tab hidden" id="tabReportForm">
+      <div class="game-tab-head">
+        <div class="game-tab-back" data-back="tabReportSelect">←</div>
+        <h3>Report</h3>
+      </div>
+      <div class="game-tab-body">
+        <div class="game-report-user">
+          <div class="gp-avatar" id="reportAvatar">?</div>
+          <div class="gp-name" id="reportUsername">Player</div>
+        </div>
+        <label style="display:block;font-size:12.5px;color:#b4b4b9;margin-bottom:8px;">Why do you want to report this player?</label>
+        <textarea class="game-report-textarea" id="reportReasonText" placeholder="Describe what happened..."></textarea>
+        <button class="game-report-submit" id="reportSubmitBtn">Submit report</button>
+        <p class="game-report-note">Reports are reviewed by moderators and may result in a ban.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="game-joystick" id="gameJoystick"><div class="gj-nub" id="gameJoystickNub"></div></div>
+  <div class="game-jump-btn" id="gameJumpBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+  </div>
+
+  <!-- Character preview: shown when you click a player in the View tab -->
+  <div class="char-preview-overlay hidden" id="charPreviewOverlay">
+    <div class="char-preview-card">
+      <div class="char-preview-canvas-wrap">
+        <canvas id="charPreviewCanvas"></canvas>
+        <div class="char-preview-close" id="charPreviewCloseBtn">&times;</div>
+      </div>
+      <div class="char-preview-info">
+        <div class="char-preview-name" id="charPreviewName">Player</div>
+        <div class="char-preview-tag" id="charPreviewTag">Playing now</div>
+        <button class="char-preview-action" id="charPreviewActionBtn">Add friend</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- In-game / anywhere friend-request toasts -->
+<div class="ingame-toast-stack" id="ingameToastStack"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+  /* ============ Firebase (multiplayer) ============ */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
+    authDomain: "blockverse-3526c.firebaseapp.com",
+    databaseURL: "https://blockverse-3526c-default-rtdb.firebaseio.com",
+    projectId: "blockverse-3526c",
+    storageBucket: "blockverse-3526c.firebasestorage.app",
+    messagingSenderId: "782192628812",
+    appId: "1:782192628812:web:79d50d2c34cd8ac969d0e9"
+  };
+  const fbApp = firebase.initializeApp(firebaseConfig);
+  const fbDb = firebase.database();
+  const fbAuth = firebase.auth();
+
+  // real, server-verified anonymous identity (no login UI needed for the player)
+  let fbUid = null;
+  let fbAuthError = null;
+  let fbReadyResolve;
+  const fbReady = new Promise(res => { fbReadyResolve = res; });
+  fbAuth.onAuthStateChanged((user) => {
+    if(user){
+      fbUid = user.uid;
+      fbReadyResolve(user.uid);
+    }
+  });
+  fbAuth.signInAnonymously().catch((err) => {
+    console.error("Firebase anonymous sign-in failed:", err);
+    fbAuthError = err;
+  });
+  // If auth doesn't resolve within 6s (e.g. Anonymous sign-in isn't enabled in
+  // the Firebase console yet), stop blocking forever - resolve with null so
+  // callers can fail loudly instead of hanging silently.
+  setTimeout(() => { if(!fbUid) fbReadyResolve(null); }, 6000);
+
+  function getPlayerId(){
+    // falls back to the old per-tab id only if auth hasn't resolved yet (shouldn't normally happen)
+    if(fbUid) return fbUid;
+    let id = sessionStorage.getItem("blockverse_player_id");
+    if(!id){
+      id = "p_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      sessionStorage.setItem("blockverse_player_id", id);
+    }
+    return id;
+  }
+
+  /* ============ i18n ============ */
+  const translations = {
+    en: {
+      tagline:"build. play. imagine.", login:"Log in", signup:"Sign up",
+      username:"Username", password:"Password", confirmPassword:"Confirm password",
+      usernamePh:"Enter your username", passwordPh:"Enter your password",
+      usernameChoosePh:"Choose a username", passwordChoosePh:"Choose a password",
+      confirmPh:"Re-enter your password",
+      gender:"Gender", male:"Male", female:"Female", createAccount:"Create account",
+      online:"Online", menu:"Menu", home:"Home", discover:"Discover", friends:"Friends",
+      settings:"Settings", logout:"Log out",
+      welcomeBack:"Welcome back", homeSub:"Here's what's happening in your BlockVerse.",
+      noGamesTitle:"No games yet", noGamesSub:"Games will show up here once they're added.",
+      settingsSub:"Manage your account, security, and session.",
+      security:"Security", securitySub:"Devices and sign-in activity",
+      account:"Account", accountSub:"Appearance and language",
+      logoutSub:"End your current session",
+      backToSettings:"Back to settings",
+      securityPageSub:"Devices that are currently signed in to your account.",
+      activeSessions:"Active sessions",
+      activeSessionsDesc:"If you see a device you don't recognize, sign out and change your password.",
+      accountPageSub:"Customize how BlockVerse looks and speaks to you.",
+      bgColorTitle:"Background color", bgColorDesc:"Choose the theme for the whole app.",
+      langTitle:"Language", langDesc:"Choose the language for the whole platform.",
+      changeLanguage:"Change language",
+      loadingLang:"Switching language...",
+      searchLanguage:"Search language...",
+      thisDevice:"This device", noResults:"No languages found.",
+      themeDark:"Black and grey", themeLight:"White and grey",
+      friendsPageSub:"Search for people and manage your requests.",
+      searchUsernamePh:"Search by username...",
+      peopleYouMayKnow:"People you may know",
+      friendRequests:"Friend requests",
+      sendRequest:"Add friend",
+      requestSent:"Request sent",
+      accept:"Accept",
+      decline:"Decline",
+      alreadyFriends:"Friends",
+      noUsersFound:"No users found.",
+      noRequests:"No pending requests.",
+      noSuggestions:"No suggestions right now.",
+      cancelRequest:"Cancel request",
+      incomingFrom:"wants to be friends",
+      notifications:"Notifications",
+      baseplateTitle:"Baseplate", baseplateSub:"Run, jump and look around.",
+      loadingGame:"Loading Baseplate...", leaveGame:"Leave",
+      ignore:"Ignore", sentYouRequestSuffix:"sent you a friend request",
+      acceptedYourRequestSuffix:"accepted your friend request",
+      youAcceptedPrefix:"You accepted", youAcceptedSuffix:"'s friend request",
+      addFriend:"Add friend", requestPending:"Request sent", friendsAlready:"Friends", playingNow:"Playing now",
+    },
+    es: {
+      tagline:"construye. juega. imagina.", login:"Iniciar sesion", signup:"Registrarse",
+      username:"Usuario", password:"Contrasena", confirmPassword:"Confirmar contrasena",
+      usernamePh:"Ingresa tu usuario", passwordPh:"Ingresa tu contrasena",
+      usernameChoosePh:"Elige un usuario", passwordChoosePh:"Elige una contrasena",
+      confirmPh:"Vuelve a escribir tu contrasena",
+      gender:"Genero", male:"Hombre", female:"Mujer", createAccount:"Crear cuenta",
+      online:"En linea", menu:"Menu", home:"Inicio", discover:"Descubrir", friends:"Amigos",
+      settings:"Ajustes", logout:"Cerrar sesion",
+      welcomeBack:"Bienvenido de nuevo", homeSub:"Esto es lo que pasa en tu BlockVerse.",
+      noGamesTitle:"Aun no hay juegos", noGamesSub:"Los juegos apareceran aqui cuando se agreguen.",
+      settingsSub:"Administra tu cuenta, seguridad y sesion.",
+      security:"Seguridad", securitySub:"Dispositivos y actividad de inicio de sesion",
+      account:"Cuenta", accountSub:"Apariencia e idioma",
+      logoutSub:"Finalizar tu sesion actual",
+      backToSettings:"Volver a ajustes",
+      securityPageSub:"Dispositivos con sesion iniciada en tu cuenta.",
+      activeSessions:"Sesiones activas",
+      activeSessionsDesc:"Si ves un dispositivo que no reconoces, cierra sesion y cambia tu contrasena.",
+      accountPageSub:"Personaliza como se ve y habla BlockVerse.",
+      bgColorTitle:"Color de fondo", bgColorDesc:"Elige el tema para toda la aplicacion.",
+      langTitle:"Idioma", langDesc:"Elige el idioma para toda la plataforma.",
+      changeLanguage:"Cambiar idioma",
+      loadingLang:"Cambiando idioma...",
+      searchLanguage:"Buscar idioma...",
+      thisDevice:"Este dispositivo", noResults:"No se encontraron idiomas.",
+      themeDark:"Negro y gris", themeLight:"Blanco y gris",
+      friendsPageSub:"Busca personas y gestiona tus solicitudes.",
+      searchUsernamePh:"Buscar por usuario...",
+      peopleYouMayKnow:"Personas que quizas conozcas",
+      friendRequests:"Solicitudes de amistad",
+      sendRequest:"Anadir amigo",
+      requestSent:"Solicitud enviada",
+      accept:"Aceptar",
+      decline:"Rechazar",
+      alreadyFriends:"Amigos",
+      noUsersFound:"No se encontraron usuarios.",
+      noRequests:"No hay solicitudes pendientes.",
+      noSuggestions:"No hay sugerencias por ahora.",
+      cancelRequest:"Cancelar solicitud",
+      incomingFrom:"quiere ser tu amigo"
+    },
+    fr: {
+      tagline:"construis. joue. imagine.", login:"Connexion", signup:"S'inscrire",
+      username:"Nom d'utilisateur", password:"Mot de passe", confirmPassword:"Confirmer le mot de passe",
+      usernamePh:"Entrez votre nom d'utilisateur", passwordPh:"Entrez votre mot de passe",
+      usernameChoosePh:"Choisissez un nom d'utilisateur", passwordChoosePh:"Choisissez un mot de passe",
+      confirmPh:"Ressaisissez votre mot de passe",
+      gender:"Genre", male:"Homme", female:"Femme", createAccount:"Creer un compte",
+      online:"En ligne", menu:"Menu", home:"Accueil", discover:"Decouvrir", friends:"Amis",
+      settings:"Parametres", logout:"Deconnexion",
+      welcomeBack:"Bon retour", homeSub:"Voici ce qui se passe sur votre BlockVerse.",
+      noGamesTitle:"Aucun jeu pour l'instant", noGamesSub:"Les jeux apparaitront ici une fois ajoutes.",
+      settingsSub:"Gerez votre compte, la securite et la session.",
+      security:"Securite", securitySub:"Appareils et activite de connexion",
+      account:"Compte", accountSub:"Apparence et langue",
+      logoutSub:"Terminer votre session actuelle",
+      backToSettings:"Retour aux parametres",
+      securityPageSub:"Appareils actuellement connectes a votre compte.",
+      activeSessions:"Sessions actives",
+      activeSessionsDesc:"Si vous voyez un appareil inconnu, deconnectez-vous et changez votre mot de passe.",
+      accountPageSub:"Personnalisez l'apparence de BlockVerse.",
+      bgColorTitle:"Couleur de fond", bgColorDesc:"Choisissez le theme de toute l'application.",
+      langTitle:"Langue", langDesc:"Choisissez la langue de toute la plateforme.",
+      changeLanguage:"Changer de langue",
+      loadingLang:"Changement de langue...",
+      searchLanguage:"Rechercher une langue...",
+      thisDevice:"Cet appareil", noResults:"Aucune langue trouvee.",
+      themeDark:"Noir et gris", themeLight:"Blanc et gris",
+      friendsPageSub:"Recherchez des personnes et gerez vos demandes.",
+      searchUsernamePh:"Rechercher par nom d'utilisateur...",
+      peopleYouMayKnow:"Personnes que vous connaissez peut-etre",
+      friendRequests:"Demandes d'ami",
+      sendRequest:"Ajouter un ami",
+      requestSent:"Demande envoyee",
+      accept:"Accepter",
+      decline:"Refuser",
+      alreadyFriends:"Amis",
+      noUsersFound:"Aucun utilisateur trouve.",
+      noRequests:"Aucune demande en attente.",
+      noSuggestions:"Aucune suggestion pour le moment.",
+      cancelRequest:"Annuler la demande",
+      incomingFrom:"veut devenir votre ami"
+    },
+    de: {
+      tagline:"baue. spiele. erschaffe.", login:"Anmelden", signup:"Registrieren",
+      username:"Benutzername", password:"Passwort", confirmPassword:"Passwort bestatigen",
+      usernamePh:"Benutzernamen eingeben", passwordPh:"Passwort eingeben",
+      usernameChoosePh:"Benutzernamen wahlen", passwordChoosePh:"Passwort wahlen",
+      confirmPh:"Passwort erneut eingeben",
+      gender:"Geschlecht", male:"Mannlich", female:"Weiblich", createAccount:"Konto erstellen",
+      online:"Online", menu:"Menu", home:"Start", discover:"Entdecken", friends:"Freunde",
+      settings:"Einstellungen", logout:"Abmelden",
+      welcomeBack:"Willkommen zuruck", homeSub:"Das passiert gerade in deinem BlockVerse.",
+      noGamesTitle:"Noch keine Spiele", noGamesSub:"Spiele erscheinen hier, sobald sie hinzugefugt werden.",
+      settingsSub:"Verwalte dein Konto, Sicherheit und Sitzung.",
+      security:"Sicherheit", securitySub:"Gerate und Anmeldeaktivitat",
+      account:"Konto", accountSub:"Erscheinungsbild und Sprache",
+      logoutSub:"Aktuelle Sitzung beenden",
+      backToSettings:"Zuruck zu Einstellungen",
+      securityPageSub:"Gerate, die aktuell bei deinem Konto angemeldet sind.",
+      activeSessions:"Aktive Sitzungen",
+      activeSessionsDesc:"Erkennst du ein Gerat nicht, melde dich ab und andere dein Passwort.",
+      accountPageSub:"Passe Aussehen und Sprache von BlockVerse an.",
+      bgColorTitle:"Hintergrundfarbe", bgColorDesc:"Wahle das Theme fur die gesamte App.",
+      langTitle:"Sprache", langDesc:"Wahle die Sprache fur die gesamte Plattform.",
+      changeLanguage:"Sprache andern",
+      loadingLang:"Sprache wird gewechselt...",
+      searchLanguage:"Sprache suchen...",
+      thisDevice:"Dieses Gerat", noResults:"Keine Sprachen gefunden.",
+      themeDark:"Schwarz und grau", themeLight:"Weiss und grau",
+      friendsPageSub:"Suche nach Personen und verwalte deine Anfragen.",
+      searchUsernamePh:"Nach Benutzername suchen...",
+      peopleYouMayKnow:"Personen, die du kennen konntest",
+      friendRequests:"Freundschaftsanfragen",
+      sendRequest:"Freund hinzufugen",
+      requestSent:"Anfrage gesendet",
+      accept:"Annehmen",
+      decline:"Ablehnen",
+      alreadyFriends:"Freunde",
+      noUsersFound:"Keine Benutzer gefunden.",
+      noRequests:"Keine ausstehenden Anfragen.",
+      noSuggestions:"Derzeit keine Vorschlage.",
+      cancelRequest:"Anfrage abbrechen",
+      incomingFrom:"mochte mit dir befreundet sein"
+    },
+    ar: {
+      tagline:"ابنِ. العب. تخيل.", login:"تسجيل الدخول", signup:"إنشاء حساب",
+      username:"اسم المستخدم", password:"كلمة المرور", confirmPassword:"تأكيد كلمة المرور",
+      usernamePh:"أدخل اسم المستخدم", passwordPh:"أدخل كلمة المرور",
+      usernameChoosePh:"اختر اسم مستخدم", passwordChoosePh:"اختر كلمة مرور",
+      confirmPh:"أعد إدخال كلمة المرور",
+      gender:"الجنس", male:"ذكر", female:"أنثى", createAccount:"إنشاء الحساب",
+      online:"متصل", menu:"القائمة", home:"الرئيسية", discover:"استكشاف", friends:"الأصدقاء",
+      settings:"الإعدادات", logout:"تسجيل الخروج",
+      welcomeBack:"مرحبا بعودتك", homeSub:"إليك ما يحدث في BlockVerse الخاص بك.",
+      noGamesTitle:"لا توجد ألعاب بعد", noGamesSub:"ستظهر الألعاب هنا بمجرد إضافتها.",
+      settingsSub:"إدارة حسابك وأمانك وجلستك.",
+      security:"الأمان", securitySub:"الأجهزة ونشاط تسجيل الدخول",
+      account:"الحساب", accountSub:"المظهر واللغة",
+      logoutSub:"إنهاء الجلسة الحالية",
+      backToSettings:"العودة إلى الإعدادات",
+      securityPageSub:"الأجهزة المسجلة دخولها حاليا إلى حسابك.",
+      activeSessions:"الجلسات النشطة",
+      activeSessionsDesc:"إذا رأيت جهازا لا تتعرف عليه، سجل الخروج وغيّر كلمة المرور.",
+      accountPageSub:"خصص شكل ولغة BlockVerse.",
+      bgColorTitle:"لون الخلفية", bgColorDesc:"اختر سمة التطبيق بأكمله.",
+      langTitle:"اللغة", langDesc:"اختر لغة المنصة بأكملها.",
+      changeLanguage:"تغيير اللغة",
+      loadingLang:"جارٍ تغيير اللغة...",
+      searchLanguage:"ابحث عن لغة...",
+      thisDevice:"هذا الجهاز", noResults:"لم يتم العثور على لغات.",
+      themeDark:"أسود ورمادي", themeLight:"أبيض ورمادي",
+      friendsPageSub:"ابحث عن أشخاص وأدر طلباتك.",
+      searchUsernamePh:"البحث باسم المستخدم...",
+      peopleYouMayKnow:"أشخاص قد تعرفهم",
+      friendRequests:"طلبات الصداقة",
+      sendRequest:"إضافة صديق",
+      requestSent:"تم إرسال الطلب",
+      accept:"قبول",
+      decline:"رفض",
+      alreadyFriends:"أصدقاء",
+      noUsersFound:"لم يتم العثور على مستخدمين.",
+      noRequests:"لا توجد طلبات معلقة.",
+      noSuggestions:"لا توجد اقتراحات حاليا.",
+      cancelRequest:"إلغاء الطلب",
+      incomingFrom:"يريد أن يكون صديقك"
+    },
+    ja: {
+      tagline:"作る。遊ぶ。想像する。", login:"ログイン", signup:"新規登録",
+      username:"ユーザー名", password:"パスワード", confirmPassword:"パスワード確認",
+      usernamePh:"ユーザー名を入力", passwordPh:"パスワードを入力",
+      usernameChoosePh:"ユーザー名を選択", passwordChoosePh:"パスワードを選択",
+      confirmPh:"パスワードを再入力",
+      gender:"性別", male:"男性", female:"女性", createAccount:"アカウント作成",
+      online:"オンライン", menu:"メニュー", home:"ホーム", discover:"見つける", friends:"フレンド",
+      settings:"設定", logout:"ログアウト",
+      welcomeBack:"おかえりなさい", homeSub:"あなたのBlockVerseの様子です。",
+      noGamesTitle:"まだゲームがありません", noGamesSub:"ゲームが追加されるとここに表示されます。",
+      settingsSub:"アカウント、セキュリティ、セッションを管理します。",
+      security:"セキュリティ", securitySub:"デバイスとログイン履歴",
+      account:"アカウント", accountSub:"外観と言語",
+      logoutSub:"現在のセッションを終了します",
+      backToSettings:"設定に戻る",
+      securityPageSub:"現在アカウントにログインしているデバイス。",
+      activeSessions:"アクティブなセッション",
+      activeSessionsDesc:"見覚えのないデバイスがある場合はログアウトしてパスワードを変更してください。",
+      accountPageSub:"BlockVerseの見た目と言語を設定します。",
+      bgColorTitle:"背景色", bgColorDesc:"アプリ全体のテーマを選択してください。",
+      langTitle:"言語", langDesc:"プラットフォーム全体の言語を選んでください。",
+      changeLanguage:"言語を変更",
+      loadingLang:"言語を切り替えています...",
+      searchLanguage:"言語を検索...",
+      thisDevice:"このデバイス", noResults:"言語が見つかりません。",
+      themeDark:"黒とグレー", themeLight:"白とグレー",
+      friendsPageSub:"ユーザーを検索してリクエストを管理します。",
+      searchUsernamePh:"ユーザー名で検索...",
+      peopleYouMayKnow:"知り合いかもしれない人",
+      friendRequests:"フレンドリクエスト",
+      sendRequest:"フレンド追加",
+      requestSent:"リクエスト送信済み",
+      accept:"承認",
+      decline:"拒否",
+      alreadyFriends:"フレンド",
+      noUsersFound:"ユーザーが見つかりません。",
+      noRequests:"保留中のリクエストはありません。",
+      noSuggestions:"現在おすすめはありません。",
+      cancelRequest:"リクエストを取り消す",
+      incomingFrom:"があなたとフレンドになりたがっています"
+    },
+    zh: {
+      tagline:"建造。游玩。想象。", login:"登录", signup:"注册",
+      username:"用户名", password:"密码", confirmPassword:"确认密码",
+      usernamePh:"输入用户名", passwordPh:"输入密码",
+      usernameChoosePh:"选择用户名", passwordChoosePh:"选择密码",
+      confirmPh:"再次输入密码",
+      gender:"性别", male:"男", female:"女", createAccount:"创建账户",
+      online:"在线", menu:"菜单", home:"主页", discover:"发现", friends:"好友",
+      settings:"设置", logout:"退出登录",
+      welcomeBack:"欢迎回来", homeSub:"这是你的BlockVerse动态。",
+      noGamesTitle:"暂无游戏", noGamesSub:"添加游戏后将显示在这里。",
+      settingsSub:"管理你的账户、安全和会话。",
+      security:"安全", securitySub:"设备和登录活动",
+      account:"账户", accountSub:"外观和语言",
+      logoutSub:"结束当前会话",
+      backToSettings:"返回设置",
+      securityPageSub:"当前登录你账户的设备。",
+      activeSessions:"活跃会话",
+      activeSessionsDesc:"如果你看到不认识的设备，请退出登录并更改密码。",
+      accountPageSub:"自定义BlockVerse的外观和语言。",
+      bgColorTitle:"背景颜色", bgColorDesc:"为整个应用选择主题。",
+      langTitle:"语言", langDesc:"选择整个平台使用的语言。",
+      changeLanguage:"更改语言",
+      loadingLang:"正在切换语言...",
+      searchLanguage:"搜索语言...",
+      thisDevice:"此设备", noResults:"未找到语言。",
+      themeDark:"黑色和灰色", themeLight:"白色和灰色",
+      friendsPageSub:"搜索用户并管理你的请求。",
+      searchUsernamePh:"按用户名搜索...",
+      peopleYouMayKnow:"你可能认识的人",
+      friendRequests:"好友请求",
+      sendRequest:"添加好友",
+      requestSent:"请求已发送",
+      accept:"接受",
+      decline:"拒绝",
+      alreadyFriends:"好友",
+      noUsersFound:"未找到用户。",
+      noRequests:"没有待处理的请求。",
+      noSuggestions:"暂无推荐。",
+      cancelRequest:"取消请求",
+      incomingFrom:"想加你为好友"
+    },
+    pt: {
+      tagline:"construa. jogue. imagine.", login:"Entrar", signup:"Cadastrar",
+      username:"Usuario", password:"Senha", confirmPassword:"Confirmar senha",
+      usernamePh:"Digite seu usuario", passwordPh:"Digite sua senha",
+      usernameChoosePh:"Escolha um usuario", passwordChoosePh:"Escolha uma senha",
+      confirmPh:"Digite a senha novamente",
+      gender:"Genero", male:"Masculino", female:"Feminino", createAccount:"Criar conta",
+      online:"Online", menu:"Menu", home:"Inicio", discover:"Descobrir", friends:"Amigos",
+      settings:"Configuracoes", logout:"Sair",
+      welcomeBack:"Bem-vindo de volta", homeSub:"Veja o que esta acontecendo no seu BlockVerse.",
+      noGamesTitle:"Nenhum jogo ainda", noGamesSub:"Os jogos aparecerao aqui quando forem adicionados.",
+      settingsSub:"Gerencie sua conta, seguranca e sessao.",
+      security:"Seguranca", securitySub:"Dispositivos e atividade de login",
+      account:"Conta", accountSub:"Aparencia e idioma",
+      logoutSub:"Encerrar sua sessao atual",
+      backToSettings:"Voltar as configuracoes",
+      securityPageSub:"Dispositivos conectados a sua conta no momento.",
+      activeSessions:"Sessoes ativas",
+      activeSessionsDesc:"Se voce ver um dispositivo desconhecido, saia e altere sua senha.",
+      accountPageSub:"Personalize a aparencia e o idioma do BlockVerse.",
+      bgColorTitle:"Cor de fundo", bgColorDesc:"Escolha o tema do aplicativo.",
+      langTitle:"Idioma", langDesc:"Escolha o idioma de toda a plataforma.",
+      changeLanguage:"Mudar idioma",
+      loadingLang:"Trocando idioma...",
+      searchLanguage:"Pesquisar idioma...",
+      thisDevice:"Este dispositivo", noResults:"Nenhum idioma encontrado.",
+      themeDark:"Preto e cinza", themeLight:"Branco e cinza",
+      friendsPageSub:"Procure pessoas e gerencie seus pedidos.",
+      searchUsernamePh:"Pesquisar por usuario...",
+      peopleYouMayKnow:"Pessoas que voce pode conhecer",
+      friendRequests:"Pedidos de amizade",
+      sendRequest:"Adicionar amigo",
+      requestSent:"Pedido enviado",
+      accept:"Aceitar",
+      decline:"Recusar",
+      alreadyFriends:"Amigos",
+      noUsersFound:"Nenhum usuario encontrado.",
+      noRequests:"Nenhum pedido pendente.",
+      noSuggestions:"Nenhuma sugestao no momento.",
+      cancelRequest:"Cancelar pedido",
+      incomingFrom:"quer ser seu amigo"
+    },
+    hi: {
+      tagline:"banao. khelo. socho.", login:"Log in", signup:"Sign up",
+      username:"Username", password:"Password", confirmPassword:"Password confirm karein",
+      usernamePh:"Apna username likhein", passwordPh:"Apna password likhein",
+      usernameChoosePh:"Ek username chunein", passwordChoosePh:"Ek password chunein",
+      confirmPh:"Password dobara likhein",
+      gender:"Gender", male:"Purush", female:"Mahila", createAccount:"Account banayein",
+      online:"Online", menu:"Menu", home:"Home", discover:"Discover", friends:"Dost",
+      settings:"Settings", logout:"Log out",
+      welcomeBack:"Wapas swagat hai", homeSub:"Aapke BlockVerse mein yeh ho raha hai.",
+      noGamesTitle:"Abhi koi game nahi", noGamesSub:"Games yahan tab dikhenge jab add honge.",
+      settingsSub:"Apna account, security aur session manage karein.",
+      security:"Security", securitySub:"Devices aur sign-in activity",
+      account:"Account", accountSub:"Look aur language",
+      logoutSub:"Apna current session khatam karein",
+      backToSettings:"Settings par wapas jayein",
+      securityPageSub:"Aapke account mein abhi login devices.",
+      activeSessions:"Active sessions",
+      activeSessionsDesc:"Agar koi anjaan device dikhe, sign out karke password badlein.",
+      accountPageSub:"BlockVerse ka look aur language customize karein.",
+      bgColorTitle:"Background color", bgColorDesc:"Poore app ke liye theme chunein.",
+      langTitle:"Language", langDesc:"Poore platform ke liye language chunein.",
+      changeLanguage:"Language badlein",
+      loadingLang:"Language badli ja rahi hai...",
+      searchLanguage:"Language search karein...",
+      thisDevice:"Yeh device", noResults:"Koi language nahi mili.",
+      themeDark:"Kala aur grey", themeLight:"Safed aur grey",
+      friendsPageSub:"Logon ko dhundein aur apne requests manage karein.",
+      searchUsernamePh:"Username se search karein...", peopleYouMayKnow:"Log jinhein aap jaante ho sakte hain",
+      friendRequests:"Friend requests", sendRequest:"Friend add karein", requestSent:"Request bhej di gayi",
+      accept:"Accept karein", decline:"Decline karein", alreadyFriends:"Dost",
+      noUsersFound:"Koi user nahi mila.", noRequests:"Koi pending request nahi.",
+      noSuggestions:"Abhi koi suggestion nahi.", cancelRequest:"Request cancel karein",
+      incomingFrom:"aapse dost banna chahte hain"
+    },
+        it: {
+      tagline:"costruisci. gioca. immagina.", login:"Accedi", signup:"Registrati",
+      username:"Nome utente", password:"Password", confirmPassword:"Conferma password",
+      usernamePh:"Inserisci il tuo nome utente", passwordPh:"Inserisci la tua password", usernameChoosePh:"Scegli un nome utente",
+      passwordChoosePh:"Scegli una password", confirmPh:"Reinserisci la password", gender:"Genere",
+      male:"Uomo", female:"Donna", createAccount:"Crea account",
+      online:"Online", menu:"Menu", home:"Home",
+      discover:"Scopri", friends:"Amici", settings:"Impostazioni",
+      logout:"Esci", welcomeBack:"Bentornato", homeSub:"Ecco cosa succede nel tuo BlockVerse.",
+      noGamesTitle:"Nessun gioco", noGamesSub:"I giochi appariranno qui una volta aggiunti.", settingsSub:"Gestisci account, sicurezza e sessione.",
+      security:"Sicurezza", securitySub:"Dispositivi e attivita di accesso", account:"Account",
+      accountSub:"Aspetto e lingua", logoutSub:"Termina la sessione corrente", backToSettings:"Torna alle impostazioni",
+      securityPageSub:"Dispositivi attualmente connessi al tuo account.", activeSessions:"Sessioni attive", activeSessionsDesc:"Se vedi un dispositivo sconosciuto, esci e cambia password.",
+      accountPageSub:"Personalizza l'aspetto e la lingua di BlockVerse.", bgColorTitle:"Colore di sfondo", bgColorDesc:"Scegli il tema per tutta l'app.",
+      langTitle:"Lingua", langDesc:"Scegli la lingua per l'intera piattaforma.", changeLanguage:"Cambia lingua",
+      loadingLang:"Cambio lingua in corso...", searchLanguage:"Cerca lingua...", thisDevice:"Questo dispositivo",
+      noResults:"Nessuna lingua trovata.", themeDark:"Nero e grigio", themeLight:"Bianco e grigio",
+      friendsPageSub:"Cerca persone e gestisci le tue richieste.", searchUsernamePh:"Cerca per nome utente...", peopleYouMayKnow:"Persone che potresti conoscere",
+      friendRequests:"Richieste di amicizia", sendRequest:"Aggiungi amico", requestSent:"Richiesta inviata",
+      accept:"Accetta", decline:"Rifiuta", alreadyFriends:"Amici",
+      noUsersFound:"Nessun utente trovato.", noRequests:"Nessuna richiesta in sospeso.", noSuggestions:"Nessun suggerimento al momento.",
+      cancelRequest:"Annulla richiesta", incomingFrom:"vuole essere tuo amico"
+    },
+    ru: {
+      tagline:"stroy. igray. voobrazhay.", login:"Voyti", signup:"Registratsiya",
+      username:"Imya polzovatelya", password:"Parol", confirmPassword:"Podtverdite parol",
+      usernamePh:"Vvedite imya polzovatelya", passwordPh:"Vvedite parol", usernameChoosePh:"Vyberite imya polzovatelya",
+      passwordChoosePh:"Vyberite parol", confirmPh:"Povtorite parol", gender:"Pol",
+      male:"Muzhskoy", female:"Zhenskiy", createAccount:"Sozdat akkaunt",
+      online:"V seti", menu:"Menyu", home:"Glavnaya",
+      discover:"Obzor", friends:"Druzya", settings:"Nastroyki",
+      logout:"Vyyti", welcomeBack:"S vozvrashcheniem", homeSub:"Vot chto proiskhodit v vashem BlockVerse.",
+      noGamesTitle:"Poka net igr", noGamesSub:"Igry poyavyatsya zdes posle dobavleniya.", settingsSub:"Upravlyayte akkauntom, bezopasnostyu i sessiey.",
+      security:"Bezopasnost", securitySub:"Ustroystva i aktivnost vkhoda", account:"Akkaunt",
+      accountSub:"Vneshniy vid i yazyk", logoutSub:"Zavershit tekushchuyu sessiyu", backToSettings:"Nazad k nastroykam",
+      securityPageSub:"Ustroystva, kotorye seychas voshli v vash akkaunt.", activeSessions:"Aktivnye sessii", activeSessionsDesc:"Esli vy vidite neznakomoye ustroystvo, vyydite i smenite parol.",
+      accountPageSub:"Nastroyte vneshniy vid i yazyk BlockVerse.", bgColorTitle:"Tsvet fona", bgColorDesc:"Vyberite temu dlya vsego prilozheniya.",
+      langTitle:"Yazyk", langDesc:"Vyberite yazyk dlya vsey platformy.", changeLanguage:"Smenit yazyk",
+      loadingLang:"Smena yazyka...", searchLanguage:"Poisk yazyka...", thisDevice:"Eto ustroystvo",
+      noResults:"Yazyki ne naydeny.", themeDark:"Cherny i seryy", themeLight:"Bely i seryy",
+      friendsPageSub:"Ishchite lyudey i upravlyayte zayavkami.", searchUsernamePh:"Poisk po imeni polzovatelya...", peopleYouMayKnow:"Vozmozhno, vy znakomy",
+      friendRequests:"Zayavki v druzya", sendRequest:"Dobavit v druzya", requestSent:"Zayavka otpravlena",
+      accept:"Prinyat", decline:"Otklonit", alreadyFriends:"Druzya",
+      noUsersFound:"Polzovateli ne naydeny.", noRequests:"Net zayavok.", noSuggestions:"Poka net predlozheniy.",
+      cancelRequest:"Otmenit zayavku", incomingFrom:"khochet druzhit s vami"
+    },
+    ko: {
+      tagline:"mandeulda. nolda. sangsanghada.", login:"Rogin", signup:"Gaipi",
+      username:"Sayongja ireum", password:"Bimilbeonho", confirmPassword:"Bimilbeonho hwagin",
+      usernamePh:"Sayongja ireumeul ibryeokhaseyo", passwordPh:"Bimilbeonhoreul ibryeokhaseyo", usernameChoosePh:"Sayongja ireum seontaek",
+      passwordChoosePh:"Bimilbeonho seontaek", confirmPh:"Bimilbeonho jaeibryeok", gender:"Seongbyeol",
+      male:"Namja", female:"Yeoja", createAccount:"Gyejeong mandeulgi",
+      online:"Onrain", menu:"Menyu", home:"Hom",
+      discover:"Balgyeon", friends:"Chingu", settings:"Seoljeong",
+      logout:"Rogeuaut", welcomeBack:"Dasi hwanyeonghamnida", homeSub:"Dangsin-ui BlockVerse-eseo ireona-go inneun il.",
+      noGamesTitle:"Ajik geim eobseum", noGamesSub:"Geim-i chuga-doemyeon yeogi pyosi-doemnida.", settingsSub:"Gyejeong, boan mit sesyeon-eul gwanri-hasyeyo.",
+      security:"Boan", securitySub:"Gigi mit rogin hwaldong", account:"Gyejeong",
+      accountSub:"Oegwan mit eoneo", logoutSub:"Hyeonjae sesyeon jongryo", backToSettings:"Seoljeong-euro doragagi",
+      securityPageSub:"Hyeonjae gyejeong-e rogin-doen gigideul-imnida.", activeSessions:"Hwaldong sesyeon", activeSessionsDesc:"Alji motan gigiga boinda-myeon rogeuaut hago bimilbeonho-reul byeongyeong-haseyo.",
+      accountPageSub:"BlockVerse-ui oegwan-gwa eoneo-reul seoljeong-haseyo.", bgColorTitle:"Baegyeong saek", bgColorDesc:"Jeonche aeb-ui teme-reul seontaek-haseyo.",
+      langTitle:"Eoneo", langDesc:"Jeonche peullaespom-ui eoneo-reul seontaek-haseyo.", changeLanguage:"Eoneo byeongyeong",
+      loadingLang:"Eoneo byeongyeong jung...", searchLanguage:"Eoneo geomsaek...", thisDevice:"I gigi",
+      noResults:"Eoneoreul chatji motaesseumnida.", themeDark:"Geomjeong-gwa hoesaek", themeLight:"Huinsaek-gwa hoesaek",
+      friendsPageSub:"Saramdeul-eul geomsaek-hago yocheong-eul gwanri-haseyo.", searchUsernamePh:"Sayongja ireumeuro geomsaek...", peopleYouMayKnow:"Aljido moreuneun saramdeul",
+      friendRequests:"Chingu yocheong", sendRequest:"Chingu chuga", requestSent:"Yocheong bonaejim",
+      accept:"Sunrak", decline:"Georjeol", alreadyFriends:"Chingu",
+      noUsersFound:"Sayongja-reul chatji motaesseumnida.", noRequests:"Daegijung-in yocheong-i eopseumnida.", noSuggestions:"Hyeonjae jean-i eopseumnida.",
+      cancelRequest:"Yocheong chwiso", incomingFrom:"dangsin-gwa chingu-ga doego sipeohamnida"
+    },
+    tr: {
+      tagline:"insa et. oyna. hayal et.", login:"Giris yap", signup:"Kaydol",
+      username:"Kullanici adi", password:"Sifre", confirmPassword:"Sifreyi onayla",
+      usernamePh:"Kullanici adinizi girin", passwordPh:"Sifrenizi girin", usernameChoosePh:"Bir kullanici adi secin",
+      passwordChoosePh:"Bir sifre secin", confirmPh:"Sifreyi tekrar girin", gender:"Cinsiyet",
+      male:"Erkek", female:"Kadin", createAccount:"Hesap olustur",
+      online:"Cevrimici", menu:"Menu", home:"Ana sayfa",
+      discover:"Kesfet", friends:"Arkadaslar", settings:"Ayarlar",
+      logout:"Cikis yap", welcomeBack:"Tekrar hosgeldin", homeSub:"BlockVerse'de olup bitenler burada.",
+      noGamesTitle:"Henuz oyun yok", noGamesSub:"Oyunlar eklendikce burada gorunecek.", settingsSub:"Hesabini, guvenligini ve oturumunu yonet.",
+      security:"Guvenlik", securitySub:"Cihazlar ve oturum acma etkinligi", account:"Hesap",
+      accountSub:"Gorunum ve dil", logoutSub:"Mevcut oturumu sonlandir", backToSettings:"Ayarlara don",
+      securityPageSub:"Hesabinizda su anda oturum acmis cihazlar.", activeSessions:"Aktif oturumlar", activeSessionsDesc:"Taniyamadiginiz bir cihaz gorurseniz, cikis yapip sifrenizi degistirin.",
+      accountPageSub:"BlockVerse'in gorunumunu ve dilini ozellestir.", bgColorTitle:"Arka plan rengi", bgColorDesc:"Tum uygulama icin temayi secin.",
+      langTitle:"Dil", langDesc:"Tum platform icin dili secin.", changeLanguage:"Dili degistir",
+      loadingLang:"Dil degistiriliyor...", searchLanguage:"Dil ara...", thisDevice:"Bu cihaz",
+      noResults:"Dil bulunamadi.", themeDark:"Siyah ve gri", themeLight:"Beyaz ve gri",
+      friendsPageSub:"Insanlari ara ve isteklerini yonet.", searchUsernamePh:"Kullanici adina gore ara...", peopleYouMayKnow:"Tanidigin olabilecek kisiler",
+      friendRequests:"Arkadaslik istekleri", sendRequest:"Arkadas ekle", requestSent:"Istek gonderildi",
+      accept:"Kabul et", decline:"Reddet", alreadyFriends:"Arkadas",
+      noUsersFound:"Kullanici bulunamadi.", noRequests:"Bekleyen istek yok.", noSuggestions:"Su anda oneri yok.",
+      cancelRequest:"Istegi iptal et", incomingFrom:"arkadasin olmak istiyor"
+    },
+    nl: {
+      tagline:"bouw. speel. verbeeld.", login:"Inloggen", signup:"Registreren",
+      username:"Gebruikersnaam", password:"Wachtwoord", confirmPassword:"Bevestig wachtwoord",
+      usernamePh:"Voer je gebruikersnaam in", passwordPh:"Voer je wachtwoord in", usernameChoosePh:"Kies een gebruikersnaam",
+      passwordChoosePh:"Kies een wachtwoord", confirmPh:"Herhaal je wachtwoord", gender:"Geslacht",
+      male:"Man", female:"Vrouw", createAccount:"Account aanmaken",
+      online:"Online", menu:"Menu", home:"Home",
+      discover:"Ontdekken", friends:"Vrienden", settings:"Instellingen",
+      logout:"Uitloggen", welcomeBack:"Welkom terug", homeSub:"Dit gebeurt er in jouw BlockVerse.",
+      noGamesTitle:"Nog geen games", noGamesSub:"Games verschijnen hier zodra ze zijn toegevoegd.", settingsSub:"Beheer je account, beveiliging en sessie.",
+      security:"Beveiliging", securitySub:"Apparaten en aanmeldactiviteit", account:"Account",
+      accountSub:"Weergave en taal", logoutSub:"Beeindig je huidige sessie", backToSettings:"Terug naar instellingen",
+      securityPageSub:"Apparaten die momenteel zijn ingelogd op je account.", activeSessions:"Actieve sessies", activeSessionsDesc:"Zie je een onbekend apparaat, log dan uit en wijzig je wachtwoord.",
+      accountPageSub:"Pas het uiterlijk en de taal van BlockVerse aan.", bgColorTitle:"Achtergrondkleur", bgColorDesc:"Kies het thema voor de hele app.",
+      langTitle:"Taal", langDesc:"Kies de taal voor het hele platform.", changeLanguage:"Taal wijzigen",
+      loadingLang:"Taal wordt gewijzigd...", searchLanguage:"Taal zoeken...", thisDevice:"Dit apparaat",
+      noResults:"Geen talen gevonden.", themeDark:"Zwart en grijs", themeLight:"Wit en grijs",
+      friendsPageSub:"Zoek mensen en beheer je verzoeken.", searchUsernamePh:"Zoek op gebruikersnaam...", peopleYouMayKnow:"Mensen die je misschien kent",
+      friendRequests:"Vriendschapsverzoeken", sendRequest:"Vriend toevoegen", requestSent:"Verzoek verzonden",
+      accept:"Accepteren", decline:"Weigeren", alreadyFriends:"Vrienden",
+      noUsersFound:"Geen gebruikers gevonden.", noRequests:"Geen openstaande verzoeken.", noSuggestions:"Momenteel geen suggesties.",
+      cancelRequest:"Verzoek annuleren", incomingFrom:"wil vrienden met je worden"
+    },
+    pl: {
+      tagline:"buduj. graj. wyobrazaj.", login:"Zaloguj sie", signup:"Zarejestruj sie",
+      username:"Nazwa uzytkownika", password:"Haslo", confirmPassword:"Potwierdz haslo",
+      usernamePh:"Wpisz nazwe uzytkownika", passwordPh:"Wpisz haslo", usernameChoosePh:"Wybierz nazwe uzytkownika",
+      passwordChoosePh:"Wybierz haslo", confirmPh:"Wpisz haslo ponownie", gender:"Plec",
+      male:"Mezczyzna", female:"Kobieta", createAccount:"Utworz konto",
+      online:"Online", menu:"Menu", home:"Strona glowna",
+      discover:"Odkrywaj", friends:"Znajomi", settings:"Ustawienia",
+      logout:"Wyloguj", welcomeBack:"Witaj ponownie", homeSub:"Oto co dzieje sie w Twoim BlockVerse.",
+      noGamesTitle:"Brak gier", noGamesSub:"Gry pojawia sie tutaj po dodaniu.", settingsSub:"Zarzadzaj kontem, bezpieczenstwem i sesja.",
+      security:"Bezpieczenstwo", securitySub:"Urzadzenia i aktywnosc logowania", account:"Konto",
+      accountSub:"Wyglad i jezyk", logoutSub:"Zakoncz biezaca sesje", backToSettings:"Wroc do ustawien",
+      securityPageSub:"Urzadzenia obecnie zalogowane do Twojego konta.", activeSessions:"Aktywne sesje", activeSessionsDesc:"Jesli widzisz nieznane urzadzenie, wyloguj sie i zmien haslo.",
+      accountPageSub:"Dostosuj wyglad i jezyk BlockVerse.", bgColorTitle:"Kolor tla", bgColorDesc:"Wybierz motyw dla calej aplikacji.",
+      langTitle:"Jezyk", langDesc:"Wybierz jezyk dla calej platformy.", changeLanguage:"Zmien jezyk",
+      loadingLang:"Zmienianie jezyka...", searchLanguage:"Szukaj jezyka...", thisDevice:"To urzadzenie",
+      noResults:"Nie znaleziono jezykow.", themeDark:"Czarny i szary", themeLight:"Bialy i szary",
+      friendsPageSub:"Szukaj ludzi i zarzadzaj zaproszeniami.", searchUsernamePh:"Szukaj po nazwie uzytkownika...", peopleYouMayKnow:"Osoby, ktore mozesz znac",
+      friendRequests:"Zaproszenia do znajomych", sendRequest:"Dodaj znajomego", requestSent:"Zaproszenie wyslane",
+      accept:"Akceptuj", decline:"Odrzuc", alreadyFriends:"Znajomi",
+      noUsersFound:"Nie znaleziono uzytkownikow.", noRequests:"Brak oczekujacych zaproszen.", noSuggestions:"Brak sugestii.",
+      cancelRequest:"Anuluj zaproszenie", incomingFrom:"chce zostac Twoim znajomym"
+    },
+    id: {
+      tagline:"bangun. main. berimajinasi.", login:"Masuk", signup:"Daftar",
+      username:"Nama pengguna", password:"Kata sandi", confirmPassword:"Konfirmasi kata sandi",
+      usernamePh:"Masukkan nama pengguna", passwordPh:"Masukkan kata sandi", usernameChoosePh:"Pilih nama pengguna",
+      passwordChoosePh:"Pilih kata sandi", confirmPh:"Masukkan ulang kata sandi", gender:"Jenis kelamin",
+      male:"Pria", female:"Wanita", createAccount:"Buat akun",
+      online:"Online", menu:"Menu", home:"Beranda",
+      discover:"Jelajahi", friends:"Teman", settings:"Pengaturan",
+      logout:"Keluar", welcomeBack:"Selamat datang kembali", homeSub:"Inilah yang terjadi di BlockVerse kamu.",
+      noGamesTitle:"Belum ada game", noGamesSub:"Game akan muncul di sini setelah ditambahkan.", settingsSub:"Kelola akun, keamanan, dan sesi kamu.",
+      security:"Keamanan", securitySub:"Perangkat dan aktivitas masuk", account:"Akun",
+      accountSub:"Tampilan dan bahasa", logoutSub:"Akhiri sesi saat ini", backToSettings:"Kembali ke pengaturan",
+      securityPageSub:"Perangkat yang saat ini masuk ke akun kamu.", activeSessions:"Sesi aktif", activeSessionsDesc:"Jika kamu melihat perangkat asing, keluar dan ganti kata sandi.",
+      accountPageSub:"Sesuaikan tampilan dan bahasa BlockVerse.", bgColorTitle:"Warna latar", bgColorDesc:"Pilih tema untuk seluruh aplikasi.",
+      langTitle:"Bahasa", langDesc:"Pilih bahasa untuk seluruh platform.", changeLanguage:"Ganti bahasa",
+      loadingLang:"Mengganti bahasa...", searchLanguage:"Cari bahasa...", thisDevice:"Perangkat ini",
+      noResults:"Bahasa tidak ditemukan.", themeDark:"Hitam dan abu-abu", themeLight:"Putih dan abu-abu",
+      friendsPageSub:"Cari orang dan kelola permintaan kamu.", searchUsernamePh:"Cari berdasarkan nama pengguna...", peopleYouMayKnow:"Orang yang mungkin kamu kenal",
+      friendRequests:"Permintaan pertemanan", sendRequest:"Tambah teman", requestSent:"Permintaan terkirim",
+      accept:"Terima", decline:"Tolak", alreadyFriends:"Teman",
+      noUsersFound:"Pengguna tidak ditemukan.", noRequests:"Tidak ada permintaan tertunda.", noSuggestions:"Belum ada saran.",
+      cancelRequest:"Batalkan permintaan", incomingFrom:"ingin berteman dengan kamu"
+    },
+    vi: {
+      tagline:"xay dung. choi. tuong tuong.", login:"Dang nhap", signup:"Dang ky",
+      username:"Ten nguoi dung", password:"Mat khau", confirmPassword:"Xac nhan mat khau",
+      usernamePh:"Nhap ten nguoi dung", passwordPh:"Nhap mat khau", usernameChoosePh:"Chon ten nguoi dung",
+      passwordChoosePh:"Chon mat khau", confirmPh:"Nhap lai mat khau", gender:"Gioi tinh",
+      male:"Nam", female:"Nu", createAccount:"Tao tai khoan",
+      online:"Truc tuyen", menu:"Menu", home:"Trang chu",
+      discover:"Kham pha", friends:"Ban be", settings:"Cai dat",
+      logout:"Dang xuat", welcomeBack:"Chao mung tro lai", homeSub:"Day la nhung gi dang dien ra trong BlockVerse cua ban.",
+      noGamesTitle:"Chua co tro choi", noGamesSub:"Tro choi se xuat hien o day khi duoc them vao.", settingsSub:"Quan ly tai khoan, bao mat va phien cua ban.",
+      security:"Bao mat", securitySub:"Thiet bi va hoat dong dang nhap", account:"Tai khoan",
+      accountSub:"Giao dien va ngon ngu", logoutSub:"Ket thuc phien hien tai", backToSettings:"Quay lai cai dat",
+      securityPageSub:"Cac thiet bi hien dang dang nhap vao tai khoan cua ban.", activeSessions:"Phien hoat dong", activeSessionsDesc:"Neu ban thay thiet bi la, hay dang xuat va doi mat khau.",
+      accountPageSub:"Tuy chinh giao dien va ngon ngu cua BlockVerse.", bgColorTitle:"Mau nen", bgColorDesc:"Chon giao dien cho toan bo ung dung.",
+      langTitle:"Ngon ngu", langDesc:"Chon ngon ngu cho toan bo nen tang.", changeLanguage:"Doi ngon ngu",
+      loadingLang:"Dang doi ngon ngu...", searchLanguage:"Tim ngon ngu...", thisDevice:"Thiet bi nay",
+      noResults:"Khong tim thay ngon ngu.", themeDark:"Den va xam", themeLight:"Trang va xam",
+      friendsPageSub:"Tim kiem moi nguoi va quan ly loi moi cua ban.", searchUsernamePh:"Tim theo ten nguoi dung...", peopleYouMayKnow:"Nhung nguoi ban co the biet",
+      friendRequests:"Loi moi ket ban", sendRequest:"Them ban be", requestSent:"Da gui loi moi",
+      accept:"Chap nhan", decline:"Tu choi", alreadyFriends:"Ban be",
+      noUsersFound:"Khong tim thay nguoi dung.", noRequests:"Khong co loi moi nao.", noSuggestions:"Hien chua co goi y.",
+      cancelRequest:"Huy loi moi", incomingFrom:"muon ket ban voi ban"
+    },
+    th: {
+      tagline:"sang. len. jintanakan.", login:"Khao su rabop", signup:"Sa mak",
+      username:"Chue phu chai", password:"Ras phan", confirmPassword:"Yenyan ras phan",
+      usernamePh:"Sai chue phu chai khong khun", passwordPh:"Sai ras phan khong khun", usernameChoosePh:"Luek chue phu chai",
+      passwordChoosePh:"Luek ras phan", confirmPh:"Sai ras phan ik khrang", gender:"Phet",
+      male:"Chai", female:"Ying", createAccount:"Sang banchi",
+      online:"Online", menu:"Menu", home:"Na lak",
+      discover:"Sam ruat", friends:"Phuean", settings:"Kan tang kha",
+      logout:"Ok chak rabop", welcomeBack:"Yin di ton rap klap", homeSub:"Ni khue sing thi kamlang koet khun nai BlockVerse khong khun.",
+      noGamesTitle:"Yang mai mi kem", noGamesSub:"Kem cha prakot thi ni mue thuk phoem.", settingsSub:"Kan chai banchi khwam plot phai lae session khong khun.",
+      security:"Khwam plot phai", securitySub:"Upakon lae kitchakam kan khao su rabop", account:"Banchi",
+      accountSub:"Ruplak lae phasa", logoutSub:"Sin sut session patchuban", backToSettings:"Klap pai kan tang kha",
+      securityPageSub:"Upakon thi kamlang khao su banchi khong khun yu ton ni.", activeSessions:"Session thi chai yu", activeSessionsDesc:"Tha khun hen upakon thi mai ru chak hai ok chak rabop lae plian ras phan.",
+      accountPageSub:"Pruap tae ruplak lae phasa khong BlockVerse.", bgColorTitle:"Si phuen lang", bgColorDesc:"Luek thim samrap thang app.",
+      langTitle:"Phasa", langDesc:"Luek phasa samrap thang platform.", changeLanguage:"Plian phasa",
+      loadingLang:"Kamlang plian phasa...", searchLanguage:"Kan ha phasa...", thisDevice:"Upakon ni",
+      noResults:"Mai phop phasa.", themeDark:"Dam lae thao", themeLight:"Khao lae thao",
+      friendsPageSub:"Kan ha khon lae kan chai kham khor khong khun.", searchUsernamePh:"Kan ha duai chue phu chai...", peopleYouMayKnow:"Khon thi khunat cha ru chak",
+      friendRequests:"Kham khor pen phuean", sendRequest:"Phoem phuean", requestSent:"Song kham khor laeo",
+      accept:"Ttokrap", decline:"Patiset", alreadyFriends:"Phuean",
+      noUsersFound:"Mai phop phu chai.", noRequests:"Mai mi kham khor thi rok yu.", noSuggestions:"Yang mai mi kham naenam.",
+      cancelRequest:"Yok loek kham khor", incomingFrom:"yak pen phuean kap khun"
+    },
+    uk: {
+      tagline:"stvoryuy. hray. uyavlyay.", login:"Uviyty", signup:"Zareyestruvatysya",
+      username:"Imya korystuvacha", password:"Parol", confirmPassword:"Pidtverdyty parol",
+      usernamePh:"Vvedit imya korystuvacha", passwordPh:"Vvedit parol", usernameChoosePh:"Oberit imya korystuvacha",
+      passwordChoosePh:"Oberit parol", confirmPh:"Povtorit parol", gender:"Stat",
+      male:"Cholovicha", female:"Zhinocha", createAccount:"Stvoryty akaunt",
+      online:"V merezhi", menu:"Menyu", home:"Holovna",
+      discover:"Oglyad", friends:"Druzi", settings:"Nalashtuvannya",
+      logout:"Vyyty", welcomeBack:"Z povernennyam", homeSub:"Os shcho vidbuvaietsya u vashomu BlockVerse.",
+      noGamesTitle:"Poky nemaie ihor", noGamesSub:"Ihry z'yavlyatsya tut pislya dodavannya.", settingsSub:"Keruyte akauntom, bezpekoyu ta sesiieyu.",
+      security:"Bezpeka", securitySub:"Prystroyi ta aktyvnist vkhodu", account:"Akaunt",
+      accountSub:"Vyglyad ta mova", logoutSub:"Zavershyty potochnu sesiyu", backToSettings:"Nazad do nalashtuvan",
+      securityPageSub:"Prystroyi, shcho zaraz uviyshly do vashoho akauntu.", activeSessions:"Aktyvni sesii", activeSessionsDesc:"Yakshcho bachyte neznayomyy prystriy, vyyditt i zminit parol.",
+      accountPageSub:"Nalashtuyte vyglyad ta movu BlockVerse.", bgColorTitle:"Kolir fonu", bgColorDesc:"Oberit temu dlya vsoho dodatku.",
+      langTitle:"Mova", langDesc:"Oberit movu dlya vsiiyi platformy.", changeLanguage:"Zminyty movu",
+      loadingLang:"Zmina movy...", searchLanguage:"Poshuk movy...", thisDevice:"Tsey prystriy",
+      noResults:"Movy ne znaydeno.", themeDark:"Chornyy ta siryy", themeLight:"Bilyy ta siryy",
+      friendsPageSub:"Shukayte lyudey ta keruyte zapytamy.", searchUsernamePh:"Poshuk za imenem korystuvacha...", peopleYouMayKnow:"Lyudy, yakykh vy mozhete znaty",
+      friendRequests:"Zapyty v druzi", sendRequest:"Dodaty v druzi", requestSent:"Zapyt nadislano",
+      accept:"Pryynyaty", decline:"Vidkhylyty", alreadyFriends:"Druzi",
+      noUsersFound:"Korystuvachiv ne znaydeno.", noRequests:"Nemaie zapytiv.", noSuggestions:"Poky nemaie propozytsiy.",
+      cancelRequest:"Skasuvaty zapyt", incomingFrom:"khoche buty vashym druhom"
+    },
+    fa: {
+      tagline:"besaz. bazi kon. tasavvor kon.", login:"Vorood", signup:"Sabt-e nam",
+      username:"Nam-e karbari", password:"Ramz-e obour", confirmPassword:"Ta-yid-e ramz-e obour",
+      usernamePh:"Nam-e karbari khod ra vared konid", passwordPh:"Ramz-e obour khod ra vared konid", usernameChoosePh:"Yek nam-e karbari entekhab konid",
+      passwordChoosePh:"Yek ramz-e obour entekhab konid", confirmPh:"Ramz-e obour ra dobare vared konid", gender:"Jensiyat",
+      male:"Mard", female:"Zan", createAccount:"Sakht-e hesab",
+      online:"Online", menu:"Menu", home:"Khane",
+      discover:"Kashf", friends:"Doostan", settings:"Tanzimat",
+      logout:"Khorooj", welcomeBack:"Khosh amadid", homeSub:"In chizi ast ke dar BlockVerse shoma dar hal-e ettefagh ast.",
+      noGamesTitle:"Hanooz bazi vojood nadarad", noGamesSub:"Bazi-ha pas az ezafe shodan dar inja namayesh dade mishavand.", settingsSub:"Hesab, amniat va jalase khod ra modiriat konid.",
+      security:"Amniat", securitySub:"Dastgah-ha va faaliat-e vorood", account:"Hesab",
+      accountSub:"Zaher va zaban", logoutSub:"Payan-e jalase-ye fe'li", backToSettings:"Bazgasht be tanzimat",
+      securityPageSub:"Dastgah-hayi ke hamaknoon be hesab-e shoma vared shode-and.", activeSessions:"Jalasat-e faal", activeSessionsDesc:"Agar dastgah-e nashenakhte-i dididid, khorooj konid va ramz-e obour ra taghir dahid.",
+      accountPageSub:"Zaher va zaban-e BlockVerse ra shakhsi-sazi konid.", bgColorTitle:"Rang-e background", bgColorDesc:"Theme baraye tamam-e barnameh ra entekhab konid.",
+      langTitle:"Zaban", langDesc:"Zaban baraye tamam-e platform ra entekhab konid.", changeLanguage:"Taghir-e zaban",
+      loadingLang:"Dar hal-e taghir-e zaban...", searchLanguage:"Jostojoo-ye zaban...", thisDevice:"In dastgah",
+      noResults:"Zabani yaft nashod.", themeDark:"Siyah va khakestari", themeLight:"Sefid va khakestari",
+      friendsPageSub:"Afrad ra jostojoo konid va darkhast-haye khod ra modiriat konid.", searchUsernamePh:"Jostojoo bar asas-e nam-e karbari...", peopleYouMayKnow:"Afradi ke momken ast beshnasid",
+      friendRequests:"Darkhast-haye doosti", sendRequest:"Afzoodan-e doost", requestSent:"Darkhast ersal shod",
+      accept:"Paziroftan", decline:"Rad kardan", alreadyFriends:"Doostan",
+      noUsersFound:"Karbari yaft nashod.", noRequests:"Darkhasti dar entezar nist.", noSuggestions:"Hich pishnahadi vojood nadarad.",
+      cancelRequest:"Lagv-e darkhast", incomingFrom:"mikhahad ba shoma doost shavad"
+    },
+    ms: {
+      tagline:"bina. main. bayangkan.", login:"Log masuk", signup:"Daftar",
+      username:"Nama pengguna", password:"Kata laluan", confirmPassword:"Sahkan kata laluan",
+      usernamePh:"Masukkan nama pengguna anda", passwordPh:"Masukkan kata laluan anda", usernameChoosePh:"Pilih nama pengguna",
+      passwordChoosePh:"Pilih kata laluan", confirmPh:"Masukkan semula kata laluan", gender:"Jantina",
+      male:"Lelaki", female:"Perempuan", createAccount:"Cipta akaun",
+      online:"Dalam talian", menu:"Menu", home:"Laman utama",
+      discover:"Terokai", friends:"Kawan", settings:"Tetapan",
+      logout:"Log keluar", welcomeBack:"Selamat kembali", homeSub:"Inilah yang berlaku dalam BlockVerse anda.",
+      noGamesTitle:"Belum ada permainan", noGamesSub:"Permainan akan muncul di sini apabila ditambah.", settingsSub:"Urus akaun, keselamatan dan sesi anda.",
+      security:"Keselamatan", securitySub:"Peranti dan aktiviti log masuk", account:"Akaun",
+      accountSub:"Rupa dan bahasa", logoutSub:"Tamatkan sesi semasa", backToSettings:"Kembali ke tetapan",
+      securityPageSub:"Peranti yang sedang log masuk ke akaun anda.", activeSessions:"Sesi aktif", activeSessionsDesc:"Jika anda melihat peranti yang tidak dikenali, log keluar dan tukar kata laluan.",
+      accountPageSub:"Sesuaikan rupa dan bahasa BlockVerse.", bgColorTitle:"Warna latar belakang", bgColorDesc:"Pilih tema untuk keseluruhan aplikasi.",
+      langTitle:"Bahasa", langDesc:"Pilih bahasa untuk keseluruhan platform.", changeLanguage:"Tukar bahasa",
+      loadingLang:"Menukar bahasa...", searchLanguage:"Cari bahasa...", thisDevice:"Peranti ini",
+      noResults:"Tiada bahasa dijumpai.", themeDark:"Hitam dan kelabu", themeLight:"Putih dan kelabu",
+      friendsPageSub:"Cari orang dan urus permintaan anda.", searchUsernamePh:"Cari mengikut nama pengguna...", peopleYouMayKnow:"Orang yang mungkin anda kenali",
+      friendRequests:"Permintaan kawan", sendRequest:"Tambah kawan", requestSent:"Permintaan dihantar",
+      accept:"Terima", decline:"Tolak", alreadyFriends:"Kawan",
+      noUsersFound:"Tiada pengguna dijumpai.", noRequests:"Tiada permintaan tertangguh.", noSuggestions:"Tiada cadangan buat masa ini.",
+      cancelRequest:"Batalkan permintaan", incomingFrom:"mahu berkawan dengan anda"
+    },
+    el: {
+      tagline:"ftiakse. paikse. fantasou.", login:"Syndesi", signup:"Eggrafi",
+      username:"Onoma christi", password:"Kodikos", confirmPassword:"Epivevaiosi kodikou",
+      usernamePh:"Eisagete to onoma christi sas", passwordPh:"Eisagete ton kodiko sas", usernameChoosePh:"Epilexte ena onoma christi",
+      passwordChoosePh:"Epilexte enan kodiko", confirmPh:"Eisagete xana ton kodiko", gender:"Fylo",
+      male:"Andras", female:"Gynaika", createAccount:"Dimiourgia logariasmou",
+      online:"Syndedemenos", menu:"Menu", home:"Archiki",
+      discover:"Anakalypse", friends:"Filoi", settings:"Rythmiseis",
+      logout:"Aposyndesi", welcomeBack:"Kalos irthate xana", homeSub:"Ayta symvainoun sto BlockVerse sas.",
+      noGamesTitle:"Kanena paichnidi akoma", noGamesSub:"Ta paichnidia tha emfanistoun edo molis prostethoun.", settingsSub:"Diacheiristeite ton logariasmo, tin asfaleia kai ti synedria sas.",
+      security:"Asfaleia", securitySub:"Syskeues kai drastiriotita syndesis", account:"Logariasmos",
+      accountSub:"Emfanisi kai glossa", logoutSub:"Termatismos trechousas synedrias", backToSettings:"Epistrofi stis rythmiseis",
+      securityPageSub:"Syskeues pou einai syndedemenes stous logariasmo sas auti ti stigmi.", activeSessions:"Energes synedries", activeSessionsDesc:"An deite mia agnosti syskevi, aposyndetheite kai allaxte ton kodiko.",
+      accountPageSub:"Prosarmoste tin emfanisi kai ti glossa tou BlockVerse.", bgColorTitle:"Chroma fontou", bgColorDesc:"Epilexte to thema gia olokliri tin efarmogi.",
+      langTitle:"Glossa", langDesc:"Epilexte ti glossa gia olokliri tin platforma.", changeLanguage:"Allagi glossas",
+      loadingLang:"Allagi glossas...", searchLanguage:"Anazitisi glossas...", thisDevice:"Afti i syskevi",
+      noResults:"Den vrethikan glosses.", themeDark:"Mavro kai gkri", themeLight:"Aspro kai gkri",
+      friendsPageSub:"Anazitiste atoma kai diacheiristeite ta aitimata sas.", searchUsernamePh:"Anazitisi me onoma christi...", peopleYouMayKnow:"Atoma pou isos gnorizete",
+      friendRequests:"Aitimata filias", sendRequest:"Prosthiki filou", requestSent:"To aitima stalthike",
+      accept:"Apodochi", decline:"Aporripsi", alreadyFriends:"Filoi",
+      noUsersFound:"Den vrethikan christes.", noRequests:"Den yparchoun ekkremi aitimata.", noSuggestions:"Kammia protasi proi ora.",
+      cancelRequest:"Akyrosi aitimatos", incomingFrom:"thelei na ginete filoi"
+    },
+    sv: {
+      tagline:"bygg. spela. forestall dig.", login:"Logga in", signup:"Registrera",
+      username:"Anvandarnamn", password:"Losenord", confirmPassword:"Bekrafta losenord",
+      usernamePh:"Ange ditt anvandarnamn", passwordPh:"Ange ditt losenord", usernameChoosePh:"Valj ett anvandarnamn",
+      passwordChoosePh:"Valj ett losenord", confirmPh:"Ange losenordet igen", gender:"Kon",
+      male:"Man", female:"Kvinna", createAccount:"Skapa konto",
+      online:"Online", menu:"Meny", home:"Hem",
+      discover:"Utforska", friends:"Vanner", settings:"Installningar",
+      logout:"Logga ut", welcomeBack:"Valkommen tillbaka", homeSub:"Har ar vad som hander i din BlockVerse.",
+      noGamesTitle:"Inga spel an", noGamesSub:"Spel visas har nar de laggs till.", settingsSub:"Hantera ditt konto, sakerhet och session.",
+      security:"Sakerhet", securitySub:"Enheter och inloggningsaktivitet", account:"Konto",
+      accountSub:"Utseende och sprak", logoutSub:"Avsluta din aktuella session", backToSettings:"Tillbaka till installningar",
+      securityPageSub:"Enheter som just nu ar inloggade pa ditt konto.", activeSessions:"Aktiva sessioner", activeSessionsDesc:"Om du ser en enhet du inte kanner igen, logga ut och byt losenord.",
+      accountPageSub:"Anpassa hur BlockVerse ser ut och talar till dig.", bgColorTitle:"Bakgrundsfarg", bgColorDesc:"Valj tema for hela appen.",
+      langTitle:"Sprak", langDesc:"Valj sprak for hela plattformen.", changeLanguage:"Byt sprak",
+      loadingLang:"Byter sprak...", searchLanguage:"Sok sprak...", thisDevice:"Den har enheten",
+      noResults:"Inga sprak hittades.", themeDark:"Svart och gra", themeLight:"Vit och gra",
+      friendsPageSub:"Sok efter personer och hantera dina forfragningar.", searchUsernamePh:"Sok efter anvandarnamn...", peopleYouMayKnow:"Personer du kanske kanner",
+      friendRequests:"Vanforfragningar", sendRequest:"Lagg till van", requestSent:"Forfragan skickad",
+      accept:"Acceptera", decline:"Avvisa", alreadyFriends:"Vanner",
+      noUsersFound:"Inga anvandare hittades.", noRequests:"Inga vantande forfragningar.", noSuggestions:"Inga forslag just nu.",
+      cancelRequest:"Avbryt forfragan", incomingFrom:"vill bli din van"
+    },
+  };
+  const langList = [
+    { code:"en", name:"English", native:"English" },
+    { code:"es", name:"Spanish", native:"Espanol" },
+    { code:"fr", name:"French", native:"Francais" },
+    { code:"de", name:"German", native:"Deutsch" },
+    { code:"ar", name:"Arabic", native:"Arabiyyah" },
+    { code:"ja", name:"Japanese", native:"Nihongo" },
+    { code:"zh", name:"Chinese", native:"Zhongwen" },
+    { code:"pt", name:"Portuguese", native:"Portugues" },
+    { code:"hi", name:"Hindi", native:"Hindi" },
+    { code:"it", name:"Italian", native:"Italiano" },
+    { code:"ru", name:"Russian", native:"Russkiy" },
+    { code:"ko", name:"Korean", native:"Hangugeo" },
+    { code:"tr", name:"Turkish", native:"Turkce" },
+    { code:"nl", name:"Dutch", native:"Nederlands" },
+    { code:"pl", name:"Polish", native:"Polski" },
+    { code:"id", name:"Indonesian", native:"Bahasa Indonesia" },
+    { code:"vi", name:"Vietnamese", native:"Tieng Viet" },
+    { code:"th", name:"Thai", native:"Phasa Thai" },
+    { code:"uk", name:"Ukrainian", native:"Ukrayinska" },
+    { code:"fa", name:"Persian", native:"Farsi" },
+    { code:"ms", name:"Malay", native:"Bahasa Melayu" },
+    { code:"el", name:"Greek", native:"Ellinika" },
+    { code:"sv", name:"Swedish", native:"Svenska" }
+  ];
+  const LANG_KEY = "blockverse_lang";
+  const THEME_KEY = "blockverse_theme";
+
+  function t(key){
+    const lang = localStorage.getItem(LANG_KEY) || "en";
+    return (translations[lang] && translations[lang][key]) || translations.en[key] || key;
+  }
+  function applyTranslations(){
+    const lang = localStorage.getItem(LANG_KEY) || "en";
+    document.documentElement.lang = lang;
+    document.documentElement.dir = (lang === "ar") ? "rtl" : "ltr";
+    document.querySelectorAll("[data-i18n]").forEach(el => {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+    document.querySelectorAll("[data-i18n-ph]").forEach(el => {
+      el.setAttribute("placeholder", t(el.getAttribute("data-i18n-ph")));
+    });
+    const cur = langList.find(l => l.code === lang);
+    const curLangLabel = document.getElementById("curLangLabel");
+    if(curLangLabel && cur) curLangLabel.textContent = cur.native;
+  }
+
+  function switchLanguage(code){
+    const overlay = document.createElement("div");
+    overlay.className = "lang-overlay";
+    overlay.innerHTML = '<div class="lang-spinner"></div><p>' + t("loadingLang") + '</p>';
+    document.body.appendChild(overlay);
+    closeLangModal();
+    setTimeout(() => {
+      localStorage.setItem(LANG_KEY, code);
+      applyTranslations();
+      setTimeout(() => overlay.remove(), 250);
+    }, 700);
+  }
+
+  /* ============ theme ============ */
+  const themes = {
+    dark: { bg0:"#0a0a0b", bg1:"#131315", bg2:"#1a1a1d", bg3:"#212124", grey1:"#2a2a2e", grey2:"#38383d", grey3:"#48484e", border:"#333338", borderSoft:"#242428", text0:"#f2f2f2", text1:"#b4b4b9", text2:"#7a7a80", text3:"#55555a", nameKey:"themeDark" },
+    light: { bg0:"#f4f4f5", bg1:"#eaeaec", bg2:"#ffffff", bg3:"#f0f0f1", grey1:"#e2e2e4", grey2:"#d3d3d6", grey3:"#b9b9bd", border:"#d8d8db", borderSoft:"#e6e6e8", text0:"#1a1a1c", text1:"#4a4a4e", text2:"#78787c", text3:"#9a9a9e", nameKey:"themeLight" }
+  };
+  function applyTheme(){
+    const key = localStorage.getItem(THEME_KEY) || "dark";
+    const th = themes[key] || themes.dark;
+    const r = document.documentElement.style;
+    r.setProperty("--bg-0", th.bg0); r.setProperty("--bg-1", th.bg1);
+    r.setProperty("--bg-2", th.bg2); r.setProperty("--bg-3", th.bg3);
+    r.setProperty("--grey-1", th.grey1); r.setProperty("--grey-2", th.grey2); r.setProperty("--grey-3", th.grey3);
+    r.setProperty("--border", th.border); r.setProperty("--border-soft", th.borderSoft);
+    r.setProperty("--text-0", th.text0); r.setProperty("--text-1", th.text1);
+    r.setProperty("--text-2", th.text2); r.setProperty("--text-3", th.text3);
+  }
+  function renderThemeRow(){
+    const row = document.getElementById("themeRow");
+    if(!row) return;
+    const current = localStorage.getItem(THEME_KEY) || "dark";
+    row.innerHTML = "";
+    Object.keys(themes).forEach(key => {
+      const th = themes[key];
+      const card = document.createElement("div");
+      card.className = "theme-card" + (key === current ? " selected" : "");
+      card.innerHTML =
+        '<div class="theme-preview">' +
+          '<span style="background:' + th.bg0 + '"></span>' +
+          '<span style="background:' + th.grey1 + '"></span>' +
+          '<span style="background:' + th.grey3 + '"></span>' +
+        '</div>' +
+        '<div class="t-name"><span>' + t(th.nameKey) + '</span>' + (key === current ? '&#10003;' : '') + '</div>';
+      card.addEventListener("click", () => {
+        localStorage.setItem(THEME_KEY, key);
+        applyTheme();
+        renderThemeRow();
+      });
+      row.appendChild(card);
+    });
+  }
+
+  /* ============ language modal ============ */
+  let langModalEl = null;
+  function openLangModal(){
+    closeLangModal();
+    const lang = localStorage.getItem(LANG_KEY) || "en";
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.id = "langModalOverlay";
+    overlay.innerHTML =
+      '<div class="lang-modal">' +
+        '<div class="lang-modal-head">' +
+          '<button class="modal-close" id="langModalClose">&times;</button>' +
+          '<h3 data-i18n="changeLanguage">' + t("changeLanguage") + '</h3>' +
+          '<input type="text" class="lang-search" id="langSearchInput" placeholder="' + t("searchLanguage") + '">' +
+        '</div>' +
+        '<div class="lang-modal-list" id="langModalList"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    langModalEl = overlay;
+
+    overlay.addEventListener("click", (e) => { if(e.target === overlay) closeLangModal(); });
+    document.getElementById("langModalClose").addEventListener("click", closeLangModal);
+    document.getElementById("langSearchInput").addEventListener("input", (e) => {
+      renderLangModalList(e.target.value);
+    });
+    renderLangModalList("");
+    setTimeout(() => document.getElementById("langSearchInput").focus(), 50);
+  }
+  function renderLangModalList(query){
+    const list = document.getElementById("langModalList");
+    if(!list) return;
+    const current = localStorage.getItem(LANG_KEY) || "en";
+    const q = query.trim().toLowerCase();
+    const filtered = langList.filter(l =>
+      l.name.toLowerCase().includes(q) || l.native.toLowerCase().includes(q)
+    );
+    list.innerHTML = "";
+    if(filtered.length === 0){
+      list.innerHTML = '<div class="lang-modal-empty">' + t("noResults") + '</div>';
+      return;
+    }
+    filtered.forEach(l => {
+      const item = document.createElement("div");
+      item.className = "lang-modal-item" + (l.code === current ? " selected" : "");
+      item.innerHTML = '<span>' + l.name + '</span><span class="li-native">' + l.native + '</span>';
+      item.addEventListener("click", () => switchLanguage(l.code));
+      list.appendChild(item);
+    });
+  }
+  function closeLangModal(){
+    if(langModalEl){ langModalEl.remove(); langModalEl = null; }
+  }
+
+  /* ============ device sessions (illustrative data) ============ */
+  function deviceIconSvg(type){
+    if(type === "mobile"){
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>';
+  }
+  function detectDeviceLabel(){
+    const ua = navigator.userAgent;
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(ua);
+    let browser = "Browser";
+    if(/Edg\//.test(ua)) browser = "Edge";
+    else if(/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = "Chrome";
+    else if(/Firefox\//.test(ua)) browser = "Firefox";
+    else if(/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = "Safari";
+    let os = "";
+    if(/Windows/.test(ua)) os = "Windows";
+    else if(/Mac OS X/.test(ua)) os = "Mac";
+    else if(/Android/.test(ua)) os = "Android";
+    else if(/iPhone|iPad/.test(ua)) os = "iOS";
+    else if(/Linux/.test(ua)) os = "Linux";
+    return { type: isMobile ? "mobile" : "desktop", label: [os, browser].filter(Boolean).join(" - ") || "This device" };
+  }
+  function renderDevices(username){
+    const list = document.getElementById("deviceList");
+    if(!list) return;
+    // BlockVerse runs fully client-side with no server/auth backend, so it has no
+    // way to see other real devices or sessions signed in to an account.
+    // The only session we can honestly report is this current browser.
+    const info = detectDeviceLabel();
+    const sessions = [
+      { device: info.label, type: info.type, country: t("online"), time: "", current:true }
+    ];
+    list.innerHTML = "";
+    sessions.forEach(s => {
+      const row = document.createElement("div");
+      row.className = "device-row";
+      row.innerHTML =
+        '<div class="device-icon">' + deviceIconSvg(s.type) + '</div>' +
+        '<div class="device-info">' +
+          '<div class="d-name">' + s.device + '</div>' +
+          '<div class="d-meta">' + s.country + (s.time ? ' &middot; ' + s.time : '') + '</div>' +
+        '</div>' +
+        (s.current ? '<span class="device-current" data-i18n="thisDevice">' + t("thisDevice") + '</span>' : '');
+      list.appendChild(row);
+    });
+  }
+
+  /* ============ accounts / auth ============ */
+  const STORE_KEY = "blockverse_accounts";
+  const SESSION_KEY = "blockverse_session";
+  function getAccounts(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e){ return {}; } }
+  function saveAccounts(a){ localStorage.setItem(STORE_KEY, JSON.stringify(a)); }
+  function setSession(u){ localStorage.setItem(SESSION_KEY, u); }
+  function getSession(){ return localStorage.getItem(SESSION_KEY); }
+  function clearSession(){ localStorage.removeItem(SESSION_KEY); }
+
+  const tabLogin = document.getElementById("tabLogin");
+  const tabSignup = document.getElementById("tabSignup");
+  const tabSlider = document.getElementById("tabSlider");
+  const loginForm = document.getElementById("loginForm");
+  const signupForm = document.getElementById("signupForm");
+
+  tabLogin.addEventListener("click", () => {
+    tabLogin.classList.add("active"); tabSignup.classList.remove("active");
+    tabSlider.style.transform = "translateX(0%)";
+    loginForm.classList.remove("hidden"); signupForm.classList.add("hidden");
+  });
+  tabSignup.addEventListener("click", () => {
+    tabSignup.classList.add("active"); tabLogin.classList.remove("active");
+    tabSlider.style.transform = "translateX(100%)";
+    signupForm.classList.remove("hidden"); loginForm.classList.add("hidden");
+  });
+
+  let selectedGender = null;
+  const genderMale = document.getElementById("genderMale");
+  const genderFemale = document.getElementById("genderFemale");
+  function pickGender(btn, value){
+    selectedGender = value;
+    genderMale.classList.remove("selected"); genderFemale.classList.remove("selected");
+    btn.classList.add("selected");
+  }
+  genderMale.addEventListener("click", () => pickGender(genderMale, "male"));
+  genderFemale.addEventListener("click", () => pickGender(genderFemale, "female"));
+
+  function showMsg(el, text, type){
+    el.textContent = "";
+    const dot = document.createElement("span"); dot.className = "msg-dot";
+    const txt = document.createElement("span"); txt.textContent = text;
+    el.appendChild(dot); el.appendChild(txt);
+    el.className = "msg show " + type;
+  }
+  function clearMsg(el){ el.textContent = ""; el.className = "msg"; }
+  function shakeField(input){
+    input.classList.remove("shake-error"); void input.offsetWidth;
+    input.classList.add("shake-error");
+    setTimeout(() => input.classList.remove("shake-error"), 400);
+  }
+
+  const signupMsg = document.getElementById("signupMsg");
+  const signupSubmitBtn = document.getElementById("signupSubmitBtn");
+  signupForm.addEventListener("submit", async function(e){
+    e.preventDefault();
+    clearMsg(signupMsg);
+    const usernameEl = document.getElementById("suUsername");
+    const passwordEl = document.getElementById("suPassword");
+    const confirmEl = document.getElementById("suConfirm");
+    const username = usernameEl.value.trim();
+    const password = passwordEl.value;
+    const confirm = confirmEl.value;
+
+    if(!username || !password || !confirm){
+      showMsg(signupMsg, "Fill in every field first.", "error");
+      if(!username) shakeField(usernameEl);
+      if(!password) shakeField(passwordEl);
+      if(!confirm) shakeField(confirmEl);
+      return;
+    }
+    if(username.length < 3){ showMsg(signupMsg, "Username needs at least 3 characters.", "error"); shakeField(usernameEl); return; }
+    if(!selectedGender){ showMsg(signupMsg, "Pick male or female.", "error"); return; }
+    if(password !== confirm){ showMsg(signupMsg, "Passwords don't match.", "error"); shakeField(confirmEl); return; }
+    if(password.length < 4){ showMsg(signupMsg, "Password needs at least 4 characters.", "error"); shakeField(passwordEl); return; }
+
+    const accounts = getAccounts();
+    const key = username.toLowerCase();
+    if(accounts[key]){ showMsg(signupMsg, "This username is taken.", "error"); shakeField(usernameEl); return; }
+
+    // Username uniqueness has to be checked against the shared Firebase
+    // directory (not just this browser's localStorage) - otherwise two
+    // different browsers/devices can both "claim" the same name. Reserve it
+    // atomically with a transaction so a simultaneous signup from another
+    // device can't slip through.
+    signupSubmitBtn.classList.add("loading");
+    try{
+      await fbReady;
+      if(!fbUid){
+        showMsg(signupMsg, "Couldn't reach the server to check that username. Try again.", "error");
+        signupSubmitBtn.classList.remove("loading");
+        return;
+      }
+      const result = await fbDb.ref("blockverse_usernames/" + key).transaction(current => {
+        if(current !== null) return; // abort - already taken
+        return { username: username };
+      });
+      if(!result.committed){
+        showMsg(signupMsg, "This username is taken.", "error");
+        shakeField(usernameEl);
+        signupSubmitBtn.classList.remove("loading");
+        return;
+      }
+    } catch(err){
+      console.error("Username reservation failed:", err);
+      showMsg(signupMsg, "Couldn't reach the server to check that username. Try again.", "error");
+      signupSubmitBtn.classList.remove("loading");
+      return;
+    }
+
+    accounts[key] = { username, password, gender: selectedGender, friends: [], incoming: [], outgoing: [] };
+    saveAccounts(accounts);
+    showMsg(signupMsg, "Account created. Logging you in...", "success");
+    setSession(key);
+    setTimeout(enterApp, 550);
+  });
+
+  const loginMsg = document.getElementById("loginMsg");
+  const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+  loginForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    clearMsg(loginMsg);
+    const usernameEl = document.getElementById("loginUsername");
+    const passwordEl = document.getElementById("loginPassword");
+    const username = usernameEl.value.trim();
+    const password = passwordEl.value;
+
+    if(!username || !password){
+      showMsg(loginMsg, "Enter your username and password.", "error");
+      if(!username) shakeField(usernameEl);
+      if(!password) shakeField(passwordEl);
+      return;
+    }
+    const accounts = getAccounts();
+    const key = username.toLowerCase();
+    const account = accounts[key];
+    if(!account || account.password !== password){
+      showMsg(loginMsg, "Wrong username or password.", "error");
+      shakeField(passwordEl);
+      return;
+    }
+    showMsg(loginMsg, "Welcome back, " + account.username + "!", "success");
+    loginSubmitBtn.classList.add("loading");
+    setSession(key);
+    publishUsernameToDirectory(key, account.username); // backfill directory for accounts made before this existed
+    setTimeout(enterApp, 450);
+  });
+
+  /* ============ friends system (Firebase Realtime Database) ============ */
+  // Friend data now lives in Firebase under blockverse_users/{usernameKey}, so
+  // requests/accepts/notices sync across real separate devices, not just this
+  // browser. Login/password accounts still live in localStorage (this demo has
+  // no real auth server), but everything social is keyed by the same lowercase
+  // username and mirrored live from Firebase into fbFriendMirror below.
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+  function currentAccountKey(){ return getSession(); }
+  function initialsAvatar(name){ return (name || "?").charAt(0).toUpperCase(); }
+
+  function fuRef(key, path){ return fbDb.ref("blockverse_users/" + key + (path ? "/" + path : "")); }
+
+  function publishUsernameToDirectory(key, username){
+    fbDb.ref("blockverse_usernames/" + key).set({ username: username }).catch(() => {});
+  }
+
+  // Live mirrors, kept in sync via Firebase listeners.
+  let fbUsernameDirectory = {};      // key -> { username }
+  const fbFriendMirror = { friends: [], incoming: [], outgoing: [] };
+  let friendListenersKey = null;
+  let friendListenersReady = false;
+
+  function displayNameFor(key){
+    return (fbUsernameDirectory[key] && fbUsernameDirectory[key].username)
+      || (getAccounts()[key] && getAccounts()[key].username)
+      || key;
+  }
+
+  function startFriendNoticePolling(){
+    const myKey = currentAccountKey();
+    if(!myKey || friendListenersKey === myKey) return;
+    friendListenersKey = myKey;
+    friendListenersReady = false;
+
+    fbDb.ref("blockverse_usernames").on("value", snap => {
+      fbUsernameDirectory = snap.val() || {};
+      renderFriendsPage();
+    });
+
+    fuRef(myKey, "friends").on("value", snap => {
+      fbFriendMirror.friends = snap.val() ? Object.keys(snap.val()) : [];
+      renderFriendsPage(); refreshCharPreviewAction(); updateFriendBadge();
+    });
+
+    fuRef(myKey, "outgoing").on("value", snap => {
+      fbFriendMirror.outgoing = snap.val() ? Object.keys(snap.val()) : [];
+      renderFriendsPage(); refreshCharPreviewAction();
+    });
+
+    const incomingRef = fuRef(myKey, "incoming");
+    incomingRef.on("value", snap => {
+      fbFriendMirror.incoming = snap.val() ? Object.keys(snap.val()) : [];
+      renderFriendsPage(); refreshCharPreviewAction(); updateFriendBadge();
+    });
+    // Only toast for requests that arrive *after* we start listening, so
+    // logging in doesn't dump a toast for every old pending request at once.
+    incomingRef.once("value", () => { friendListenersReady = true; });
+    incomingRef.on("child_added", snap => {
+      if(!friendListenersReady) return;
+      const fromKey = snap.key;
+      showIngameToast({
+        kind:"request", userKey: fromKey,
+        html: "<b>" + escapeHtml(displayNameFor(fromKey)) + "</b> " + t("sentYouRequestSuffix")
+      });
+    });
+
+    fuRef(myKey, "notices").on("child_added", snap => {
+      const n = snap.val() || {};
+      if(n.type === "accepted"){
+        showIngameToast({
+          kind:"info", userKey: n.by,
+          html: "<b>" + escapeHtml(displayNameFor(n.by)) + "</b> " + t("acceptedYourRequestSuffix")
+        });
+      }
+      snap.ref.remove();
+    });
+  }
+
+  function stopFriendNoticePolling(){
+    if(friendListenersKey){
+      fuRef(friendListenersKey, "friends").off();
+      fuRef(friendListenersKey, "outgoing").off();
+      fuRef(friendListenersKey, "incoming").off();
+      fuRef(friendListenersKey, "notices").off();
+      fbDb.ref("blockverse_usernames").off();
+    }
+    friendListenersKey = null;
+    friendListenersReady = false;
+    fbFriendMirror.friends = []; fbFriendMirror.incoming = []; fbFriendMirror.outgoing = [];
+    const stack = ingameToastStack();
+    if(stack) stack.innerHTML = "";
+  }
+
+  function updateFriendBadge(){
+    const badge = document.getElementById("friendReqBadge");
+    const dot = document.getElementById("notifBellDot");
+    const count = fbFriendMirror.incoming.length;
+    if(badge){
+      badge.textContent = count > 9 ? "9+" : String(count);
+      badge.classList.toggle("hidden", count === 0);
+    }
+    if(dot) dot.classList.toggle("hidden", count === 0);
+    if(notifPanelOpen) renderNotifPanel();
+  }
+
+  /* ============ friend toasts (bottom-right, shown anywhere in the app) ============ */
+  function ingameToastStack(){ return document.getElementById("ingameToastStack"); }
+
+  function dismissToastEl(el){
+    if(!el || el.classList.contains("out")) return;
+    el.classList.add("out");
+    setTimeout(() => el.remove(), 200);
+  }
+
+  function dismissRequestToast(fromKey){
+    const el = ingameToastStack().querySelector('[data-toast-request="' + fromKey + '"]');
+    if(el) dismissToastEl(el);
+  }
+
+  // kind: "request" (accept/ignore a friend request) or "info" (auto-dismissing confirmation)
+  function showIngameToast({ kind, userKey, html }){
+    const stack = ingameToastStack();
+    if(!stack) return;
+    const el = document.createElement("div");
+    el.className = "ingame-toast";
+    if(kind === "request") el.setAttribute("data-toast-request", userKey);
+
+    const actionsHtml = kind === "request"
+      ? '<div class="it-actions">' +
+          '<button class="it-btn primary" data-toast-accept>' + t("accept") + '</button>' +
+          '<button class="it-btn" data-toast-ignore>' + t("ignore") + '</button>' +
+        '</div>'
+      : "";
+
+    el.innerHTML =
+      '<div class="friend-avatar">' + initialsAvatar(displayNameFor(userKey)) + '</div>' +
+      '<div class="it-body"><div class="it-text">' + html + '</div>' + actionsHtml + '</div>';
+
+    stack.appendChild(el);
+
+    if(kind === "request"){
+      el.querySelector("[data-toast-accept]").addEventListener("click", () => acceptFriendRequest(userKey));
+      el.querySelector("[data-toast-ignore]").addEventListener("click", () => {
+        // Just hides the toast - the request stays pending in Firebase and
+        // still shows up later in the dashboard's Friends > Requests list.
+        dismissToastEl(el);
+      });
+    } else {
+      setTimeout(() => dismissToastEl(el), 5000);
+    }
+  }
+
+  function sendFriendRequest(targetKey){
+    const myKey = currentAccountKey();
+    if(!myKey || myKey === targetKey) return;
+    if(fbFriendMirror.friends.includes(targetKey) || fbFriendMirror.outgoing.includes(targetKey)) return;
+    // If they already sent us a request, accept it instead of sending a duplicate one.
+    if(fbFriendMirror.incoming.includes(targetKey)){ acceptFriendRequest(targetKey); return; }
+    const myName = (getAccounts()[myKey] || {}).username || myKey;
+    fuRef(targetKey, "incoming/" + myKey).set(true);
+    fuRef(myKey, "outgoing/" + targetKey).set(true);
+    refreshCharPreviewAction();
+  }
+
+  function cancelFriendRequest(targetKey){
+    const myKey = currentAccountKey();
+    fuRef(myKey, "outgoing/" + targetKey).remove();
+    fuRef(targetKey, "incoming/" + myKey).remove();
+  }
+
+  function acceptFriendRequest(fromKey){
+    const myKey = currentAccountKey();
+    fuRef(myKey, "incoming/" + fromKey).remove();
+    fuRef(fromKey, "outgoing/" + myKey).remove();
+    fuRef(myKey, "friends/" + fromKey).set(true);
+    fuRef(fromKey, "friends/" + myKey).set(true);
+    // Queue a ping for the original sender: "X accepted your friend request".
+    fuRef(fromKey, "notices").push({ type:"accepted", by: myKey, ts: firebase.database.ServerValue.TIMESTAMP });
+    dismissRequestToast(fromKey);
+    // Immediate confirmation for the person who just clicked accept.
+    showIngameToast({
+      kind:"info",
+      userKey: fromKey,
+      html: "<b>" + t("youAcceptedPrefix") + " " + escapeHtml(displayNameFor(fromKey)) + "</b>" + t("youAcceptedSuffix")
+    });
+  }
+
+  function declineFriendRequest(fromKey){
+    const myKey = currentAccountKey();
+    fuRef(myKey, "incoming/" + fromKey).remove();
+    fuRef(fromKey, "outgoing/" + myKey).remove();
+  }
+
+  function friendRowHtml(key, actionsHtml){
+    return (
+      '<div class="friend-row" data-user="' + key + '">' +
+        '<div class="friend-avatar">' + initialsAvatar(displayNameFor(key)) + '</div>' +
+        '<div class="friend-info">' +
+          '<div class="f-name">' + escapeHtml(displayNameFor(key)) + '</div>' +
+        '</div>' +
+        '<div class="friend-actions">' + actionsHtml + '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderFriendsPage(){
+    const myKey = currentAccountKey();
+    if(!myKey) return;
+    const pageEl = document.getElementById("pageFriends");
+    if(!pageEl || pageEl.classList.contains("hidden")) { updateFriendBadge(); return; }
+
+    const query = (document.getElementById("friendSearchInput").value || "").trim().toLowerCase();
+    const resultsEl = document.getElementById("friendSearchResults");
+    const reqListEl = document.getElementById("friendRequestsList");
+    const reqCountEl = document.getElementById("friendReqCount");
+    const suggestListEl = document.getElementById("friendSuggestList");
+    const reqSection = document.getElementById("friendRequestsSection");
+    const suggestSection = document.getElementById("friendSuggestSection");
+
+    function actionsFor(key){
+      if(fbFriendMirror.friends.includes(key)) return '<span class="friend-btn disabled">' + t("alreadyFriends") + '</span>';
+      if(fbFriendMirror.outgoing.includes(key)) return '<button class="friend-btn" data-cancel="' + key + '">' + t("requestSent") + '</button>';
+      if(fbFriendMirror.incoming.includes(key)) return (
+        '<button class="friend-btn primary" data-accept="' + key + '">' + t("accept") + '</button>' +
+        '<button class="friend-btn danger" data-decline="' + key + '">' + t("decline") + '</button>'
+      );
+      return '<button class="friend-btn primary" data-add="' + key + '">' + t("sendRequest") + '</button>';
+    }
+
+    // Search results: the shared Firebase username directory, so this finds
+    // real accounts made on any device, not just this browser.
+    if(query){
+      const matches = Object.keys(fbUsernameDirectory).filter(k => k !== myKey && k.includes(query));
+      resultsEl.innerHTML = matches.length
+        ? matches.map(k => friendRowHtml(k, actionsFor(k))).join("")
+        : '<div class="friend-empty">' + t("noUsersFound") + '</div>';
+      reqSection.classList.add("hidden");
+      suggestSection.classList.add("hidden");
+    } else {
+      resultsEl.innerHTML = "";
+      reqSection.classList.remove("hidden");
+      suggestSection.classList.remove("hidden");
+    }
+
+    // Incoming requests
+    reqCountEl.textContent = fbFriendMirror.incoming.length;
+    reqListEl.innerHTML = fbFriendMirror.incoming.length
+      ? fbFriendMirror.incoming.map(k => friendRowHtml(k, actionsFor(k))).join("")
+      : '<div class="friend-empty">' + t("noRequests") + '</div>';
+
+    // People you may know: other directory accounts that aren't already friends/pending
+    const suggestions = Object.keys(fbUsernameDirectory).filter(k =>
+      k !== myKey && !fbFriendMirror.friends.includes(k) && !fbFriendMirror.outgoing.includes(k) && !fbFriendMirror.incoming.includes(k)
+    ).slice(0, 8);
+    suggestListEl.innerHTML = suggestions.length
+      ? suggestions.map(k => friendRowHtml(k, actionsFor(k))).join("")
+      : '<div class="friend-empty">' + t("noSuggestions") + '</div>';
+
+    updateFriendBadge();
+  }
+
+  /* ============ notification bell / panel ============ */
+  let notifPanelOpen = false;
+  function renderNotifPanel(){
+    const root = document.getElementById("notifPanelRoot");
+    if(!root) return;
+    const requests = fbFriendMirror.incoming;
+
+    const rows = requests.length
+      ? requests.map(k => {
+          return (
+            '<div class="notif-row" data-notif-user="' + k + '">' +
+              '<div class="friend-avatar">' + initialsAvatar(displayNameFor(k)) + '</div>' +
+              '<div class="n-text"><b>' + escapeHtml(displayNameFor(k)) + '</b> ' + t("incomingFrom") + '</div>' +
+              '<div class="friend-actions">' +
+                '<button class="friend-btn primary" data-notif-accept="' + k + '">' + t("accept") + '</button>' +
+                '<button class="friend-btn danger" data-notif-decline="' + k + '">' + t("decline") + '</button>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join("")
+      : '<div class="notif-panel-empty">' + t("noRequests") + '</div>';
+
+    root.innerHTML =
+      '<div class="notif-panel-overlay" id="notifOverlay"></div>' +
+      '<div class="notif-panel">' +
+        '<div class="notif-panel-head">' +
+          '<h3>' + (translations[localStorage.getItem(LANG_KEY) || "en"].notifications || "Notifications") + '</h3>' +
+          '<button class="modal-close" id="notifPanelClose">&times;</button>' +
+        '</div>' +
+        '<div class="notif-panel-list">' + rows + '</div>' +
+      '</div>';
+
+    document.getElementById("notifOverlay").addEventListener("click", closeNotifPanel);
+    document.getElementById("notifPanelClose").addEventListener("click", closeNotifPanel);
+    root.querySelectorAll("[data-notif-accept]").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); acceptFriendRequest(btn.getAttribute("data-notif-accept")); });
+    });
+    root.querySelectorAll("[data-notif-decline]").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); declineFriendRequest(btn.getAttribute("data-notif-decline")); });
+    });
+    root.querySelectorAll(".notif-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const targetUser = row.getAttribute("data-notif-user");
+        closeNotifPanel();
+        showPage("friends");
+        const input = document.getElementById("friendSearchInput");
+        if(input){ input.value = targetUser; renderFriendsPage(); }
+      });
+    });
+  }
+  function openNotifPanel(){
+    notifPanelOpen = true;
+    renderNotifPanel();
+  }
+  function closeNotifPanel(){
+    notifPanelOpen = false;
+    const root = document.getElementById("notifPanelRoot");
+    if(root) root.innerHTML = "";
+  }
+  document.getElementById("notifBellBtn").addEventListener("click", () => {
+    if(notifPanelOpen) closeNotifPanel(); else openNotifPanel();
+  });
+
+  document.getElementById("friendSearchInput").addEventListener("input", renderFriendsPage);
+  document.getElementById("pageFriends").addEventListener("click", (e) => {
+    const add = e.target.closest("[data-add]");
+    const cancel = e.target.closest("[data-cancel]");
+    const accept = e.target.closest("[data-accept]");
+    const decline = e.target.closest("[data-decline]");
+    if(add) sendFriendRequest(add.getAttribute("data-add"));
+    else if(cancel) cancelFriendRequest(cancel.getAttribute("data-cancel"));
+    else if(accept) acceptFriendRequest(accept.getAttribute("data-accept"));
+    else if(decline) declineFriendRequest(decline.getAttribute("data-decline"));
+  });
+
+  /* ============ dashboard nav ============ */
+  const pages = {
+    home: document.getElementById("pageHome"),
+    settingsHub: document.getElementById("pageSettingsHub"),
+    security: document.getElementById("pageSecurity"),
+    account: document.getElementById("pageAccount"),
+    friends: document.getElementById("pageFriends")
+  };
+  function showPage(name){
+    Object.keys(pages).forEach(k => pages[k].classList.toggle("hidden", k !== name));
+    const settingsPages = ["settingsHub", "security", "account"];
+    document.querySelectorAll(".sb-item").forEach(i => {
+      const p = i.getAttribute("data-page");
+      i.classList.toggle("active", p === name || (p === "settings" && settingsPages.includes(name)));
+    });
+    if(name === "account"){ renderThemeRow(); applyTranslations(); }
+    if(name === "security"){ renderDevices(); }
+    if(name === "friends"){ renderFriendsPage(); }
+  }
+  document.querySelectorAll(".sb-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const page = item.getAttribute("data-page");
+      if(page === "settings"){ showPage("settingsHub"); }
+      else{ showPage(page); }
+    });
+  });
+  document.querySelectorAll("[data-back]").forEach(el => {
+    el.addEventListener("click", () => showPage(el.getAttribute("data-back")));
+  });
+
+  document.getElementById("openSecurity").addEventListener("click", () => showPage("security"));
+  document.getElementById("openAccount").addEventListener("click", () => showPage("account"));
+  document.getElementById("openLogoutTile").addEventListener("click", () => doLogout());
+  document.getElementById("openLangModal").addEventListener("click", openLangModal);
+
+  /* ============ enter/exit dashboard ============ */
+  function enterApp(){
+    const key = getSession();
+    if(!key) return;
+    const accounts = getAccounts();
+    const account = accounts[key];
+    if(!account) return;
+
+    document.getElementById("authScreenWrap").classList.add("hidden");
+    document.getElementById("dashScreen").classList.remove("hidden");
+    document.getElementById("hubUsername").textContent = account.username;
+    document.getElementById("hubAvatar").textContent = account.username.charAt(0).toUpperCase();
+    document.getElementById("welcomeName").textContent = ", " + account.username;
+    showPage("home");
+    updateFriendBadge();
+    startFriendNoticePolling();
+  }
+
+  function doLogout(){
+    clearSession();
+    closeNotifPanel();
+    stopFriendNoticePolling();
+    document.getElementById("dashScreen").classList.add("hidden");
+    document.getElementById("authScreenWrap").classList.remove("hidden");
+    loginForm.reset(); signupForm.reset();
+    clearMsg(loginMsg); clearMsg(signupMsg);
+    loginSubmitBtn.classList.remove("loading"); signupSubmitBtn.classList.remove("loading");
+    genderMale.classList.remove("selected"); genderFemale.classList.remove("selected");
+    selectedGender = null;
+    tabLogin.click();
+  }
+  document.getElementById("logoutBtn").addEventListener("click", doLogout);
+
+  /* ============ 3D game: Baseplate ============ */
+  const BaseplateGame = (function(){
+    let renderer, scene, camera, clock;
+    let character, leftArm, rightArm, leftLeg, rightLeg, head;
+    let running = false;
+    let animId = null;
+
+    const keys = {};
+    const move = { x:0, z:0 }; // joystick / wasd vector
+    let camYaw = Math.PI;      // horizontal look angle (target)
+    let camPitch = 0.28;       // vertical look angle (target)
+    let smYaw = Math.PI;       // smoothed/applied look angle
+    let smPitch = 0.28;
+    let vy = 0;                // vertical velocity for jump
+    let onGround = true;
+    let walkT = 0;
+    let velX = 0, velZ = 0;    // smoothed movement velocity
+    let mouseSensitivity = 1;
+    let ragdoll = false;
+
+    // multiplayer state
+    let playerId = null;
+    let playersRef = null;
+    let onlineRef = null;
+    const remotePlayers = {};   // id -> { group, target:{x,y,z,ry}, name }
+    let livePlayers = {};       // id -> latest raw data from Firebase (for View/Report tabs)
+    let netTimer = 0;
+    const NET_INTERVAL = 0.12;  // seconds between position writes
+
+    const GROUND_Y = 0;
+    const GRAVITY = -0.028;
+    const JUMP_VELOCITY = 0.46;
+    const MOVE_SPEED = 0.11;
+
+    function initScene(){
+      const canvas = document.getElementById("gameCanvas");
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x8fd0f0);
+      scene.fog = new THREE.Fog(0x8fd0f0, 40, 160);
+
+      camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 500);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x3a5f2b, 0.9);
+      scene.add(hemi);
+      const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+      sun.position.set(30, 45, 20);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024);
+      sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
+      sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
+      scene.add(sun);
+
+      // baseplate
+      const groundGeo = new THREE.PlaneGeometry(300, 300);
+      const groundMat = new THREE.MeshLambertMaterial({ color: 0x2f9e44 });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI/2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // faint grid for scale reference
+      const grid = new THREE.GridHelper(300, 60, 0x1f7a34, 0x1f7a34);
+      grid.material.opacity = 0.18;
+      grid.material.transparent = true;
+      scene.add(grid);
+
+      buildCharacter();
+      clock = new THREE.Clock();
+    }
+
+    function makeLimbMesh(mat, w,h,d, pivotY){
+      const grp = new THREE.Group();
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+      mesh.position.y = -h/2;
+      mesh.castShadow = true;
+      grp.add(mesh);
+      grp.position.y = pivotY;
+      return grp;
+    }
+
+    // builds a full blocky character rig; returns references to each part
+    function buildCharacterRig(color){
+      const grp = new THREE.Group();
+
+      const skin = new THREE.MeshLambertMaterial({ color: 0xf0c090 });
+      const shirt = new THREE.MeshLambertMaterial({ color: color || 0x4a5fd6 });
+      const pants = new THREE.MeshLambertMaterial({ color: 0x2a2a2e });
+
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.5), shirt);
+      torso.position.y = 1.35;
+      torso.castShadow = true;
+      grp.add(torso);
+
+      const rigHead = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.58), skin);
+      rigHead.position.y = 2.05;
+      rigHead.castShadow = true;
+      grp.add(rigHead);
+
+      const rigLeftArm = makeLimbMesh(shirt, 0.3, 1.0, 0.3, 1.85);
+      rigLeftArm.position.x = -0.62;
+      grp.add(rigLeftArm);
+
+      const rigRightArm = makeLimbMesh(shirt, 0.3, 1.0, 0.3, 1.85);
+      rigRightArm.position.x = 0.62;
+      grp.add(rigRightArm);
+
+      const rigLeftLeg = makeLimbMesh(pants, 0.35, 1.05, 0.35, 0.78);
+      rigLeftLeg.position.x = -0.24;
+      grp.add(rigLeftLeg);
+
+      const rigRightLeg = makeLimbMesh(pants, 0.35, 1.05, 0.35, 0.78);
+      rigRightLeg.position.x = 0.24;
+      grp.add(rigRightLeg);
+
+      grp.scale.set(0.86, 0.86, 0.86);
+
+      return { group: grp, head: rigHead, leftArm: rigLeftArm, rightArm: rigRightArm, leftLeg: rigLeftLeg, rightLeg: rigRightLeg };
+    }
+
+    function buildCharacter(){
+      const rig = buildCharacterRig(0x4a5fd6);
+      character = rig.group;
+      head = rig.head; leftArm = rig.leftArm; rightArm = rig.rightArm;
+      leftLeg = rig.leftLeg; rightLeg = rig.rightLeg;
+      character.position.set(0, 0, 0);
+      scene.add(character);
+    }
+
+    // ---- remote players (other real people from Firebase) ----
+    const REMOTE_COLORS = [0xd64a6a, 0x4ad6a0, 0xd6b34a, 0x8a4ad6, 0x4ab0d6];
+    function colorForId(id){
+      let h = 0;
+      for(let i=0;i<id.length;i++) h = (h*31 + id.charCodeAt(i)) >>> 0;
+      return REMOTE_COLORS[h % REMOTE_COLORS.length];
+    }
+
+    function addRemotePlayer(id, data){
+      const rig = buildCharacterRig(colorForId(id));
+      rig.group.position.set(data.x||0, data.y||0, data.z||0);
+      rig.group.rotation.y = data.ry||0;
+      scene.add(rig.group);
+
+      // simple floating name tag using a canvas sprite
+      const nameSprite = makeNameSprite(data.name || "Player");
+      nameSprite.position.set(0, 2.9, 0);
+      rig.group.add(nameSprite);
+
+      remotePlayers[id] = {
+        group: rig.group, leftArm: rig.leftArm, rightArm: rig.rightArm,
+        leftLeg: rig.leftLeg, rightLeg: rig.rightLeg,
+        target: { x:data.x||0, y:data.y||0, z:data.z||0, ry:data.ry||0 },
+        walkT: 0, lastPos: { x:data.x||0, z:data.z||0 }
+      };
+    }
+
+    function makeNameSprite(text){
+      const canvas = document.createElement("canvas");
+      canvas.width = 256; canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      ctx.font = "bold 30px Arial";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(10,10,11,0.55)";
+      const w = ctx.measureText(text).width + 24;
+      ctx.fillRect(128 - w/2, 12, w, 40);
+      ctx.fillStyle = "#f2f2f2";
+      ctx.fillText(text, 128, 40);
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(1.6, 0.4, 1);
+      return sprite;
+    }
+
+    /* ---- chat speech bubbles above heads ---- */
+    function wrapChatLines(ctx, text, maxWidth){
+      const words = text.split(/\s+/);
+      const lines = [];
+      let line = "";
+      words.forEach(word => {
+        const test = line ? line + " " + word : word;
+        if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = word; }
+        else line = test;
+      });
+      if(line) lines.push(line);
+      return lines.slice(0, 3); // cap at 3 lines so bubbles can't get huge
+    }
+
+    function makeChatBubbleSprite(text){
+      const canvas = document.createElement("canvas");
+      canvas.width = 320; canvas.height = 160;
+      const ctx = canvas.getContext("2d");
+      ctx.font = "26px Arial";
+      const lines = wrapChatLines(ctx, text, 270);
+      const lineH = 30;
+      const boxH = lines.length * lineH + 24;
+      const boxW = Math.min(300, Math.max(...lines.map(l => ctx.measureText(l).width)) + 30);
+      const boxX = (canvas.width - boxW) / 2;
+      const boxY = canvas.height - boxH - 18;
+
+      ctx.fillStyle = "rgba(242,242,242,0.96)";
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 10);
+      ctx.fill();
+      // little pointer tail
+      ctx.beginPath();
+      ctx.moveTo(canvas.width/2 - 8, boxY + boxH);
+      ctx.lineTo(canvas.width/2 + 8, boxY + boxH);
+      ctx.lineTo(canvas.width/2, boxY + boxH + 12);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = "#0a0a0b";
+      ctx.textAlign = "center";
+      lines.forEach((line, i) => {
+        ctx.fillText(line, canvas.width/2, boxY + 26 + i*lineH);
+      });
+
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(2.4, 2.4 * (canvas.height/canvas.width), 1);
+      return sprite;
+    }
+
+    function roundRectPath(ctx, x, y, w, h, r){
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.arcTo(x+w, y, x+w, y+h, r);
+      ctx.arcTo(x+w, y+h, x, y+h, r);
+      ctx.arcTo(x, y+h, x, y, r);
+      ctx.arcTo(x, y, x+w, y, r);
+      ctx.closePath();
+    }
+
+    // group -> { sprite, timeoutId }
+    const activeBubbles = new Map();
+    function showChatBubbleOnGroup(group, text){
+      if(!group) return;
+      const prev = activeBubbles.get(group);
+      if(prev){ group.remove(prev.sprite); clearTimeout(prev.timeoutId); }
+      const sprite = makeChatBubbleSprite(text);
+      sprite.position.set(0, 3.55, 0);
+      group.add(sprite);
+      const timeoutId = setTimeout(() => {
+        group.remove(sprite);
+        activeBubbles.delete(group);
+      }, 5000);
+      activeBubbles.set(group, { sprite, timeoutId });
+    }
+
+    function removeRemotePlayer(id){
+      const rp = remotePlayers[id];
+      if(!rp) return;
+      scene.remove(rp.group);
+      delete remotePlayers[id];
+    }
+
+    function updateRemotePlayers(dt){
+      Object.keys(remotePlayers).forEach(id => {
+        const rp = remotePlayers[id];
+        const g = rp.group;
+        g.position.x += (rp.target.x - g.position.x) * 0.25;
+        g.position.y += (rp.target.y - g.position.y) * 0.25;
+        g.position.z += (rp.target.z - g.position.z) * 0.25;
+
+        let diff = rp.target.ry - g.rotation.y;
+        while(diff > Math.PI) diff -= Math.PI*2;
+        while(diff < -Math.PI) diff += Math.PI*2;
+        g.rotation.y += diff * 0.25;
+
+        const movedDist = Math.hypot(g.position.x - rp.lastPos.x, g.position.z - rp.lastPos.z);
+        rp.lastPos.x = g.position.x; rp.lastPos.z = g.position.z;
+
+        if(movedDist > 0.0015){
+          rp.walkT += dt * 5.5;
+          const swing = Math.sin(rp.walkT) * 0.5;
+          rp.leftLeg.rotation.x = swing; rp.rightLeg.rotation.x = -swing;
+          rp.leftArm.rotation.x = -swing*0.8; rp.rightArm.rotation.x = swing*0.8;
+        } else {
+          rp.walkT = 0;
+          rp.leftLeg.rotation.x *= 0.8; rp.rightLeg.rotation.x *= 0.8;
+          rp.leftArm.rotation.x *= 0.8; rp.rightArm.rotation.x *= 0.8;
+        }
+      });
+    }
+
+    // ---- networking: push our transform, listen for everyone else ----
+    async function connectMultiplayer(){
+      await fbReady; // wait for anonymous auth to resolve so we have a real uid
+
+      if(!fbUid){
+        // Anonymous auth never resolved - almost always means Anonymous
+        // Authentication isn't turned on for this Firebase project yet
+        // (Firebase console -> Authentication -> Sign-in method -> Anonymous -> Enable),
+        // or the Realtime Database rules haven't been published. Fail loudly
+        // instead of silently doing nothing.
+        console.error("BlockVerse multiplayer: no Firebase auth uid. Enable Anonymous sign-in in the Firebase console and make sure the database rules are published.", fbAuthError);
+        showMultiplayerError();
+        return;
+      }
+
+      playerId = getPlayerId();
+
+      playersRef = fbDb.ref("rooms/baseplate/players");
+      onlineRef = playersRef.child(playerId);
+
+      onlineRef.onDisconnect().remove();
+
+      onlineRef.set({
+        name: currentUsername(),
+        x: character.position.x, y: character.position.y, z: character.position.z,
+        ry: character.rotation.y,
+        ts: firebase.database.ServerValue.TIMESTAMP
+      }).catch(err => {
+        console.error("BlockVerse multiplayer: failed to write player position (permission denied usually means the database rules aren't published yet).", err);
+        showMultiplayerError();
+      });
+
+      playersRef.on("value", (snap) => {
+        const data = snap.val() || {};
+        livePlayers = data;
+
+        // add/update
+        Object.keys(data).forEach(id => {
+          if(id === playerId) return;
+          if(!remotePlayers[id]) addRemotePlayer(id, data[id]);
+          else {
+            const rp = remotePlayers[id];
+            rp.target.x = data[id].x||0; rp.target.y = data[id].y||0;
+            rp.target.z = data[id].z||0; rp.target.ry = data[id].ry||0;
+          }
+        });
+        // remove players who left
+        Object.keys(remotePlayers).forEach(id => {
+          if(!data[id]) removeRemotePlayer(id);
+        });
+      }, (err) => {
+        console.error("BlockVerse multiplayer: lost connection to players list (check database rules are published).", err);
+        showMultiplayerError();
+      });
+
+      connectChat();
+    }
+
+    let mpErrorShown = false;
+    function showMultiplayerError(){
+      if(mpErrorShown) return;
+      mpErrorShown = true;
+      const stack = document.getElementById("ingameToastStack");
+      if(!stack) return;
+      const el = document.createElement("div");
+      el.className = "ingame-toast";
+      el.innerHTML =
+        '<div class="friend-avatar" style="background:linear-gradient(135deg,#e5484d,#2a2a2e);">!</div>' +
+        '<div class="it-body"><div class="it-text"><b>Multiplayer unavailable</b><br>Couldn\'t connect to the game server. Check the browser console for details.</div></div>';
+      stack.appendChild(el);
+      setTimeout(() => dismissToastEl(el), 8000);
+    }
+
+    function disconnectMultiplayer(){
+      if(playersRef) playersRef.off("value");
+      if(onlineRef){ onlineRef.onDisconnect().cancel(); onlineRef.remove(); }
+      playersRef = null; onlineRef = null;
+      Object.keys(remotePlayers).forEach(removeRemotePlayer);
+      livePlayers = {};
+      disconnectChat();
+      mpErrorShown = false;
+    }
+
+    /* ---- in-game chat ---- */
+    let chatRef = null;
+    let chatReady = false; // becomes true once initial backlog has streamed in, so we don't bubble-pop old history
+
+    function chatLogEl(){ return document.getElementById("gameChatLog"); }
+    function chatNewMsgPill(){ return document.getElementById("gameChatNewMsgPill"); }
+
+    function isChatScrolledNearBottom(){
+      const log = chatLogEl();
+      if(!log) return true;
+      return (log.scrollHeight - log.scrollTop - log.clientHeight) < 60;
+    }
+
+    function appendChatLine(name, text){
+      const log = chatLogEl();
+      if(!log) return;
+      const wasNearBottom = isChatScrolledNearBottom();
+      const row = document.createElement("div");
+      row.className = "cm";
+      row.innerHTML = "<b>" + escapeHtml(name) + ":</b> " + escapeHtml(text);
+      log.appendChild(row);
+      while(log.children.length > 100) log.removeChild(log.firstChild);
+      if(wasNearBottom){
+        log.scrollTop = log.scrollHeight;
+      } else {
+        // user scrolled up reading old messages - surface a pill instead of yanking them to the bottom
+        const pill = chatNewMsgPill();
+        if(pill) pill.classList.remove("hidden");
+      }
+    }
+
+    function connectChat(){
+      chatReady = false;
+      chatRef = fbDb.ref("rooms/baseplate/chat").limitToLast(50);
+      chatRef.on("child_added", (snap) => {
+        const msg = snap.val() || {};
+        appendChatLine(msg.name || "Player", msg.text || "");
+        if(!chatReady) return; // skip bubbles for the history that loads in on join
+        const targetGroup = msg.uid === playerId ? character : (remotePlayers[msg.uid] && remotePlayers[msg.uid].group);
+        showChatBubbleOnGroup(targetGroup, msg.text || "");
+      }, (err) => {
+        console.error("BlockVerse chat: lost connection to chat (check database rules are published).", err);
+        showMultiplayerError();
+      });
+      chatRef.once("value", () => { chatReady = true; });
+    }
+
+    function disconnectChat(){
+      if(chatRef){ chatRef.off(); chatRef = null; }
+      chatReady = false;
+      const log = chatLogEl();
+      if(log) log.innerHTML = "";
+      const pill = chatNewMsgPill();
+      if(pill) pill.classList.add("hidden");
+      activeBubbles.forEach((v, group) => { group.remove(v.sprite); clearTimeout(v.timeoutId); });
+      activeBubbles.clear();
+    }
+
+    function sendChatMessage(text){
+      text = (text || "").trim().slice(0, 140);
+      if(!text) return;
+      if(!playerId || !fbUid){
+        console.error("BlockVerse chat: can't send - not connected to the server yet (check Firebase Anonymous auth is enabled and the database rules are published).");
+        showMultiplayerError();
+        return;
+      }
+      fbDb.ref("rooms/baseplate/chat").push({
+        uid: playerId,
+        name: currentUsername(),
+        text: text,
+        ts: firebase.database.ServerValue.TIMESTAMP
+      }).catch(err => {
+        console.error("BlockVerse chat: failed to send message (often a rules/publish issue).", err);
+        showMultiplayerError();
+      });
+    }
+
+    let chatWired = false;
+    function wireChat(){
+      if(chatWired) return;
+      chatWired = true;
+      const btn = document.getElementById("gameChatBtn");
+      const panel = document.getElementById("gameChatPanel");
+      const input = document.getElementById("gameChatInput");
+      const sendBtn = document.getElementById("gameChatSendBtn");
+      const log = chatLogEl();
+      const pill = chatNewMsgPill();
+
+      function toggleChat(){
+        const opening = panel.classList.contains("hidden");
+        panel.classList.toggle("hidden");
+        if(opening){
+          input.focus();
+          log.scrollTop = log.scrollHeight;
+          pill.classList.add("hidden");
+        }
+      }
+      function doSend(){
+        if(!input.value.trim()) return;
+        sendChatMessage(input.value);
+        input.value = "";
+        log.scrollTop = log.scrollHeight;
+        pill.classList.add("hidden");
+      }
+      btn.addEventListener("click", toggleChat);
+      sendBtn.addEventListener("click", doSend);
+      input.addEventListener("keydown", (e) => {
+        e.stopPropagation(); // don't let WASD movement keys fire while typing
+        if(e.key === "Enter") doSend();
+      });
+      input.addEventListener("keyup", (e) => e.stopPropagation());
+      log.addEventListener("scroll", () => {
+        if(isChatScrolledNearBottom()) pill.classList.add("hidden");
+      });
+      pill.addEventListener("click", () => {
+        log.scrollTop = log.scrollHeight;
+        pill.classList.add("hidden");
+      });
+    }
+
+    function pushOwnTransform(dt){
+      netTimer += dt;
+      if(netTimer < NET_INTERVAL || !onlineRef) return;
+      netTimer = 0;
+      onlineRef.update({
+        x: character.position.x, y: character.position.y, z: character.position.z,
+        ry: character.rotation.y,
+        ts: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+
+    function updateCamera(){
+      // smoothly ease the applied camera angles toward the target angles
+      smYaw += (camYaw - smYaw) * 0.18;
+      smPitch += (camPitch - smPitch) * 0.18;
+
+      const dist = 6.5;
+      const offX = Math.sin(smYaw) * Math.cos(smPitch) * dist;
+      const offZ = Math.cos(smYaw) * Math.cos(smPitch) * dist;
+      const offY = 2.2 + Math.sin(smPitch) * dist;
+      camera.position.set(
+        character.position.x + offX,
+        character.position.y + offY,
+        character.position.z + offZ
+      );
+      camera.lookAt(
+        character.position.x,
+        character.position.y + 1.5,
+        character.position.z
+      );
+    }
+
+    function updateMovement(dt){
+      let mx = move.x, mz = move.z;
+      if(keys["w"]||keys["arrowup"]) mz -= 1;
+      if(keys["s"]||keys["arrowdown"]) mz += 1;
+      if(keys["a"]||keys["arrowleft"]) mx -= 1;
+      if(keys["d"]||keys["arrowright"]) mx += 1;
+
+      const len = Math.hypot(mx, mz);
+      const moving = len > 0.05;
+      let targetVelX = 0, targetVelZ = 0;
+      if(moving){
+        mx /= len; mz /= len;
+        // move relative to camera yaw (forward = -Z rotated by yaw)
+        const sin = Math.sin(smYaw), cos = Math.cos(smYaw);
+        const worldX = mx*cos - mz*sin;
+        const worldZ = mx*sin + mz*cos;
+        targetVelX = worldX * MOVE_SPEED;
+        targetVelZ = worldZ * MOVE_SPEED;
+      }
+
+      // smooth acceleration / deceleration so movement doesn't feel snappy
+      const accel = moving ? 0.22 : 0.16;
+      velX += (targetVelX - velX) * accel;
+      velZ += (targetVelZ - velZ) * accel;
+
+      if(Math.hypot(velX, velZ) > 0.002){
+        character.position.x += velX;
+        character.position.z += velZ;
+
+        const targetRot = Math.atan2(velX, velZ);
+        let diff = targetRot - character.rotation.y;
+        while(diff > Math.PI) diff -= Math.PI*2;
+        while(diff < -Math.PI) diff += Math.PI*2;
+        character.rotation.y += diff * 0.18;
+
+        walkT += dt * 5.5;
+        const swing = Math.sin(walkT) * 0.5;
+        leftLeg.rotation.x = swing;
+        rightLeg.rotation.x = -swing;
+        leftArm.rotation.x = -swing * 0.8;
+        rightArm.rotation.x = swing * 0.8;
+      } else {
+        walkT = 0;
+        leftLeg.rotation.x *= 0.8; rightLeg.rotation.x *= 0.8;
+        leftArm.rotation.x *= 0.8; rightArm.rotation.x *= 0.8;
+      }
+
+      // jump / gravity
+      vy += GRAVITY;
+      character.position.y += vy;
+      if(character.position.y <= GROUND_Y){
+        character.position.y = GROUND_Y;
+        vy = 0;
+        onGround = true;
+      } else {
+        onGround = false;
+      }
+
+      // simple jump pose: tuck legs a bit while airborne
+      if(!onGround){
+        leftLeg.rotation.x = -0.35; rightLeg.rotation.x = -0.35;
+        leftArm.rotation.x = -0.5; rightArm.rotation.x = -0.5;
+      }
+    }
+
+    function doJump(){
+      if(onGround){ vy = JUMP_VELOCITY; onGround = false; }
+    }
+
+    function tick(){
+      if(!running) return;
+      const dt = Math.min(clock.getDelta(), 0.05);
+      if(!ragdoll) updateMovement(dt);
+      updateRemotePlayers(dt);
+      pushOwnTransform(dt);
+      updateCamera();
+      renderer.render(scene, camera);
+      animId = requestAnimationFrame(tick);
+    }
+
+    function onResize(){
+      if(!renderer) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    /* ---- input wiring ---- */
+    let dragging = false, lastX = 0, lastY = 0, menuOpen = false;
+    function wireInput(){
+      window.addEventListener("keydown", (e) => {
+        if(e.key === "Escape"){
+          if(!running) return;
+          if(menuOpen) closeMenu(); else openMenu();
+          return;
+        }
+        if(menuOpen){
+          const k = e.key.toLowerCase();
+          if(k === "l") { closeMenu(); BaseplateGame.stop(); }
+          else if(k === "r") { closeMenu(); respawn(); }
+          return;
+        }
+        keys[e.key.toLowerCase()] = true;
+        if(e.key === " ") doJump();
+      });
+      window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+      window.addEventListener("resize", onResize);
+
+      document.getElementById("gameMenuOverlay").addEventListener("click", (e) => {
+        if(e.target.id === "gameMenuOverlay") closeMenu();
+      });
+
+      const canvas = document.getElementById("gameCanvas");
+      canvas.setAttribute("draggable", "false");
+      canvas.addEventListener("dragstart", (e) => e.preventDefault());
+      canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+      canvas.addEventListener("selectstart", (e) => e.preventDefault());
+      canvas.addEventListener("mousedown", (e) => {
+        if(menuOpen) return;
+        e.preventDefault();
+        dragging = true; lastX = e.clientX; lastY = e.clientY;
+      });
+      window.addEventListener("mouseup", () => { dragging = false; });
+      window.addEventListener("mousemove", (e) => {
+        if(!dragging || menuOpen) return;
+        e.preventDefault();
+        const dx = e.clientX - lastX, dy = e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        camYaw -= dx * 0.006 * mouseSensitivity;
+        camPitch = Math.max(0.05, Math.min(0.9, camPitch + dy * 0.004 * mouseSensitivity));
+      });
+      canvas.addEventListener("touchstart", (e) => {
+        if(menuOpen) return;
+        const t = e.touches[0];
+        if(t.clientX > window.innerWidth * 0.42){
+          dragging = true; lastX = t.clientX; lastY = t.clientY;
+        }
+      }, { passive:true });
+      canvas.addEventListener("touchmove", (e) => {
+        if(!dragging || menuOpen) return;
+        const t = e.touches[0];
+        const dx = t.clientX - lastX, dy = t.clientY - lastY;
+        lastX = t.clientX; lastY = t.clientY;
+        camYaw -= dx * 0.006 * mouseSensitivity;
+        camPitch = Math.max(0.05, Math.min(0.9, camPitch + dy * 0.004 * mouseSensitivity));
+      }, { passive:true });
+      canvas.addEventListener("touchend", () => { dragging = false; });
+
+      // mobile joystick
+      const joy = document.getElementById("gameJoystick");
+      const nub = document.getElementById("gameJoystickNub");
+      let joyActive = false, joyId = null, joyCenter = {x:0,y:0};
+      joy.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        joyActive = true; joyId = t.identifier;
+        const rect = joy.getBoundingClientRect();
+        joyCenter = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+      }, { passive:false });
+      window.addEventListener("touchmove", (e) => {
+        if(!joyActive) return;
+        for(const t of e.changedTouches){
+          if(t.identifier !== joyId) continue;
+          let dx = t.clientX - joyCenter.x, dy = t.clientY - joyCenter.y;
+          const maxR = 40;
+          const r = Math.hypot(dx, dy);
+          if(r > maxR){ dx = dx/r*maxR; dy = dy/r*maxR; }
+          nub.style.transform = "translate(" + dx + "px," + dy + "px)";
+          move.x = dx / maxR;
+          move.z = dy / maxR;
+        }
+      }, { passive:true });
+      window.addEventListener("touchend", (e) => {
+        for(const t of e.changedTouches){
+          if(t.identifier !== joyId) continue;
+          joyActive = false; joyId = null;
+          nub.style.transform = "translate(0,0)";
+          move.x = 0; move.z = 0;
+        }
+      });
+
+      // jump button
+      const jumpBtn = document.getElementById("gameJumpBtn");
+      jumpBtn.addEventListener("touchstart", (e) => { e.preventDefault(); doJump(); }, { passive:false });
+      jumpBtn.addEventListener("mousedown", () => doJump());
+
+      wireMenu();
+    }
+
+    /* ---- respawn (ragdoll) ---- */
+    function respawn(){
+      if(ragdoll) return;
+      ragdoll = true;
+      keys.w = keys.a = keys.s = keys.d = false;
+      move.x = 0; move.z = 0;
+
+      const parts = [
+        { obj: head,     vel:{x:(Math.random()-0.5)*0.09, y:0.14, z:(Math.random()-0.5)*0.09}, rot:(Math.random()-0.5)*0.3 },
+        { obj: leftArm,  vel:{x:-0.07+(Math.random()-0.5)*0.05, y:0.10, z:(Math.random()-0.5)*0.09}, rot:(Math.random()-0.5)*0.4 },
+        { obj: rightArm, vel:{x: 0.07+(Math.random()-0.5)*0.05, y:0.10, z:(Math.random()-0.5)*0.09}, rot:(Math.random()-0.5)*0.4 },
+        { obj: leftLeg,  vel:{x:-0.04+(Math.random()-0.5)*0.05, y:0.08, z:(Math.random()-0.5)*0.09}, rot:(Math.random()-0.5)*0.4 },
+        { obj: rightLeg, vel:{x: 0.04+(Math.random()-0.5)*0.05, y:0.08, z:(Math.random()-0.5)*0.09}, rot:(Math.random()-0.5)*0.4 }
+      ];
+      // detach torso too by fading it, since it's the character root's own base position
+      const torsoStartY = character.position.y;
+      let t = 0;
+      const grav = -0.012;
+
+      function ragdollTick(){
+        t += 1;
+        parts.forEach(p => {
+          p.vel.y += grav;
+          p.obj.position.x += p.vel.x;
+          p.obj.position.y += p.vel.y;
+          p.obj.position.z += p.vel.z;
+          p.obj.rotation.z += p.rot;
+          p.obj.rotation.x += p.rot * 0.6;
+        });
+        character.position.y = Math.max(GROUND_Y, torsoStartY - t*0.01);
+        renderer.render(scene, camera);
+        if(t < 55){
+          requestAnimationFrame(ragdollTick);
+        } else {
+          setTimeout(finishRespawn, 500);
+        }
+      }
+      ragdollTick();
+    }
+
+    function finishRespawn(){
+      // reset all part transforms back to their rest pose
+      head.position.set(0, 2.05, 0);
+      head.rotation.set(0,0,0);
+      leftArm.position.set(-0.62, 1.85, 0); leftArm.rotation.set(0,0,0);
+      rightArm.position.set(0.62, 1.85, 0); rightArm.rotation.set(0,0,0);
+      leftLeg.position.set(-0.24, 0.78, 0); leftLeg.rotation.set(0,0,0);
+      rightLeg.position.set(0.24, 0.78, 0); rightLeg.rotation.set(0,0,0);
+
+      character.position.set(0, 0, 0);
+      character.rotation.set(0,0,0);
+      vy = 0; onGround = true; velX = 0; velZ = 0;
+      camYaw = Math.PI; camPitch = 0.28; smYaw = Math.PI; smPitch = 0.28;
+      ragdoll = false;
+    }
+
+    /* ---- in-game menu ---- */
+    function currentUsername(){ return getSession() || "You"; }
+    function initials(name){ return (name || "?").trim().slice(0,2).toUpperCase(); }
+
+    function showTab(id){
+      document.querySelectorAll("#gameMenuOverlay .game-tab").forEach(t => t.classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+    }
+
+    function openMenu(){
+      menuOpen = true;
+      dragging = false;
+      for(const k in keys) keys[k] = false;
+      showTab("tabMain");
+      document.getElementById("gameMenuOverlay").classList.remove("hidden");
+    }
+    function closeMenu(){
+      menuOpen = false;
+      document.getElementById("gameMenuOverlay").classList.add("hidden");
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    }
+
+    function otherRealPlayers(){
+      return Object.keys(livePlayers)
+        .filter(id => id !== playerId)
+        .map(id => ({ id, name: livePlayers[id].name || "Player" }));
+    }
+
+    function renderPlayerList(container, { clickable, onRowClick }){
+      container.innerHTML = "";
+      const me = currentUsername();
+      const others = otherRealPlayers();
+
+      if(!clickable){
+        const row = document.createElement("div");
+        row.className = "game-player-row self";
+        row.innerHTML =
+          '<div class="gp-avatar">' + initials(me) + '</div>' +
+          '<div><div class="gp-name">' + escapeHtml(me) + ' (You)</div>' +
+          '<div class="gp-tag">In this server</div></div>';
+        container.appendChild(row);
+      }
+
+      if(others.length === 0){
+        const note = document.createElement("div");
+        note.className = "game-empty-state";
+        note.innerHTML = clickable
+          ? '<strong>No one else here yet</strong><span>You\'re currently the only real player in this server.</span>'
+          : '<span>No one else has joined this server yet — invite a friend and they\'ll show up here live.</span>';
+        container.appendChild(note);
+        return;
+      }
+
+      others.forEach(p => {
+        const row = document.createElement("div");
+        row.className = "game-player-row";
+        row.innerHTML =
+          '<div class="gp-avatar">' + initials(p.name) + '</div>' +
+          '<div><div class="gp-name">' + escapeHtml(p.name) + '</div>' +
+          '<div class="gp-tag">Playing now</div></div>';
+        if(clickable) row.addEventListener("click", () => onRowClick(p.name));
+        container.appendChild(row);
+      });
+    }
+
+    let reportTargetName = null;
+    function openReportForm(name){
+      reportTargetName = name;
+      document.getElementById("reportAvatar").textContent = initials(name);
+      document.getElementById("reportUsername").textContent = name;
+      document.getElementById("reportReasonText").value = "";
+      showTab("tabReportForm");
+    }
+
+    /* ---- character preview: click a player in the View tab ---- */
+    let previewRenderer, previewScene, previewCamera, previewRig, previewAnimId;
+    let previewName = null;
+
+    function initCharPreview(){
+      if(previewRenderer) return;
+      const canvas = document.getElementById("charPreviewCanvas");
+      previewRenderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+      previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      previewScene = new THREE.Scene();
+      previewCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 20);
+      previewCamera.position.set(0, 1.55, 4.2);
+      previewCamera.lookAt(0, 1.3, 0);
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x2a2a2e, 1.1);
+      previewScene.add(hemi);
+      const key = new THREE.DirectionalLight(0xffffff, 0.7);
+      key.position.set(3, 6, 4);
+      previewScene.add(key);
+    }
+
+    function resizePreviewCanvas(){
+      const wrap = document.querySelector(".char-preview-canvas-wrap");
+      if(!previewRenderer || !wrap) return;
+      const w = wrap.clientWidth, h = wrap.clientHeight;
+      previewRenderer.setSize(w, h, false);
+      previewCamera.aspect = w / h;
+      previewCamera.updateProjectionMatrix();
+    }
+
+    function previewTick(){
+      if(!previewRenderer) return;
+      if(previewRig) previewRig.group.rotation.y += 0.012;
+      previewRenderer.render(previewScene, previewCamera);
+      previewAnimId = requestAnimationFrame(previewTick);
+    }
+
+    function refreshCharPreviewAction(){
+      if(!previewName) return;
+      const targetKey = previewName.toLowerCase();
+      const btn = document.getElementById("charPreviewActionBtn");
+      if(!btn) return;
+      btn.classList.remove("disabled");
+      btn.onclick = null;
+      if(fbFriendMirror.friends.includes(targetKey)){
+        btn.textContent = t("friendsAlready");
+        btn.classList.add("disabled");
+      } else if(fbFriendMirror.outgoing.includes(targetKey)){
+        btn.textContent = t("requestPending");
+        btn.classList.add("disabled");
+      } else if(fbFriendMirror.incoming.includes(targetKey)){
+        btn.textContent = t("accept");
+        btn.onclick = () => { acceptFriendRequest(targetKey); refreshCharPreviewAction(); };
+      } else {
+        btn.textContent = t("addFriend");
+        btn.onclick = () => { sendFriendRequest(targetKey); refreshCharPreviewAction(); };
+      }
+    }
+
+    function openCharacterPreview(name){
+      previewName = name;
+      initCharPreview();
+      resizePreviewCanvas();
+
+      if(previewRig) previewScene.remove(previewRig.group);
+      previewRig = buildCharacterRig(colorForId(name));
+      previewRig.group.position.set(0, 0, 0);
+      previewScene.add(previewRig.group);
+
+      document.getElementById("charPreviewName").textContent = name;
+      document.getElementById("charPreviewTag").textContent = t("playingNow");
+      refreshCharPreviewAction();
+
+      document.getElementById("charPreviewOverlay").classList.remove("hidden");
+      if(previewAnimId) cancelAnimationFrame(previewAnimId);
+      previewTick();
+    }
+
+    function closeCharacterPreview(){
+      document.getElementById("charPreviewOverlay").classList.add("hidden");
+      if(previewAnimId){ cancelAnimationFrame(previewAnimId); previewAnimId = null; }
+      previewName = null;
+    }
+    document.getElementById("charPreviewCloseBtn").addEventListener("click", closeCharacterPreview);
+    document.getElementById("charPreviewOverlay").addEventListener("click", (e) => {
+      if(e.target.id === "charPreviewOverlay") closeCharacterPreview();
+    });
+
+    let menuWired = false;
+    function wireMenu(){
+      if(menuWired) return;
+      menuWired = true;
+
+      document.getElementById("gameMenuBtn").addEventListener("click", openMenu);
+
+      document.querySelectorAll(".game-tab-back").forEach(btn => {
+        btn.addEventListener("click", () => showTab(btn.dataset.back));
+      });
+
+      document.getElementById("btnView").addEventListener("click", () => {
+        renderPlayerList(document.getElementById("viewPlayerList"), {
+          clickable:true,
+          onRowClick: (name) => { closeMenu(); openCharacterPreview(name); }
+        });
+        showTab("tabView");
+      });
+
+      document.getElementById("btnSettings").addEventListener("click", () => showTab("tabSettings"));
+
+      document.getElementById("btnReport").addEventListener("click", () => {
+        renderPlayerList(document.getElementById("reportPlayerList"), { clickable:true, onRowClick: openReportForm });
+        showTab("tabReportSelect");
+      });
+
+      document.getElementById("btnResume").addEventListener("click", closeMenu);
+
+      document.getElementById("btnRespawn").addEventListener("click", () => {
+        closeMenu();
+        respawn();
+      });
+
+      document.getElementById("btnLeaveGame").addEventListener("click", () => {
+        closeMenu();
+        BaseplateGame.stop();
+      });
+
+      const sensRange = document.getElementById("sensRange");
+      const sensValue = document.getElementById("sensValue");
+      sensRange.addEventListener("input", () => {
+        mouseSensitivity = parseFloat(sensRange.value);
+        sensValue.textContent = mouseSensitivity.toFixed(1) + "x";
+      });
+
+      document.getElementById("reportSubmitBtn").addEventListener("click", (e) => {
+        const btn = e.currentTarget;
+        const text = document.getElementById("reportReasonText").value.trim();
+        if(!text || !reportTargetName) return;
+        btn.disabled = true;
+        fbDb.ref("rooms/baseplate/reports").push({
+          reporterUid: playerId,
+          reporterName: currentUsername(),
+          targetName: reportTargetName,
+          reason: text.slice(0, 500),
+          ts: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+          btn.textContent = "Report sent ✓";
+          setTimeout(() => {
+            btn.textContent = "Submit report";
+            btn.disabled = false;
+            closeMenu();
+          }, 900);
+        }).catch(err => {
+          console.error("BlockVerse report: failed to send.", err);
+          btn.textContent = "Submit report";
+          btn.disabled = false;
+          showMultiplayerError();
+        });
+      });
+    }
+
+    let wired = false;
+    function start(){
+      const screen = document.getElementById("gameScreen");
+      const loading = document.getElementById("gameLoading");
+      const bar = document.getElementById("gameLoadBar");
+      screen.classList.remove("hidden");
+      loading.classList.remove("hidden");
+      bar.style.width = "0%";
+
+      if(!renderer) initScene();
+      if(!wired){ wireInput(); wired = true; }
+      wireMenu();
+      wireChat();
+
+      character.position.set(0,0,0);
+      vy = 0; onGround = true; camYaw = Math.PI; camPitch = 0.28;
+      updateCamera();
+      renderer.render(scene, camera);
+
+      let pct = 0;
+      const iv = setInterval(() => {
+        pct += 14 + Math.random()*18;
+        if(pct >= 100){ pct = 100; clearInterval(iv); }
+        bar.style.width = pct + "%";
+        if(pct >= 100){
+          setTimeout(() => {
+            loading.classList.add("hidden");
+            running = true;
+            clock.getDelta();
+            connectMultiplayer();
+            animId = requestAnimationFrame(tick);
+          }, 200);
+        }
+      }, 140);
+    }
+
+    function stop(){
+      const screen = document.getElementById("gameScreen");
+      const loading = document.getElementById("gameLoading");
+      const bar = document.getElementById("gameLoadBar");
+      const label = document.getElementById("gameLoadingText");
+      closeMenu();
+      closeCharacterPreview();
+      disconnectMultiplayer();
+      const chatPanel = document.getElementById("gameChatPanel");
+      if(chatPanel) chatPanel.classList.add("hidden");
+
+      // show a quick "leaving" loading screen before we actually tear the game down
+      label.textContent = "Leaving Baseplate...";
+      loading.classList.remove("hidden");
+      loading.classList.remove("fade-out");
+      bar.style.width = "0%";
+
+      let pct = 0;
+      const iv = setInterval(() => {
+        pct += 20 + Math.random()*20;
+        if(pct >= 100){ pct = 100; clearInterval(iv); }
+        bar.style.width = pct + "%";
+        if(pct >= 100){
+          setTimeout(() => {
+            running = false;
+            if(animId) cancelAnimationFrame(animId);
+            screen.classList.add("hidden");
+            loading.classList.add("hidden");
+            label.textContent = "Loading Baseplate...";
+            bar.style.width = "0%";
+          }, 180);
+        }
+      }, 90);
+    }
+
+    return { start, stop };
+  })();
+
+  document.getElementById("playBaseplateBtn").addEventListener("click", () => BaseplateGame.start());
+
+  /* ============ init ============ */
+  applyTheme();
+  applyTranslations();
+  if(getSession()){
+    document.getElementById("authScreenWrap").classList.add("hidden");
+    enterApp();
+    document.getElementById("dashScreen").classList.remove("hidden");
+  }
+</script>
+
+</body>
+</html>
