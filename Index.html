@@ -189,6 +189,11 @@
   .notif-row .friend-avatar{ width:34px; height:34px; font-size:13px; }
   .notif-row .n-text{ flex:1; min-width:0; font-size:12.5px; color:var(--text-1); }
   .notif-row .n-text b{ color:var(--text-0); }
+  .notif-row .n-time{ font-size:11px; color:var(--text-3); margin-top:2px; }
+  .notif-panel-section-label{
+    font-size:10.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-3);
+    padding:14px 10px 6px;
+  }
   .notif-row .friend-actions{ flex-shrink:0; }
   .notif-panel-empty{ text-align:center; color:var(--text-3); font-size:12.5px; padding:40px 14px; }
   .sb-user{
@@ -317,6 +322,7 @@
     background:#151517; border:1px solid #2c2c30; border-radius:16px;
     box-shadow:0 24px 70px rgba(0,0,0,0.55); animation:modalIn .2s ease both;
   }
+  .game-tab.wide{ width:680px; }
   .game-tab-head{
     display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid #242428;
   }
@@ -331,6 +337,31 @@
   }
   .game-tab-back:hover{ background:#2e2e32; color:#f2f2f2; }
   .game-tab-body{ padding:14px 16px 18px; }
+
+  /* View tab header gets a right-aligned Invite button next to the title */
+  .game-tab-head .gt-invite-btn{
+    margin-left:auto; display:flex; align-items:center; gap:6px; padding:7px 13px;
+    background:#232326; border:1px solid #2c2c30; border-radius:8px; color:#e4e4e6;
+    font-size:12px; font-weight:600; cursor:pointer; transition:background .15s, border-color .15s;
+    flex-shrink:0;
+  }
+  .game-tab-head .gt-invite-btn:hover{ background:#2c2c30; border-color:#3a3a40; }
+  .game-tab-head .gt-invite-btn svg{ width:14px; height:14px; }
+
+  .gp-invite-btn{
+    padding:6px 12px; border-radius:7px; font-size:11.5px; font-weight:600; cursor:pointer;
+    background:#232326; border:1px solid #2c2c30; color:#e4e4e6; transition:background .15s;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .gp-invite-btn:hover{ background:#2c2c30; }
+  .gp-invite-btn.disabled{ opacity:0.5; cursor:default; pointer-events:none; }
+
+  /* Top-right in-game invite notifications, separate from the bottom-right friend toasts */
+  .invite-toast-stack{
+    position:fixed; top:16px; right:16px; z-index:3000; display:flex; flex-direction:column; gap:10px;
+    max-width:300px; pointer-events:none;
+  }
+  .invite-toast-stack .ingame-toast{ pointer-events:auto; }
 
   .game-tab-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:14px 16px; }
   .game-tab-grid + .game-tab-grid{ padding-top:0; }
@@ -359,6 +390,9 @@
   .game-player-row .gp-tag{ font-size:11px; color:#7a7a80; margin-top:1px; }
   .game-player-row.self{ cursor:default; }
   .game-player-row.self:hover{ background:transparent; }
+  .game-player-row.invite-row{ cursor:default; }
+  .game-player-row.invite-row:hover{ background:transparent; }
+  .game-player-row.invite-row > div:nth-child(2){ flex:1; min-width:0; }
   .game-empty-state{
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; gap:8px; padding:34px 16px; color:#7a7a80; font-size:12.5px;
@@ -572,7 +606,14 @@
     width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
     border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:14px; color:var(--text-0); flex-shrink:0;
+    position:relative;
   }
+  /* Small dot ring on the avatar circle: green = online (currently in Baseplate), grey = offline. */
+  .friend-avatar .status-dot{
+    position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border-radius:50%;
+    border:2px solid var(--bg-2); background:var(--text-3); box-sizing:content-box;
+  }
+  .friend-avatar .status-dot.online{ background:#3ecf6e; }
   .friend-info{ flex:1; min-width:0; }
   .friend-info .f-name{ font-size:13.5px; color:var(--text-0); font-weight:600; }
   .friend-info .f-sub{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
@@ -849,6 +890,11 @@
 
       <div id="friendSearchResults"></div>
 
+      <div class="friend-section" id="friendListSection">
+        <h3><span data-i18n="friends">Friends</span><span class="fs-count" id="friendListCount">0</span></h3>
+        <div id="friendListList"></div>
+      </div>
+
       <div class="friend-section" id="friendRequestsSection">
         <h3><span data-i18n="friendRequests">Friend requests</span><span class="fs-count" id="friendReqCount">0</span></h3>
         <div id="friendRequestsList"></div>
@@ -930,12 +976,25 @@
     </div>
 
     <!-- View: players in server -->
-    <div class="game-tab hidden" id="tabView">
+    <div class="game-tab wide hidden" id="tabView">
       <div class="game-tab-head">
         <div class="game-tab-back" data-back="tabMain">←</div>
         <h3>Players</h3>
+        <button class="gt-invite-btn" id="btnOpenInvite">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
+          Invite
+        </button>
       </div>
       <div class="game-tab-body" id="viewPlayerList"></div>
+    </div>
+
+    <!-- View > Invite: your friends list with an Invite button each -->
+    <div class="game-tab wide hidden" id="tabViewInvite">
+      <div class="game-tab-head">
+        <div class="game-tab-back" data-back="tabView">←</div>
+        <h3>Invite friends</h3>
+      </div>
+      <div class="game-tab-body" id="inviteFriendList"></div>
     </div>
 
     <!-- Settings -->
@@ -1004,6 +1063,7 @@
 
 <!-- In-game / anywhere friend-request toasts -->
 <div class="ingame-toast-stack" id="ingameToastStack"></div>
+<div class="invite-toast-stack" id="inviteToastStack"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -1095,7 +1155,7 @@
       alreadyFriends:"Friends",
       noUsersFound:"No users found.",
       noRequests:"No pending requests.",
-      noSuggestions:"No suggestions right now.",
+      noSuggestions:"No suggestions right now.", online:"Online", offline:"Offline", noFriendsYet:"No friends yet.", invite:"Invite", invited:"Invited", invitedYouSuffix:"invited you to their server", join:"Join", gameInvites:"Game invites", justNow:"Just now", minAgoSuffix:"m ago", hrAgoSuffix:"h ago", dayAgoSuffix:"d ago",
       cancelRequest:"Cancel request",
       incomingFrom:"wants to be friends",
       notifications:"Notifications",
@@ -1144,7 +1204,7 @@
       alreadyFriends:"Amigos",
       noUsersFound:"No se encontraron usuarios.",
       noRequests:"No hay solicitudes pendientes.",
-      noSuggestions:"No hay sugerencias por ahora.",
+      noSuggestions:"No hay sugerencias por ahora.", online:"En linea", offline:"Desconectado", noFriendsYet:"Aun no tienes amigos.", invite:"Invitar", invited:"Invitado", invitedYouSuffix:"te invito a su servidor", join:"Unirse", gameInvites:"Invitaciones de juego", justNow:"Ahora mismo", minAgoSuffix:"m", hrAgoSuffix:"h", dayAgoSuffix:"d",
       cancelRequest:"Cancelar solicitud",
       incomingFrom:"quiere ser tu amigo"
     },
@@ -1186,7 +1246,7 @@
       alreadyFriends:"Amis",
       noUsersFound:"Aucun utilisateur trouve.",
       noRequests:"Aucune demande en attente.",
-      noSuggestions:"Aucune suggestion pour le moment.",
+      noSuggestions:"Aucune suggestion pour le moment.", online:"En ligne", offline:"Hors ligne", noFriendsYet:"Pas encore d'amis.", invite:"Inviter", invited:"Invite", invitedYouSuffix:"vous a invite dans son serveur", join:"Rejoindre", gameInvites:"Invitations de jeu", justNow:"A l'instant", minAgoSuffix:"min", hrAgoSuffix:"h", dayAgoSuffix:"j",
       cancelRequest:"Annuler la demande",
       incomingFrom:"veut devenir votre ami"
     },
@@ -1228,7 +1288,7 @@
       alreadyFriends:"Freunde",
       noUsersFound:"Keine Benutzer gefunden.",
       noRequests:"Keine ausstehenden Anfragen.",
-      noSuggestions:"Derzeit keine Vorschlage.",
+      noSuggestions:"Derzeit keine Vorschlage.", online:"Online", offline:"Offline", noFriendsYet:"Noch keine Freunde.", invite:"Einladen", invited:"Eingeladen", invitedYouSuffix:"hat dich auf seinen Server eingeladen", join:"Beitreten", gameInvites:"Spieleinladungen", justNow:"Gerade eben", minAgoSuffix:"m", hrAgoSuffix:"Std", dayAgoSuffix:"T",
       cancelRequest:"Anfrage abbrechen",
       incomingFrom:"mochte mit dir befreundet sein"
     },
@@ -1270,7 +1330,7 @@
       alreadyFriends:"أصدقاء",
       noUsersFound:"لم يتم العثور على مستخدمين.",
       noRequests:"لا توجد طلبات معلقة.",
-      noSuggestions:"لا توجد اقتراحات حاليا.",
+      noSuggestions:"لا توجد اقتراحات حاليا.", online:"متصل", offline:"غير متصل", noFriendsYet:"لا يوجد أصدقاء بعد.", invite:"دعوة", invited:"تمت الدعوة", invitedYouSuffix:"دعاك إلى خادمه", join:"انضمام", gameInvites:"دعوات اللعبة", justNow:"الآن", minAgoSuffix:"د", hrAgoSuffix:"س", dayAgoSuffix:"ي",
       cancelRequest:"إلغاء الطلب",
       incomingFrom:"يريد أن يكون صديقك"
     },
@@ -1312,7 +1372,7 @@
       alreadyFriends:"フレンド",
       noUsersFound:"ユーザーが見つかりません。",
       noRequests:"保留中のリクエストはありません。",
-      noSuggestions:"現在おすすめはありません。",
+      noSuggestions:"現在おすすめはありません。", online:"オンライン", offline:"オフライン", noFriendsYet:"まだ友達がいません。", invite:"招待", invited:"招待済み", invitedYouSuffix:"があなたをサーバーに招待しました", join:"参加", gameInvites:"ゲーム招待", justNow:"たった今", minAgoSuffix:"分前", hrAgoSuffix:"時間前", dayAgoSuffix:"日前",
       cancelRequest:"リクエストを取り消す",
       incomingFrom:"があなたとフレンドになりたがっています"
     },
@@ -1354,7 +1414,7 @@
       alreadyFriends:"好友",
       noUsersFound:"未找到用户。",
       noRequests:"没有待处理的请求。",
-      noSuggestions:"暂无推荐。",
+      noSuggestions:"暂无推荐。", online:"在线", offline:"离线", noFriendsYet:"还没有好友。", invite:"邀请", invited:"已邀请", invitedYouSuffix:"邀请你加入他的服务器", join:"加入", gameInvites:"游戏邀请", justNow:"刚刚", minAgoSuffix:"分钟前", hrAgoSuffix:"小时前", dayAgoSuffix:"天前",
       cancelRequest:"取消请求",
       incomingFrom:"想加你为好友"
     },
@@ -1396,7 +1456,7 @@
       alreadyFriends:"Amigos",
       noUsersFound:"Nenhum usuario encontrado.",
       noRequests:"Nenhum pedido pendente.",
-      noSuggestions:"Nenhuma sugestao no momento.",
+      noSuggestions:"Nenhuma sugestao no momento.", online:"Online", offline:"Offline", noFriendsYet:"Ainda sem amigos.", invite:"Convidar", invited:"Convidado", invitedYouSuffix:"convidou voce para o servidor dele", join:"Entrar", gameInvites:"Convites de jogo", justNow:"Agora mesmo", minAgoSuffix:"m", hrAgoSuffix:"h", dayAgoSuffix:"d",
       cancelRequest:"Cancelar pedido",
       incomingFrom:"quer ser seu amigo"
     },
@@ -1432,7 +1492,7 @@
       friendRequests:"Friend requests", sendRequest:"Friend add karein", requestSent:"Request bhej di gayi",
       accept:"Accept karein", decline:"Decline karein", alreadyFriends:"Dost",
       noUsersFound:"Koi user nahi mila.", noRequests:"Koi pending request nahi.",
-      noSuggestions:"Abhi koi suggestion nahi.", cancelRequest:"Request cancel karein",
+      noSuggestions:"Abhi koi suggestion nahi.", online:"Online", offline:"Offline", noFriendsYet:"Abhi koi dost nahi hai.", invite:"Invite karein", invited:"Invite bhej diya", invitedYouSuffix:"ne aapko apne server mein invite kiya", join:"Join karein", gameInvites:"Game invites", justNow:"Abhi abhi", minAgoSuffix:"m pehle", hrAgoSuffix:"h pehle", dayAgoSuffix:"d pehle", cancelRequest:"Request cancel karein",
       incomingFrom:"aapse dost banna chahte hain"
     },
         it: {
@@ -1455,7 +1515,7 @@
       friendsPageSub:"Cerca persone e gestisci le tue richieste.", searchUsernamePh:"Cerca per nome utente...", peopleYouMayKnow:"Persone che potresti conoscere",
       friendRequests:"Richieste di amicizia", sendRequest:"Aggiungi amico", requestSent:"Richiesta inviata",
       accept:"Accetta", decline:"Rifiuta", alreadyFriends:"Amici",
-      noUsersFound:"Nessun utente trovato.", noRequests:"Nessuna richiesta in sospeso.", noSuggestions:"Nessun suggerimento al momento.",
+      noUsersFound:"Nessun utente trovato.", noRequests:"Nessuna richiesta in sospeso.", noSuggestions:"Nessun suggerimento al momento.", online:"Online", offline:"Offline", noFriendsYet:"Nessun amico ancora.", invite:"Invita", invited:"Invitato", invitedYouSuffix:"ti ha invitato nel suo server", join:"Unisciti", gameInvites:"Inviti di gioco", justNow:"Proprio ora", minAgoSuffix:"m fa", hrAgoSuffix:"h fa", dayAgoSuffix:"g fa",
       cancelRequest:"Annulla richiesta", incomingFrom:"vuole essere tuo amico"
     },
     ru: {
@@ -1478,7 +1538,7 @@
       friendsPageSub:"Ishchite lyudey i upravlyayte zayavkami.", searchUsernamePh:"Poisk po imeni polzovatelya...", peopleYouMayKnow:"Vozmozhno, vy znakomy",
       friendRequests:"Zayavki v druzya", sendRequest:"Dobavit v druzya", requestSent:"Zayavka otpravlena",
       accept:"Prinyat", decline:"Otklonit", alreadyFriends:"Druzya",
-      noUsersFound:"Polzovateli ne naydeny.", noRequests:"Net zayavok.", noSuggestions:"Poka net predlozheniy.",
+      noUsersFound:"Polzovateli ne naydeny.", noRequests:"Net zayavok.", noSuggestions:"Poka net predlozheniy.", online:"V seti", offline:"Ne v seti", noFriendsYet:"Poka net druzey.", invite:"Priglasit", invited:"Priglashen", invitedYouSuffix:"priglasil vas na svoy server", join:"Prisoedinitsya", gameInvites:"Igrovye priglasheniya", justNow:"Tolko chto", minAgoSuffix:"m nazad", hrAgoSuffix:"ch nazad", dayAgoSuffix:"d nazad",
       cancelRequest:"Otmenit zayavku", incomingFrom:"khochet druzhit s vami"
     },
     ko: {
@@ -1501,7 +1561,7 @@
       friendsPageSub:"Saramdeul-eul geomsaek-hago yocheong-eul gwanri-haseyo.", searchUsernamePh:"Sayongja ireumeuro geomsaek...", peopleYouMayKnow:"Aljido moreuneun saramdeul",
       friendRequests:"Chingu yocheong", sendRequest:"Chingu chuga", requestSent:"Yocheong bonaejim",
       accept:"Sunrak", decline:"Georjeol", alreadyFriends:"Chingu",
-      noUsersFound:"Sayongja-reul chatji motaesseumnida.", noRequests:"Daegijung-in yocheong-i eopseumnida.", noSuggestions:"Hyeonjae jean-i eopseumnida.",
+      noUsersFound:"Sayongja-reul chatji motaesseumnida.", noRequests:"Daegijung-in yocheong-i eopseumnida.", noSuggestions:"Hyeonjae jean-i eopseumnida.", online:"Onlain", offline:"Opeullain", noFriendsYet:"Ajik chin-gu-ga eopseumnida.", invite:"Chodae", invited:"Chodaedoem", invitedYouSuffix:"nim-i seobeo-e chodaehaessseumnida", join:"Chamyeo", gameInvites:"Geim chodae", justNow:"Bang-geum", minAgoSuffix:"bun jeon", hrAgoSuffix:"sigan jeon", dayAgoSuffix:"il jeon",
       cancelRequest:"Yocheong chwiso", incomingFrom:"dangsin-gwa chingu-ga doego sipeohamnida"
     },
     tr: {
@@ -1524,7 +1584,7 @@
       friendsPageSub:"Insanlari ara ve isteklerini yonet.", searchUsernamePh:"Kullanici adina gore ara...", peopleYouMayKnow:"Tanidigin olabilecek kisiler",
       friendRequests:"Arkadaslik istekleri", sendRequest:"Arkadas ekle", requestSent:"Istek gonderildi",
       accept:"Kabul et", decline:"Reddet", alreadyFriends:"Arkadas",
-      noUsersFound:"Kullanici bulunamadi.", noRequests:"Bekleyen istek yok.", noSuggestions:"Su anda oneri yok.",
+      noUsersFound:"Kullanici bulunamadi.", noRequests:"Bekleyen istek yok.", noSuggestions:"Su anda oneri yok.", online:"Cevrimici", offline:"Cevrimdisi", noFriendsYet:"Henuz arkadas yok.", invite:"Davet et", invited:"Davet edildi", invitedYouSuffix:"sizi sunucusuna davet etti", join:"Katil", gameInvites:"Oyun davetleri", justNow:"Az once", minAgoSuffix:"dk once", hrAgoSuffix:"sa once", dayAgoSuffix:"g once",
       cancelRequest:"Istegi iptal et", incomingFrom:"arkadasin olmak istiyor"
     },
     nl: {
@@ -1547,7 +1607,7 @@
       friendsPageSub:"Zoek mensen en beheer je verzoeken.", searchUsernamePh:"Zoek op gebruikersnaam...", peopleYouMayKnow:"Mensen die je misschien kent",
       friendRequests:"Vriendschapsverzoeken", sendRequest:"Vriend toevoegen", requestSent:"Verzoek verzonden",
       accept:"Accepteren", decline:"Weigeren", alreadyFriends:"Vrienden",
-      noUsersFound:"Geen gebruikers gevonden.", noRequests:"Geen openstaande verzoeken.", noSuggestions:"Momenteel geen suggesties.",
+      noUsersFound:"Geen gebruikers gevonden.", noRequests:"Geen openstaande verzoeken.", noSuggestions:"Momenteel geen suggesties.", online:"Online", offline:"Offline", noFriendsYet:"Nog geen vrienden.", invite:"Uitnodigen", invited:"Uitgenodigd", invitedYouSuffix:"heeft je uitgenodigd voor zijn server", join:"Deelnemen", gameInvites:"Spelnodigingen", justNow:"Zojuist", minAgoSuffix:"m geleden", hrAgoSuffix:"u geleden", dayAgoSuffix:"d geleden",
       cancelRequest:"Verzoek annuleren", incomingFrom:"wil vrienden met je worden"
     },
     pl: {
@@ -1570,7 +1630,7 @@
       friendsPageSub:"Szukaj ludzi i zarzadzaj zaproszeniami.", searchUsernamePh:"Szukaj po nazwie uzytkownika...", peopleYouMayKnow:"Osoby, ktore mozesz znac",
       friendRequests:"Zaproszenia do znajomych", sendRequest:"Dodaj znajomego", requestSent:"Zaproszenie wyslane",
       accept:"Akceptuj", decline:"Odrzuc", alreadyFriends:"Znajomi",
-      noUsersFound:"Nie znaleziono uzytkownikow.", noRequests:"Brak oczekujacych zaproszen.", noSuggestions:"Brak sugestii.",
+      noUsersFound:"Nie znaleziono uzytkownikow.", noRequests:"Brak oczekujacych zaproszen.", noSuggestions:"Brak sugestii.", online:"Online", offline:"Offline", noFriendsYet:"Brak znajomych.", invite:"Zapros", invited:"Zaproszono", invitedYouSuffix:"zaprosil cie do swojego serwera", join:"Dolacz", gameInvites:"Zaproszenia do gry", justNow:"Wlasnie teraz", minAgoSuffix:"m temu", hrAgoSuffix:"godz temu", dayAgoSuffix:"d temu",
       cancelRequest:"Anuluj zaproszenie", incomingFrom:"chce zostac Twoim znajomym"
     },
     id: {
@@ -1593,7 +1653,7 @@
       friendsPageSub:"Cari orang dan kelola permintaan kamu.", searchUsernamePh:"Cari berdasarkan nama pengguna...", peopleYouMayKnow:"Orang yang mungkin kamu kenal",
       friendRequests:"Permintaan pertemanan", sendRequest:"Tambah teman", requestSent:"Permintaan terkirim",
       accept:"Terima", decline:"Tolak", alreadyFriends:"Teman",
-      noUsersFound:"Pengguna tidak ditemukan.", noRequests:"Tidak ada permintaan tertunda.", noSuggestions:"Belum ada saran.",
+      noUsersFound:"Pengguna tidak ditemukan.", noRequests:"Tidak ada permintaan tertunda.", noSuggestions:"Belum ada saran.", online:"Online", offline:"Offline", noFriendsYet:"Belum ada teman.", invite:"Undang", invited:"Diundang", invitedYouSuffix:"mengundang Anda ke servernya", join:"Gabung", gameInvites:"Undangan game", justNow:"Baru saja", minAgoSuffix:"m lalu", hrAgoSuffix:"j lalu", dayAgoSuffix:"h lalu",
       cancelRequest:"Batalkan permintaan", incomingFrom:"ingin berteman dengan kamu"
     },
     vi: {
@@ -1616,7 +1676,7 @@
       friendsPageSub:"Tim kiem moi nguoi va quan ly loi moi cua ban.", searchUsernamePh:"Tim theo ten nguoi dung...", peopleYouMayKnow:"Nhung nguoi ban co the biet",
       friendRequests:"Loi moi ket ban", sendRequest:"Them ban be", requestSent:"Da gui loi moi",
       accept:"Chap nhan", decline:"Tu choi", alreadyFriends:"Ban be",
-      noUsersFound:"Khong tim thay nguoi dung.", noRequests:"Khong co loi moi nao.", noSuggestions:"Hien chua co goi y.",
+      noUsersFound:"Khong tim thay nguoi dung.", noRequests:"Khong co loi moi nao.", noSuggestions:"Hien chua co goi y.", online:"Truc tuyen", offline:"Ngoai tuyen", noFriendsYet:"Chua co ban be.", invite:"Moi", invited:"Da moi", invitedYouSuffix:"da moi ban vao may chu cua ho", join:"Tham gia", gameInvites:"Loi moi choi game", justNow:"Vua xong", minAgoSuffix:"phut truoc", hrAgoSuffix:"gio truoc", dayAgoSuffix:"ngay truoc",
       cancelRequest:"Huy loi moi", incomingFrom:"muon ket ban voi ban"
     },
     th: {
@@ -1639,7 +1699,7 @@
       friendsPageSub:"Kan ha khon lae kan chai kham khor khong khun.", searchUsernamePh:"Kan ha duai chue phu chai...", peopleYouMayKnow:"Khon thi khunat cha ru chak",
       friendRequests:"Kham khor pen phuean", sendRequest:"Phoem phuean", requestSent:"Song kham khor laeo",
       accept:"Ttokrap", decline:"Patiset", alreadyFriends:"Phuean",
-      noUsersFound:"Mai phop phu chai.", noRequests:"Mai mi kham khor thi rok yu.", noSuggestions:"Yang mai mi kham naenam.",
+      noUsersFound:"Mai phop phu chai.", noRequests:"Mai mi kham khor thi rok yu.", noSuggestions:"Yang mai mi kham naenam.", online:"Online", offline:"Offline", noFriendsYet:"Yang mai mi phuean.", invite:"Chuen", invited:"Chuen laeo", invitedYouSuffix:"chuen khun pai server khong khao", join:"Ruam", gameInvites:"Kham chuen game", justNow:"Muea khrue ni", minAgoSuffix:"n thi laeo", hrAgoSuffix:"chm thi laeo", dayAgoSuffix:"wan thi laeo",
       cancelRequest:"Yok loek kham khor", incomingFrom:"yak pen phuean kap khun"
     },
     uk: {
@@ -1662,7 +1722,7 @@
       friendsPageSub:"Shukayte lyudey ta keruyte zapytamy.", searchUsernamePh:"Poshuk za imenem korystuvacha...", peopleYouMayKnow:"Lyudy, yakykh vy mozhete znaty",
       friendRequests:"Zapyty v druzi", sendRequest:"Dodaty v druzi", requestSent:"Zapyt nadislano",
       accept:"Pryynyaty", decline:"Vidkhylyty", alreadyFriends:"Druzi",
-      noUsersFound:"Korystuvachiv ne znaydeno.", noRequests:"Nemaie zapytiv.", noSuggestions:"Poky nemaie propozytsiy.",
+      noUsersFound:"Korystuvachiv ne znaydeno.", noRequests:"Nemaie zapytiv.", noSuggestions:"Poky nemaie propozytsiy.", online:"V merezhi", offline:"Ne v merezhi", noFriendsYet:"Poky nemaie druziv.", invite:"Zaprosyty", invited:"Zaprosheno", invitedYouSuffix:"zaprosyv vas na svii server", join:"Dolucytysya", gameInvites:"Ihrovi zaproshennya", justNow:"Shchoyno", minAgoSuffix:"khv tomu", hrAgoSuffix:"hod tomu", dayAgoSuffix:"dn tomu",
       cancelRequest:"Skasuvaty zapyt", incomingFrom:"khoche buty vashym druhom"
     },
     fa: {
@@ -1685,7 +1745,7 @@
       friendsPageSub:"Afrad ra jostojoo konid va darkhast-haye khod ra modiriat konid.", searchUsernamePh:"Jostojoo bar asas-e nam-e karbari...", peopleYouMayKnow:"Afradi ke momken ast beshnasid",
       friendRequests:"Darkhast-haye doosti", sendRequest:"Afzoodan-e doost", requestSent:"Darkhast ersal shod",
       accept:"Paziroftan", decline:"Rad kardan", alreadyFriends:"Doostan",
-      noUsersFound:"Karbari yaft nashod.", noRequests:"Darkhasti dar entezar nist.", noSuggestions:"Hich pishnahadi vojood nadarad.",
+      noUsersFound:"Karbari yaft nashod.", noRequests:"Darkhasti dar entezar nist.", noSuggestions:"Hich pishnahadi vojood nadarad.", online:"Online", offline:"Offline", noFriendsYet:"Hanuz doosti nadarid.", invite:"Da'vat", invited:"Da'vat shod", invitedYouSuffix:"shoma ra be server-e khod da'vat kard", join:"Molhagh shodan", gameInvites:"Da'vat-haye bazi", justNow:"Hamin alan", minAgoSuffix:"d pish", hrAgoSuffix:"s pish", dayAgoSuffix:"r pish",
       cancelRequest:"Lagv-e darkhast", incomingFrom:"mikhahad ba shoma doost shavad"
     },
     ms: {
@@ -1708,7 +1768,7 @@
       friendsPageSub:"Cari orang dan urus permintaan anda.", searchUsernamePh:"Cari mengikut nama pengguna...", peopleYouMayKnow:"Orang yang mungkin anda kenali",
       friendRequests:"Permintaan kawan", sendRequest:"Tambah kawan", requestSent:"Permintaan dihantar",
       accept:"Terima", decline:"Tolak", alreadyFriends:"Kawan",
-      noUsersFound:"Tiada pengguna dijumpai.", noRequests:"Tiada permintaan tertangguh.", noSuggestions:"Tiada cadangan buat masa ini.",
+      noUsersFound:"Tiada pengguna dijumpai.", noRequests:"Tiada permintaan tertangguh.", noSuggestions:"Tiada cadangan buat masa ini.", online:"Dalam talian", offline:"Luar talian", noFriendsYet:"Belum ada kawan.", invite:"Jemput", invited:"Dijemput", invitedYouSuffix:"menjemput anda ke pelayannya", join:"Sertai", gameInvites:"Jemputan permainan", justNow:"Sebentar tadi", minAgoSuffix:"m lalu", hrAgoSuffix:"j lalu", dayAgoSuffix:"h lalu",
       cancelRequest:"Batalkan permintaan", incomingFrom:"mahu berkawan dengan anda"
     },
     el: {
@@ -1731,7 +1791,7 @@
       friendsPageSub:"Anazitiste atoma kai diacheiristeite ta aitimata sas.", searchUsernamePh:"Anazitisi me onoma christi...", peopleYouMayKnow:"Atoma pou isos gnorizete",
       friendRequests:"Aitimata filias", sendRequest:"Prosthiki filou", requestSent:"To aitima stalthike",
       accept:"Apodochi", decline:"Aporripsi", alreadyFriends:"Filoi",
-      noUsersFound:"Den vrethikan christes.", noRequests:"Den yparchoun ekkremi aitimata.", noSuggestions:"Kammia protasi proi ora.",
+      noUsersFound:"Den vrethikan christes.", noRequests:"Den yparchoun ekkremi aitimata.", noSuggestions:"Kammia protasi proi ora.", online:"Syndedemenos", offline:"Aposyndedemenos", noFriendsYet:"Kanena filo akoma.", invite:"Prosklisi", invited:"Proskeklimenos", invitedYouSuffix:"sas prokalese ston server tou", join:"Symmetochi", gameInvites:"Prosklisis paichnidiou", justNow:"Mkolis tora", minAgoSuffix:"l prin", hrAgoSuffix:"o prin", dayAgoSuffix:"m prin",
       cancelRequest:"Akyrosi aitimatos", incomingFrom:"thelei na ginete filoi"
     },
     sv: {
@@ -1754,7 +1814,7 @@
       friendsPageSub:"Sok efter personer och hantera dina forfragningar.", searchUsernamePh:"Sok efter anvandarnamn...", peopleYouMayKnow:"Personer du kanske kanner",
       friendRequests:"Vanforfragningar", sendRequest:"Lagg till van", requestSent:"Forfragan skickad",
       accept:"Acceptera", decline:"Avvisa", alreadyFriends:"Vanner",
-      noUsersFound:"Inga anvandare hittades.", noRequests:"Inga vantande forfragningar.", noSuggestions:"Inga forslag just nu.",
+      noUsersFound:"Inga anvandare hittades.", noRequests:"Inga vantande forfragningar.", noSuggestions:"Inga forslag just nu.", online:"Online", offline:"Offline", noFriendsYet:"Inga vanner an.", invite:"Bjud in", invited:"Inbjuden", invitedYouSuffix:"bjod in dig till sin server", join:"Ga med", gameInvites:"Spelinbjudningar", justNow:"Just nu", minAgoSuffix:"m sedan", hrAgoSuffix:"tim sedan", dayAgoSuffix:"d sedan",
       cancelRequest:"Avbryt forfragan", incomingFrom:"vill bli din van"
     },
   };
@@ -2128,8 +2188,35 @@
   // Live mirrors, kept in sync via Firebase listeners.
   let fbUsernameDirectory = {};      // key -> { username }
   const fbFriendMirror = { friends: [], incoming: [], outgoing: [] };
+  let fbInvites = [];                 // [{ id, fromKey, fromName, ts }] - pending game invites for me
   let friendListenersKey = null;
   let friendListenersReady = false;
+
+  // ---- presence (for the green/grey dot on friend avatars) ----
+  // "Online" here means "currently inside a Baseplate session" - rooms/baseplate/players
+  // only holds an entry while someone is actually in the game (it's written on join
+  // and auto-removed via onDisconnect(), see connectMultiplayer()), so this is a cheap,
+  // always-accurate presence signal without a separate presence system.
+  let onlineUsernameKeys = new Set();
+  let presenceRef = null;
+  function startPresenceTracking(){
+    if(presenceRef) return;
+    presenceRef = fbDb.ref("rooms/baseplate/players");
+    presenceRef.on("value", snap => {
+      const data = snap.val() || {};
+      onlineUsernameKeys = new Set(
+        Object.values(data)
+          .map(p => (p && p.name ? String(p.name).toLowerCase() : null))
+          .filter(Boolean)
+      );
+      renderFriendsPage();
+    });
+  }
+  function stopPresenceTracking(){
+    if(presenceRef){ presenceRef.off("value"); presenceRef = null; }
+    onlineUsernameKeys = new Set();
+  }
+  function isKeyOnline(key){ return onlineUsernameKeys.has(key); }
 
   function displayNameFor(key){
     return (fbUsernameDirectory[key] && fbUsernameDirectory[key].username)
@@ -2185,6 +2272,25 @@
       }
       snap.ref.remove();
     });
+
+    // Game invites: kept as a live list (for the bell panel), plus a top-right
+    // in-game toast for ones that arrive while the game is running.
+    const invitesRef = fuRef(myKey, "invites");
+    let invitesReady = false;
+    invitesRef.on("value", snap => {
+      const data = snap.val() || {};
+      fbInvites = Object.keys(data).map(id => ({ id, ...data[id] })).sort((a,b) => (b.ts||0) - (a.ts||0));
+      updateFriendBadge();
+      if(notifPanelOpen) renderNotifPanel();
+    });
+    invitesRef.once("value", () => { invitesReady = true; });
+    invitesRef.on("child_added", snap => {
+      if(!invitesReady) return;
+      const inv = snap.val() || {};
+      showInviteToast(snap.key, inv.fromKey, inv.fromName);
+    });
+
+    startPresenceTracking();
   }
 
   function stopFriendNoticePolling(){
@@ -2193,24 +2299,30 @@
       fuRef(friendListenersKey, "outgoing").off();
       fuRef(friendListenersKey, "incoming").off();
       fuRef(friendListenersKey, "notices").off();
+      fuRef(friendListenersKey, "invites").off();
       fbDb.ref("blockverse_usernames").off();
     }
     friendListenersKey = null;
     friendListenersReady = false;
     fbFriendMirror.friends = []; fbFriendMirror.incoming = []; fbFriendMirror.outgoing = [];
+    fbInvites = [];
     const stack = ingameToastStack();
     if(stack) stack.innerHTML = "";
+    const inviteStack = document.getElementById("inviteToastStack");
+    if(inviteStack) inviteStack.innerHTML = "";
+    stopPresenceTracking();
   }
 
   function updateFriendBadge(){
     const badge = document.getElementById("friendReqBadge");
     const dot = document.getElementById("notifBellDot");
-    const count = fbFriendMirror.incoming.length;
+    const reqCount = fbFriendMirror.incoming.length;
+    const totalCount = reqCount + fbInvites.length;
     if(badge){
-      badge.textContent = count > 9 ? "9+" : String(count);
-      badge.classList.toggle("hidden", count === 0);
+      badge.textContent = reqCount > 9 ? "9+" : String(reqCount);
+      badge.classList.toggle("hidden", reqCount === 0);
     }
-    if(dot) dot.classList.toggle("hidden", count === 0);
+    if(dot) dot.classList.toggle("hidden", totalCount === 0);
     if(notifPanelOpen) renderNotifPanel();
   }
 
@@ -2226,6 +2338,36 @@
   function dismissRequestToast(fromKey){
     const el = ingameToastStack().querySelector('[data-toast-request="' + fromKey + '"]');
     if(el) dismissToastEl(el);
+  }
+
+  /* ---- game invite toasts (top-right, shown while in-game or on dashboard) ---- */
+  function inviteToastStack(){ return document.getElementById("inviteToastStack"); }
+
+  function dismissInviteToast(inviteId){
+    const stack = inviteToastStack();
+    if(!stack) return;
+    const el = stack.querySelector('[data-invite-id="' + inviteId + '"]');
+    if(el) dismissToastEl(el);
+  }
+
+  function showInviteToast(inviteId, fromKey, fromName){
+    const stack = inviteToastStack();
+    if(!stack) return;
+    const name = fromName || displayNameFor(fromKey);
+    const el = document.createElement("div");
+    el.className = "ingame-toast";
+    el.setAttribute("data-invite-id", inviteId);
+    el.innerHTML =
+      '<div class="friend-avatar">' + initialsAvatar(name) + '</div>' +
+      '<div class="it-body"><div class="it-text"><b>' + escapeHtml(name) + '</b> ' + t("invitedYouSuffix") + '</div>' +
+        '<div class="it-actions">' +
+          '<button class="it-btn primary" data-invite-accept>' + t("accept") + '</button>' +
+          '<button class="it-btn" data-invite-ignore>' + t("ignore") + '</button>' +
+        '</div>' +
+      '</div>';
+    stack.appendChild(el);
+    el.querySelector("[data-invite-accept]").addEventListener("click", () => acceptGameInvite(inviteId, fromKey));
+    el.querySelector("[data-invite-ignore]").addEventListener("click", () => ignoreGameInvite(inviteId));
   }
 
   // kind: "request" (accept/ignore a friend request) or "info" (auto-dismissing confirmation)
@@ -2302,12 +2444,63 @@
     fuRef(fromKey, "outgoing/" + myKey).remove();
   }
 
-  function friendRowHtml(key, actionsHtml){
+  /* ============ game invites ============ */
+  // Per-target 5 minute cooldown so the same friend can't be spammed with
+  // invites. This is purely a client-side UX throttle (tracked in-memory,
+  // resets on refresh) - it isn't a security boundary.
+  const INVITE_COOLDOWN_MS = 5 * 60 * 1000;
+  const inviteCooldowns = {}; // targetKey -> timestamp of last invite sent
+
+  function inviteCooldownRemaining(targetKey){
+    const last = inviteCooldowns[targetKey];
+    if(!last) return 0;
+    const remaining = INVITE_COOLDOWN_MS - (Date.now() - last);
+    return remaining > 0 ? remaining : 0;
+  }
+
+  function sendGameInvite(targetKey){
+    const myKey = currentAccountKey();
+    if(!myKey || myKey === targetKey) return;
+    if(inviteCooldownRemaining(targetKey) > 0) return;
+    inviteCooldowns[targetKey] = Date.now();
+    const myName = (getAccounts()[myKey] || {}).username || myKey;
+    fuRef(targetKey, "invites").push({
+      fromKey: myKey,
+      fromName: myName,
+      ts: firebase.database.ServerValue.TIMESTAMP
+    }).catch(() => {});
+  }
+
+  function acceptGameInvite(inviteId, fromKey){
+    const myKey = currentAccountKey();
+    if(myKey) fuRef(myKey, "invites/" + inviteId).remove();
+    dismissInviteToast(inviteId);
+    closeNotifPanel();
+    // Everyone plays in the same shared Baseplate room, so "joining their
+    // server" just means making sure we're in the game ourselves.
+    if(!BaseplateGame.isRunning()) BaseplateGame.start();
+  }
+
+  function ignoreGameInvite(inviteId){
+    const myKey = currentAccountKey();
+    if(myKey) fuRef(myKey, "invites/" + inviteId).remove();
+    dismissInviteToast(inviteId);
+  }
+
+  function friendRowHtml(key, actionsHtml, opts){
+    const showStatus = opts && opts.showStatus;
+    const dotHtml = showStatus
+      ? '<span class="status-dot' + (isKeyOnline(key) ? ' online' : '') + '"></span>'
+      : '';
+    const subHtml = showStatus
+      ? '<div class="f-sub">' + (isKeyOnline(key) ? t("online") : t("offline")) + '</div>'
+      : '';
     return (
       '<div class="friend-row" data-user="' + key + '">' +
-        '<div class="friend-avatar">' + initialsAvatar(displayNameFor(key)) + '</div>' +
+        '<div class="friend-avatar">' + initialsAvatar(displayNameFor(key)) + dotHtml + '</div>' +
         '<div class="friend-info">' +
           '<div class="f-name">' + escapeHtml(displayNameFor(key)) + '</div>' +
+          subHtml +
         '</div>' +
         '<div class="friend-actions">' + actionsHtml + '</div>' +
       '</div>'
@@ -2322,6 +2515,8 @@
 
     const query = (document.getElementById("friendSearchInput").value || "").trim().toLowerCase();
     const resultsEl = document.getElementById("friendSearchResults");
+    const listListEl = document.getElementById("friendListList");
+    const listCountEl = document.getElementById("friendListCount");
     const reqListEl = document.getElementById("friendRequestsList");
     const reqCountEl = document.getElementById("friendReqCount");
     const suggestListEl = document.getElementById("friendSuggestList");
@@ -2337,6 +2532,13 @@
       );
       return '<button class="friend-btn primary" data-add="' + key + '">' + t("sendRequest") + '</button>';
     }
+
+    // Your friends list: avatar circle per friend with a green (online, i.e.
+    // currently in Baseplate) or grey (offline) status dot.
+    listCountEl.textContent = fbFriendMirror.friends.length;
+    listListEl.innerHTML = fbFriendMirror.friends.length
+      ? fbFriendMirror.friends.map(k => friendRowHtml(k, "", { showStatus:true })).join("")
+      : '<div class="friend-empty">' + t("noFriendsYet") + '</div>';
 
     // Search results: the shared Firebase username directory, so this finds
     // real accounts made on any device, not just this browser.
@@ -2372,12 +2574,23 @@
 
   /* ============ notification bell / panel ============ */
   let notifPanelOpen = false;
+  function timeAgoShort(ts){
+    if(!ts) return "";
+    const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if(diffSec < 60) return t("justNow");
+    const diffMin = Math.floor(diffSec / 60);
+    if(diffMin < 60) return diffMin + t("minAgoSuffix");
+    const diffHr = Math.floor(diffMin / 60);
+    if(diffHr < 24) return diffHr + t("hrAgoSuffix");
+    return Math.floor(diffHr / 24) + t("dayAgoSuffix");
+  }
+
   function renderNotifPanel(){
     const root = document.getElementById("notifPanelRoot");
     if(!root) return;
     const requests = fbFriendMirror.incoming;
 
-    const rows = requests.length
+    const reqRows = requests.length
       ? requests.map(k => {
           return (
             '<div class="notif-row" data-notif-user="' + k + '">' +
@@ -2392,6 +2605,29 @@
         }).join("")
       : '<div class="notif-panel-empty">' + t("noRequests") + '</div>';
 
+    // Game invites: name, then how long ago it was sent, then Join/Ignore.
+    const inviteRows = fbInvites.length
+      ? fbInvites.map(inv => {
+          const name = inv.fromName || displayNameFor(inv.fromKey);
+          return (
+            '<div class="notif-row" data-invite-row="' + inv.id + '">' +
+              '<div class="friend-avatar">' + initialsAvatar(name) + '</div>' +
+              '<div class="n-text"><b>' + escapeHtml(name) + '</b> ' + t("invitedYouSuffix") +
+                '<div class="n-time">' + timeAgoShort(inv.ts) + '</div>' +
+              '</div>' +
+              '<div class="friend-actions">' +
+                '<button class="friend-btn primary" data-invite-join="' + inv.id + '" data-invite-from="' + inv.fromKey + '">' + t("join") + '</button>' +
+                '<button class="friend-btn danger" data-invite-ignore-panel="' + inv.id + '">' + t("ignore") + '</button>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join("")
+      : "";
+
+    const inviteSection = fbInvites.length
+      ? '<div class="notif-panel-section-label">' + t("gameInvites") + '</div>' + inviteRows
+      : "";
+
     root.innerHTML =
       '<div class="notif-panel-overlay" id="notifOverlay"></div>' +
       '<div class="notif-panel">' +
@@ -2399,7 +2635,7 @@
           '<h3>' + (translations[localStorage.getItem(LANG_KEY) || "en"].notifications || "Notifications") + '</h3>' +
           '<button class="modal-close" id="notifPanelClose">&times;</button>' +
         '</div>' +
-        '<div class="notif-panel-list">' + rows + '</div>' +
+        '<div class="notif-panel-list">' + reqRows + inviteSection + '</div>' +
       '</div>';
 
     document.getElementById("notifOverlay").addEventListener("click", closeNotifPanel);
@@ -2410,7 +2646,16 @@
     root.querySelectorAll("[data-notif-decline]").forEach(btn => {
       btn.addEventListener("click", (e) => { e.stopPropagation(); declineFriendRequest(btn.getAttribute("data-notif-decline")); });
     });
-    root.querySelectorAll(".notif-row").forEach(row => {
+    root.querySelectorAll("[data-invite-join]").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        acceptGameInvite(btn.getAttribute("data-invite-join"), btn.getAttribute("data-invite-from"));
+      });
+    });
+    root.querySelectorAll("[data-invite-ignore-panel]").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); ignoreGameInvite(btn.getAttribute("data-invite-ignore-panel")); });
+    });
+    root.querySelectorAll(".notif-row[data-notif-user]").forEach(row => {
       row.addEventListener("click", () => {
         const targetUser = row.getAttribute("data-notif-user");
         closeNotifPanel();
@@ -2529,6 +2774,7 @@
     let vy = 0;                // vertical velocity for jump
     let onGround = true;
     let walkT = 0;
+    let idleT = 0;
     let velX = 0, velZ = 0;    // smoothed movement velocity
     let mouseSensitivity = 1;
     let ragdoll = false;
@@ -2634,40 +2880,28 @@
 
       grp.scale.set(0.86, 0.86, 0.86);
 
-      return { group: grp, head: rigHead, leftArm: rigLeftArm, rightArm: rigRightArm, leftLeg: rigLeftLeg, rightLeg: rigRightLeg, shirtMat: shirt };
+      return { group: grp, head: rigHead, leftArm: rigLeftArm, rightArm: rigRightArm, leftLeg: rigLeftLeg, rightLeg: rigRightLeg };
     }
 
-    let characterShirtMat = null;
     function buildCharacter(){
       const rig = buildCharacterRig(0x4a5fd6);
       character = rig.group;
       head = rig.head; leftArm = rig.leftArm; rightArm = rig.rightArm;
       leftLeg = rig.leftLeg; rightLeg = rig.rightLeg;
-      characterShirtMat = rig.shirtMat;
       character.position.set(0, 0, 0);
       scene.add(character);
     }
 
     // ---- remote players (other real people from Firebase) ----
-    const REMOTE_COLORS = [0xd64a6a, 0x4ad6a0, 0xd6b34a, 0x8a4ad6, 0x4ab0d6, 0x4a5fd6, 0xd64ac6, 0x4ad64a];
-    // Color is derived from the player's stable username (not their per-session
-    // uid), so it comes out the same on every screen instead of a random hash
-    // per browser session.
+    const REMOTE_COLORS = [0xd64a6a, 0x4ad6a0, 0xd6b34a, 0x8a4ad6, 0x4ab0d6];
     function colorForId(id){
       let h = 0;
       for(let i=0;i<id.length;i++) h = (h*31 + id.charCodeAt(i)) >>> 0;
       return REMOTE_COLORS[h % REMOTE_COLORS.length];
     }
-    function colorToHexString(colorNum){ return "#" + colorNum.toString(16).padStart(6, "0"); }
-    function hexStringToColor(hex){
-      if(!hex) return null;
-      const n = parseInt(hex.replace("#",""), 16);
-      return Number.isNaN(n) ? null : n;
-    }
 
     function addRemotePlayer(id, data){
-      const color = hexStringToColor(data.color) ?? colorForId((data.name || id).toLowerCase());
-      const rig = buildCharacterRig(color);
+      const rig = buildCharacterRig(colorForId(id));
       rig.group.position.set(data.x||0, data.y||0, data.z||0);
       rig.group.rotation.y = data.ry||0;
       scene.add(rig.group);
@@ -2678,10 +2912,10 @@
       rig.group.add(nameSprite);
 
       remotePlayers[id] = {
-        group: rig.group, leftArm: rig.leftArm, rightArm: rig.rightArm,
+        group: rig.group, head: rig.head, leftArm: rig.leftArm, rightArm: rig.rightArm,
         leftLeg: rig.leftLeg, rightLeg: rig.rightLeg,
         target: { x:data.x||0, y:data.y||0, z:data.z||0, ry:data.ry||0 },
-        walkT: 0, lastPos: { x:data.x||0, z:data.z||0 }
+        walkT: 0, idleT: 0, lastPos: { x:data.x||0, z:data.z||0 }
       };
     }
 
@@ -2718,53 +2952,36 @@
     }
 
     function makeChatBubbleSprite(text){
-      const SS = 2; // supersample for crisper text on the sprite
       const canvas = document.createElement("canvas");
-      canvas.width = 320 * SS; canvas.height = 170 * SS;
+      canvas.width = 320; canvas.height = 160;
       const ctx = canvas.getContext("2d");
-      ctx.scale(SS, SS);
-      ctx.font = "600 25px Arial";
-      const lines = wrapChatLines(ctx, text, 268);
-      const lineH = 29;
-      const padX = 18, padY = 16;
-      const boxH = lines.length * lineH + padY * 2 - 6;
-      const boxW = Math.min(300, Math.max(...lines.map(l => ctx.measureText(l).width)) + padX * 2);
-      const cw = canvas.width / SS, ch = canvas.height / SS;
-      const boxX = (cw - boxW) / 2;
-      const boxY = ch - boxH - 22;
+      ctx.font = "26px Arial";
+      const lines = wrapChatLines(ctx, text, 270);
+      const lineH = 30;
+      const boxH = lines.length * lineH + 24;
+      const boxW = Math.min(300, Math.max(...lines.map(l => ctx.measureText(l).width)) + 30);
+      const boxX = (canvas.width - boxW) / 2;
+      const boxY = canvas.height - boxH - 18;
 
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.35)";
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetY = 3;
-      ctx.fillStyle = "rgba(250,250,251,0.97)";
-      roundRectPath(ctx, boxX, boxY, boxW, boxH, 14);
+      ctx.fillStyle = "rgba(242,242,242,0.96)";
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 10);
       ctx.fill();
-      ctx.restore();
-
-      ctx.fillStyle = "rgba(250,250,251,0.97)";
+      // little pointer tail
       ctx.beginPath();
-      ctx.moveTo(cw/2 - 9, boxY + boxH - 1);
-      ctx.lineTo(cw/2 + 9, boxY + boxH - 1);
-      ctx.lineTo(cw/2, boxY + boxH + 13);
+      ctx.moveTo(canvas.width/2 - 8, boxY + boxH);
+      ctx.lineTo(canvas.width/2 + 8, boxY + boxH);
+      ctx.lineTo(canvas.width/2, boxY + boxH + 12);
       ctx.closePath();
       ctx.fill();
 
-      ctx.strokeStyle = "rgba(0,0,0,0.06)";
-      ctx.lineWidth = 1;
-      roundRectPath(ctx, boxX, boxY, boxW, boxH, 14);
-      ctx.stroke();
-
-      ctx.fillStyle = "#131315";
+      ctx.fillStyle = "#0a0a0b";
       ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
       lines.forEach((line, i) => {
-        ctx.fillText(line, cw/2, boxY + padY + 17 + i*lineH);
+        ctx.fillText(line, canvas.width/2, boxY + 26 + i*lineH);
       });
 
       const tex = new THREE.CanvasTexture(canvas);
-      tex.anisotropy = 4;
-      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
       const sprite = new THREE.Sprite(mat);
       sprite.scale.set(2.4, 2.4 * (canvas.height/canvas.width), 1);
       return sprite;
@@ -2791,15 +3008,34 @@
       group.add(sprite);
       const timeoutId = setTimeout(() => {
         group.remove(sprite);
+        disposeObject3D(sprite);
         activeBubbles.delete(group);
       }, 5000);
       activeBubbles.set(group, { sprite, timeoutId });
+    }
+
+    // Frees GPU/CPU memory held by a THREE.Object3D tree: geometries, materials,
+    // and any textures (including canvas textures used by name/chat sprites).
+    // Without this, removing an object from the scene only detaches it visually -
+    // the GPU buffers stay allocated until the page reloads, so joining/leaving
+    // the game repeatedly (or players constantly coming/going) leaks memory.
+    function disposeObject3D(root){
+      if(!root) return;
+      root.traverse(obj => {
+        if(obj.geometry) obj.geometry.dispose();
+        const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+        mats.forEach(mat => {
+          if(mat.map) mat.map.dispose();
+          mat.dispose();
+        });
+      });
     }
 
     function removeRemotePlayer(id){
       const rp = remotePlayers[id];
       if(!rp) return;
       scene.remove(rp.group);
+      disposeObject3D(rp.group);
       delete remotePlayers[id];
     }
 
@@ -2821,13 +3057,11 @@
 
         if(movedDist > 0.0015){
           rp.walkT += dt * 5.5;
-          const swing = Math.sin(rp.walkT) * 0.5;
-          rp.leftLeg.rotation.x = swing; rp.rightLeg.rotation.x = -swing;
-          rp.leftArm.rotation.x = -swing*0.8; rp.rightArm.rotation.x = swing*0.8;
+          applyWalkPose(rp, rp.walkT, true);
         } else {
           rp.walkT = 0;
-          rp.leftLeg.rotation.x *= 0.8; rp.rightLeg.rotation.x *= 0.8;
-          rp.leftArm.rotation.x *= 0.8; rp.rightArm.rotation.x *= 0.8;
+          rp.idleT = (rp.idleT || 0) + dt * 1.6;
+          applyWalkPose(rp, rp.walkT, false, rp.idleT);
         }
       });
     }
@@ -2854,14 +3088,8 @@
 
       onlineRef.onDisconnect().remove();
 
-      // Recolor our own rig to the same deterministic color remote viewers
-      // will compute from our username, so everyone sees the same color.
-      const myColor = colorForId(currentUsername().toLowerCase());
-      if(characterShirtMat) characterShirtMat.color.setHex(myColor);
-
       onlineRef.set({
         name: currentUsername(),
-        color: colorToHexString(myColor),
         x: character.position.x, y: character.position.y, z: character.position.z,
         ry: character.rotation.y,
         ts: firebase.database.ServerValue.TIMESTAMP
@@ -2975,79 +3203,8 @@
       if(log) log.innerHTML = "";
       const pill = chatNewMsgPill();
       if(pill) pill.classList.add("hidden");
-      activeBubbles.forEach((v, group) => { group.remove(v.sprite); clearTimeout(v.timeoutId); });
+      activeBubbles.forEach((v, group) => { group.remove(v.sprite); disposeObject3D(v.sprite); clearTimeout(v.timeoutId); });
       activeBubbles.clear();
-    }
-
-    /* ---- multi-language profanity filter ----
-       Covers common swear roots across a broad set of languages (English,
-       Spanish, French, German, Italian, Portuguese, Dutch, Russian, Polish,
-       Turkish, Arabic (romanized), Hindi (romanized), Indonesian/Malay,
-       Tagalog, Swedish, Japanese (romanized), Korean (romanized), Vietnamese,
-       Chinese (pinyin)). It's a practical, not exhaustive, list - there's no
-       way to cover literally every one of the world's ~7000 languages, but
-       this catches common profanity in most languages people are likely to
-       type here. If the whole message matches, the whole message is replaced
-       with hashtags rather than just the flagged word. */
-    const PROFANITY_WORDS = [
-      // English
-      "fuck","fucking","fucker","shit","bitch","asshole","bastard","cunt","dick","piss","slut","whore","nigger","nigga","faggot","retard","cock","pussy","twat","wanker","motherfucker",
-      // Spanish
-      "mierda","puta","puto","pendejo","cabron","cabrón","joder","coño","gilipollas","verga","chinga","chingar","maricon","maricón",
-      // French
-      "merde","putain","salope","connard","connasse","enculé","enfoiré","batard","bâtard","pute",
-      // German
-      "scheisse","scheiße","fick","ficken","hure","arschloch","wichser","fotze","hurensohn",
-      // Italian
-      "cazzo","stronzo","stronza","puttana","vaffanculo","merda","troia","figa",
-      // Portuguese
-      "merda","porra","caralho","puta","filho da puta","foder","cacete","desgraça",
-      // Dutch
-      "kut","klootzak","hoer","tering","kanker","lul",
-      // Russian (romanized + cyrillic)
-      "blyat","blya","suka","pizda","huy","ebat","хуй","блять","сука","пизда","ебать",
-      // Polish
-      "kurwa","chuj","pierdole","jebac","jebać",
-      // Turkish
-      "siktir","orospu","amk","yarrak","piç",
-      // Arabic (romanized)
-      "kalb","sharmoota","sharmuta","kus","zebi","khara",
-      // Hindi/Urdu (romanized)
-      "chutiya","madarchod","bhosdike","gandu","randi","harami","lund","bhenchod",
-      // Indonesian/Malay
-      "anjing","bangsat","kontol","memek","babi","goblok",
-      // Tagalog
-      "putangina","gago","tangina","tarantado","ulol",
-      // Swedish
-      "fitta","jävla","helvete","skit",
-      // Japanese (romanized)
-      "kuso","chikushou","bakayaro",
-      // Korean (romanized)
-      "sibal","sibal","gaeseki","byeongshin",
-      // Vietnamese
-      "dcm","djcm","lon","cac",
-      // Chinese (pinyin)
-      "nmsl","cnm","tmd","sha bi","shabi"
-    ];
-
-    function normalizeForFilter(text){
-      return text.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // strip accents
-        .replace(/0/g,"o").replace(/1/g,"i").replace(/3/g,"e").replace(/4/g,"a")
-        .replace(/5/g,"s").replace(/7/g,"t").replace(/@/g,"a").replace(/\$/g,"s")
-        .replace(/[^a-z\u0400-\u04FF ]/g, ""); // keep latin + cyrillic letters and spaces only
-    }
-
-    function containsProfanity(text){
-      const normalized = normalizeForFilter(text);
-      const compact = normalized.replace(/\s+/g, ""); // catches "f u c k" style spacing tricks too
-      return PROFANITY_WORDS.some(w => normalized.includes(w) || compact.includes(w.replace(/\s+/g,"")));
-    }
-
-    function filterChatText(text){
-      if(!containsProfanity(text)) return text;
-      // whole message gets hashed out, spaces preserved so word shape stays readable
-      return text.split("").map(ch => (ch === " " ? " " : "#")).join("");
     }
 
     function sendChatMessage(text){
@@ -3061,7 +3218,7 @@
       fbDb.ref("rooms/baseplate/chat").push({
         uid: playerId,
         name: currentUsername(),
-        text: filterChatText(text),
+        text: text,
         ts: firebase.database.ServerValue.TIMESTAMP
       }).catch(err => {
         console.error("BlockVerse chat: failed to send message (often a rules/publish issue).", err);
@@ -3180,15 +3337,11 @@
         character.rotation.y += diff * 0.18;
 
         walkT += dt * 5.5;
-        const swing = Math.sin(walkT) * 0.5;
-        leftLeg.rotation.x = swing;
-        rightLeg.rotation.x = -swing;
-        leftArm.rotation.x = -swing * 0.8;
-        rightArm.rotation.x = swing * 0.8;
+        applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head }, walkT, true);
       } else {
         walkT = 0;
-        leftLeg.rotation.x *= 0.8; rightLeg.rotation.x *= 0.8;
-        leftArm.rotation.x *= 0.8; rightArm.rotation.x *= 0.8;
+        idleT += dt * 1.6;
+        applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head }, walkT, false, idleT);
       }
 
       // jump / gravity
@@ -3211,6 +3364,38 @@
 
     function doJump(){
       if(onGround){ vy = JUMP_VELOCITY; onGround = false; }
+    }
+
+    // Shared pose helper for both the local character and remote players, so
+    // everyone animates consistently. Adds a slight torso bob + arm counter-
+    // swing while walking (instead of just leg/arm swing on one flat sine),
+    // and a subtle idle breathing motion when standing still.
+    function applyWalkPose(rig, walkT, moving, idleT){
+      if(moving){
+        const swing = Math.sin(walkT) * 0.5;
+        rig.leftLeg.rotation.x = swing;
+        rig.rightLeg.rotation.x = -swing;
+        rig.leftArm.rotation.x = -swing * 0.85;
+        rig.rightArm.rotation.x = swing * 0.85;
+        // slight outward arm sway and a small torso bob so the walk reads
+        // less like a metronome and more like a stride
+        rig.leftArm.rotation.z = Math.cos(walkT) * 0.06;
+        rig.rightArm.rotation.z = -Math.cos(walkT) * 0.06;
+        // bob the head/torso only (not the group), so this never fights the
+        // ground/gravity position logic driving rig.group.position.y
+        if(rig.head) rig.head.position.y = 2.05 + Math.abs(Math.sin(walkT)) * 0.035;
+      } else {
+        rig.leftLeg.rotation.x *= 0.8; rig.rightLeg.rotation.x *= 0.8;
+        rig.leftArm.rotation.x *= 0.8; rig.rightArm.rotation.x *= 0.8;
+        rig.leftArm.rotation.z *= 0.8; rig.rightArm.rotation.z *= 0.8;
+        if(rig.head) rig.head.position.y += (2.05 - rig.head.position.y) * 0.2;
+        if(typeof idleT === "number"){
+          // gentle breathing sway while idle, barely noticeable but keeps
+          // the character from looking frozen
+          rig.leftArm.rotation.z += Math.sin(idleT) * 0.015;
+          rig.rightArm.rotation.z -= Math.sin(idleT) * 0.015;
+        }
+      }
     }
 
     function tick(){
@@ -3457,6 +3642,42 @@
       });
     }
 
+    // Friends list inside the in-game Invite tab: each row shows the friend
+    // and an Invite button (becomes "Invited" during the 5-minute cooldown).
+    function renderInviteFriendList(){
+      const container = document.getElementById("inviteFriendList");
+      if(!container) return;
+      const friends = fbFriendMirror.friends;
+
+      if(!friends.length){
+        container.innerHTML = '<div class="game-empty-state"><span>' + t("noFriendsYet") + '</span></div>';
+        return;
+      }
+
+      container.innerHTML = friends.map(key => {
+        const remaining = inviteCooldownRemaining(key);
+        const btnHtml = remaining > 0
+          ? '<span class="gp-invite-btn disabled">' + t("invited") + '</span>'
+          : '<button class="gp-invite-btn" data-invite-friend="' + key + '">' + t("invite") + '</button>';
+        return (
+          '<div class="game-player-row invite-row" data-user="' + key + '">' +
+            '<div class="gp-avatar">' + initials(displayNameFor(key)) + '</div>' +
+            '<div><div class="gp-name">' + escapeHtml(displayNameFor(key)) + '</div>' +
+            '<div class="gp-tag">' + (isKeyOnline(key) ? t("online") : t("offline")) + '</div></div>' +
+            btnHtml +
+          '</div>'
+        );
+      }).join("");
+
+      container.querySelectorAll("[data-invite-friend]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const key = btn.getAttribute("data-invite-friend");
+          sendGameInvite(key);
+          renderInviteFriendList();
+        });
+      });
+    }
+
     let reportTargetName = null;
     function openReportForm(name){
       reportTargetName = name;
@@ -3526,12 +3747,11 @@
 
     function openCharacterPreview(name){
       previewName = name;
-      document.getElementById("charPreviewOverlay").classList.remove("hidden");
       initCharPreview();
       resizePreviewCanvas();
 
-      if(previewRig) previewScene.remove(previewRig.group);
-      previewRig = buildCharacterRig(colorForId(name.toLowerCase()));
+      if(previewRig){ previewScene.remove(previewRig.group); disposeObject3D(previewRig.group); previewRig = null; }
+      previewRig = buildCharacterRig(colorForId(name));
       previewRig.group.position.set(0, 0, 0);
       previewScene.add(previewRig.group);
 
@@ -3539,13 +3759,22 @@
       document.getElementById("charPreviewTag").textContent = t("playingNow");
       refreshCharPreviewAction();
 
+      document.getElementById("charPreviewOverlay").classList.remove("hidden");
       if(previewAnimId) cancelAnimationFrame(previewAnimId);
       previewTick();
     }
 
+    // Closing fully tears the preview down (rig disposed, renderer freed) so
+    // reopening on the same or a different player starts clean with nothing
+    // left over in GPU memory. It rebuilds itself on the next open via
+    // initCharPreview()/openCharacterPreview() so this costs nothing UX-wise.
     function closeCharacterPreview(){
       document.getElementById("charPreviewOverlay").classList.add("hidden");
       if(previewAnimId){ cancelAnimationFrame(previewAnimId); previewAnimId = null; }
+      if(previewRig){ previewScene.remove(previewRig.group); disposeObject3D(previewRig.group); previewRig = null; }
+      if(previewRenderer){ previewRenderer.dispose(); previewRenderer = null; }
+      previewScene = null;
+      previewCamera = null;
       previewName = null;
     }
     document.getElementById("charPreviewCloseBtn").addEventListener("click", closeCharacterPreview);
@@ -3570,6 +3799,11 @@
           onRowClick: (name) => { closeMenu(); openCharacterPreview(name); }
         });
         showTab("tabView");
+      });
+
+      document.getElementById("btnOpenInvite").addEventListener("click", () => {
+        renderInviteFriendList();
+        showTab("tabViewInvite");
       });
 
       document.getElementById("btnSettings").addEventListener("click", () => showTab("tabSettings"));
@@ -3696,7 +3930,7 @@
       }, 90);
     }
 
-    return { start, stop };
+    return { start, stop, isRunning: () => running };
   })();
 
   document.getElementById("playBaseplateBtn").addEventListener("click", () => BaseplateGame.start());
