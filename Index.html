@@ -649,6 +649,27 @@
   }
   .profile-viewer-canvas-wrap{ width:180px; height:180px; border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#7fc4ec,#bfe4f7); }
   .profile-viewer-canvas-wrap canvas{ width:100%; height:100%; display:block; }
+
+  /* ---- customize page ---- */
+  .customize-layout{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+  .customize-panel{
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:14px; padding:18px;
+  }
+  .customize-panel-left, .customize-panel-right{ flex:1 1 220px; min-width:220px; }
+  .customize-panel-center{ flex:1 1 260px; min-width:260px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .customize-panel-title{ font-size:13px; font-weight:700; color:var(--text-0); margin-bottom:14px; letter-spacing:0.2px; }
+  .customize-slider-label{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-1); margin:14px 0 6px; }
+  .customize-slider-val{ color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .customize-layout input[type="range"]{ width:100%; accent-color:#4a5fd6; }
+  .customize-hint{ margin-top:16px; font-size:11.5px; color:var(--text-3); line-height:1.4; }
+  .customize-color-row{
+    display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:var(--text-1);
+  }
+  .customize-color-row input[type="color"]{
+    width:38px; height:30px; border-radius:8px; border:1px solid var(--border-soft); background:none; padding:0; cursor:pointer;
+  }
+  .customize-canvas-wrap{ width:220px; height:280px; border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#7fc4ec,#bfe4f7); }
+  .customize-canvas-wrap canvas{ width:100%; height:100%; display:block; }
   .profile-3d-toggle{
     background:var(--grey-1); border:1px solid var(--border); color:var(--text-0);
     font-size:12.5px; font-weight:700; padding:8px 18px; border-radius:20px; cursor:pointer;
@@ -796,7 +817,7 @@
   <div class="sidebar">
     <div class="sb-brand"><div class="sb-cube"></div><span>BlockVerse</span></div>
 
-    <div class="sb-user">
+    <div class="sb-user" id="hubUserRow" style="cursor:pointer;" title="Customize your character">
       <div id="hubAvatar" style="width:32px;height:32px;border-radius:50%;background:var(--grey-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:1px solid var(--border);">?</div>
       <div class="su-text" style="overflow:hidden;">
         <div id="hubUsername" style="font-size:13px;font-weight:600;color:var(--text-0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
@@ -962,6 +983,64 @@
         <div class="friend-profile-viewer">
           <div class="profile-viewer-canvas-wrap"><canvas id="profileViewerCanvas"></canvas></div>
           <button class="profile-3d-toggle" id="profile3dToggle">3D</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOMIZE PAGE -->
+    <div id="pageCustomize" class="hidden">
+      <div class="back-link" data-back="home">&#8592; <span>Back to home</span></div>
+      <div class="main-header">
+        <h2>Customize your character</h2>
+        <p>Change your colors and body size. Others will see this the moment you join Baseplate.</p>
+      </div>
+
+      <div class="customize-layout">
+        <div class="customize-panel customize-panel-left">
+          <div class="customize-panel-title">Body / Size</div>
+
+          <label class="customize-slider-label">
+            <span>Height</span><span class="customize-slider-val" id="custHeightVal">100%</span>
+          </label>
+          <input type="range" id="custHeightRange" min="85" max="115" step="1" value="100">
+
+          <label class="customize-slider-label">
+            <span>Head size</span><span class="customize-slider-val" id="custHeadVal">100%</span>
+          </label>
+          <input type="range" id="custHeadRange" min="80" max="120" step="1" value="100">
+
+          <div class="customize-hint">Sizes are limited so characters stay fair-sized for everyone.</div>
+        </div>
+
+        <div class="customize-panel customize-panel-center">
+          <div class="customize-canvas-wrap"><canvas id="customizeCanvas"></canvas></div>
+          <button class="submit-btn" id="customizeSaveBtn" style="max-width:220px;">Save character</button>
+          <div class="msg" id="customizeMsg"></div>
+        </div>
+
+        <div class="customize-panel customize-panel-right">
+          <div class="customize-panel-title">Colors</div>
+
+          <div class="customize-color-row">
+            <span>Torso</span>
+            <input type="color" id="custTorso" value="#4a5fd6">
+          </div>
+          <div class="customize-color-row">
+            <span>Left hand</span>
+            <input type="color" id="custLeftArm" value="#4a5fd6">
+          </div>
+          <div class="customize-color-row">
+            <span>Right hand</span>
+            <input type="color" id="custRightArm" value="#4a5fd6">
+          </div>
+          <div class="customize-color-row">
+            <span>Left leg</span>
+            <input type="color" id="custLeftLeg" value="#2a2a2e">
+          </div>
+          <div class="customize-color-row">
+            <span>Right leg</span>
+            <input type="color" id="custRightLeg" value="#2a2a2e">
+          </div>
         </div>
       </div>
     </div>
@@ -1163,6 +1242,43 @@
   // the Firebase console yet), stop blocking forever - resolve with null so
   // callers can fail loudly instead of hanging silently.
   setTimeout(() => { if(!fbUid) fbReadyResolve(null); }, 6000);
+
+  /* ============ character customization (colors + body/size) ============ */
+  const CUSTOM_DEFAULT = {
+    torso: "#4a5fd6", leftArm: "#4a5fd6", rightArm: "#4a5fd6",
+    leftLeg: "#2a2a2e", rightLeg: "#2a2a2e",
+    heightScale: 1, headScale: 1
+  };
+  function customStorageKey(){ return "blockverse_custom_" + (typeof currentAccountKey === "function" ? (currentAccountKey() || "guest") : "guest"); }
+  function getMyCustom(){
+    try{
+      const raw = localStorage.getItem(customStorageKey());
+      if(!raw) return Object.assign({}, CUSTOM_DEFAULT);
+      return Object.assign({}, CUSTOM_DEFAULT, JSON.parse(raw));
+    }catch(e){ return Object.assign({}, CUSTOM_DEFAULT); }
+  }
+  function saveMyCustom(custom){
+    localStorage.setItem(customStorageKey(), JSON.stringify(custom));
+    // best-effort sync to Firebase so the same account sees its look on
+    // another device too; safe to fail silently (e.g. offline)
+    try{
+      const key = currentAccountKey && currentAccountKey();
+      if(key && typeof fbDb !== "undefined"){
+        fbDb.ref("blockverse_users/" + key + "/avatar").set(custom).catch(()=>{});
+      }
+    }catch(e){}
+    // if currently connected to the live game, push the new look immediately
+    try{
+      if(typeof onlineRef !== "undefined" && onlineRef){
+        onlineRef.update({
+          color: custom.torso, torso: custom.torso,
+          leftArmColor: custom.leftArm, rightArmColor: custom.rightArm,
+          leftLegColor: custom.leftLeg, rightLegColor: custom.rightLeg,
+          heightScale: custom.heightScale, headScale: custom.headScale
+        });
+      }
+    }catch(e){}
+  }
 
   function getPlayerId(){
     // falls back to the old per-tab id only if auth hasn't resolved yet (shouldn't normally happen)
@@ -2677,8 +2793,10 @@
     const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.5), shirt);
     torso.position.y = 1.35; group.add(torso);
 
+    // head sits at torsoTop(1.9) + halfHead(0.29) + a small neck gap, so it
+    // never sinks into the torso (see buildCharacterRig for the same fix)
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.58), skin);
-    head.position.y = 2.05; group.add(head);
+    head.position.y = 2.27; group.add(head);
 
     const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.0, 0.3), shirt);
     lArm.position.set(-0.62, 1.35, 0); group.add(lArm);
@@ -2722,6 +2840,98 @@
     if(profileViewer && profileViewer.raf) cancelAnimationFrame(profileViewer.raf);
     profileViewer = null;
   }
+
+  /* ============ customize page (live 3D preview) ============ */
+  let customizeViewer = null; // { renderer, scene, camera, group, raf }
+
+  function readCustomFromInputs(){
+    return {
+      torso: document.getElementById("custTorso").value,
+      leftArm: document.getElementById("custLeftArm").value,
+      rightArm: document.getElementById("custRightArm").value,
+      leftLeg: document.getElementById("custLeftLeg").value,
+      rightLeg: document.getElementById("custRightLeg").value,
+      heightScale: Number(document.getElementById("custHeightRange").value) / 100,
+      headScale: Number(document.getElementById("custHeadRange").value) / 100
+    };
+  }
+
+  function rebuildCustomizePreview(){
+    if(!customizeViewer) return;
+    if(customizeViewer.group){ customizeViewer.scene.remove(customizeViewer.group); }
+    const rig = buildCharacterRig(readCustomFromInputs());
+    rig.group.scale.multiplyScalar(1); // (already scaled inside buildCharacterRig)
+    rig.group.position.y = -1.1;
+    customizeViewer.group = rig.group;
+    customizeViewer.scene.add(rig.group);
+  }
+
+  function customizeViewerTick(){
+    if(!customizeViewer) return;
+    customizeViewer.group.rotation.y += 0.012;
+    customizeViewer.renderer.render(customizeViewer.scene, customizeViewer.camera);
+    customizeViewer.raf = requestAnimationFrame(customizeViewerTick);
+  }
+
+  function stopCustomizeViewer(){
+    if(customizeViewer && customizeViewer.raf) cancelAnimationFrame(customizeViewer.raf);
+    customizeViewer = null;
+  }
+
+  function openCustomizePage(){
+    const custom = getMyCustom();
+    document.getElementById("custTorso").value = custom.torso;
+    document.getElementById("custLeftArm").value = custom.leftArm;
+    document.getElementById("custRightArm").value = custom.rightArm;
+    document.getElementById("custLeftLeg").value = custom.leftLeg;
+    document.getElementById("custRightLeg").value = custom.rightLeg;
+    document.getElementById("custHeightRange").value = Math.round(custom.heightScale * 100);
+    document.getElementById("custHeadRange").value = Math.round(custom.headScale * 100);
+    document.getElementById("custHeightVal").textContent = Math.round(custom.heightScale * 100) + "%";
+    document.getElementById("custHeadVal").textContent = Math.round(custom.headScale * 100) + "%";
+    const msg = document.getElementById("customizeMsg");
+    msg.style.display = "none";
+
+    const canvas = document.getElementById("customizeCanvas");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+    renderer.setSize(220, 280, false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(35, 220/280, 0.1, 100);
+    camera.position.set(0, 0.9, 4.6);
+    camera.lookAt(0, 0.5, 0);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.55);
+    dir.position.set(3, 5, 4); scene.add(dir);
+    customizeViewer = { renderer, scene, camera, group: null, raf: null };
+    rebuildCustomizePreview();
+    customizeViewerTick();
+  }
+
+  function wireCustomizePage(){
+    const liveIds = ["custTorso","custLeftArm","custRightArm","custLeftLeg","custRightLeg"];
+    liveIds.forEach(id => document.getElementById(id).addEventListener("input", rebuildCustomizePreview));
+
+    document.getElementById("custHeightRange").addEventListener("input", (e) => {
+      document.getElementById("custHeightVal").textContent = e.target.value + "%";
+      rebuildCustomizePreview();
+    });
+    document.getElementById("custHeadRange").addEventListener("input", (e) => {
+      document.getElementById("custHeadVal").textContent = e.target.value + "%";
+      rebuildCustomizePreview();
+    });
+
+    document.getElementById("customizeSaveBtn").addEventListener("click", () => {
+      const custom = readCustomFromInputs();
+      saveMyCustom(custom);
+      const msg = document.getElementById("customizeMsg");
+      msg.textContent = "Saved! You'll spawn with this look.";
+      msg.className = "msg success";
+      msg.style.display = "flex";
+      setTimeout(() => { msg.style.display = "none"; }, 2500);
+    });
+  }
+  wireCustomizePage();
 
   function openFriendProfilePage(key){
     const name = displayNameFor(key);
@@ -2880,10 +3090,12 @@
     security: document.getElementById("pageSecurity"),
     account: document.getElementById("pageAccount"),
     friends: document.getElementById("pageFriends"),
-    friendProfile: document.getElementById("pageFriendProfile")
+    friendProfile: document.getElementById("pageFriendProfile"),
+    customize: document.getElementById("pageCustomize")
   };
   function showPage(name){
     if(name !== "friendProfile" && profileViewer) stopProfileViewer(); // free the WebGL context when leaving the profile page
+    if(name !== "customize" && typeof stopCustomizeViewer === "function") stopCustomizeViewer();
     Object.keys(pages).forEach(k => pages[k].classList.toggle("hidden", k !== name));
     const settingsPages = ["settingsHub", "security", "account"];
     document.querySelectorAll(".sb-item").forEach(i => {
@@ -2893,6 +3105,7 @@
     if(name === "account"){ renderThemeRow(); applyTranslations(); }
     if(name === "security"){ renderDevices(); }
     if(name === "friends"){ renderFriendsPage(); }
+    if(name === "customize" && typeof openCustomizePage === "function") openCustomizePage();
   }
   document.querySelectorAll(".sb-item").forEach(item => {
     item.addEventListener("click", () => {
@@ -2905,6 +3118,7 @@
     el.addEventListener("click", () => showPage(el.getAttribute("data-back")));
   });
 
+  document.getElementById("hubUserRow").addEventListener("click", () => showPage("customize"));
   document.getElementById("openSecurity").addEventListener("click", () => showPage("security"));
   document.getElementById("openAccount").addEventListener("click", () => showPage("account"));
   document.getElementById("openLogoutTile").addEventListener("click", () => doLogout());
@@ -2926,6 +3140,15 @@
     showPage("home");
     updateFriendBadge();
     startFriendNoticePolling();
+
+    // pull any previously-saved customization for this account down from
+    // Firebase (covers logging in on a new device/browser)
+    try{
+      fbDb.ref("blockverse_users/" + key + "/avatar").once("value").then(snap => {
+        const v = snap.val();
+        if(v) localStorage.setItem(customStorageKey(), JSON.stringify(v));
+      }).catch(()=>{});
+    }catch(e){}
   }
 
   function doLogout(){
@@ -3029,48 +3252,93 @@
       return grp;
     }
 
-    // builds a full blocky character rig; returns references to each part
-    function buildCharacterRig(color){
+    // clamps a customization value into its allowed range (mirrors the
+    // limits enforced server-side in the Firebase rules, so a bad/old
+    // saved value can never produce an out-of-range character)
+    function clampCustom(v, min, max, fallback){
+      v = Number(v);
+      if(!isFinite(v)) v = fallback;
+      return Math.max(min, Math.min(max, v));
+    }
+    const CUSTOM_LIMITS = { heightScale:[0.85,1.15], headScale:[0.8,1.2] };
+    function normalizeCustom(c){
+      c = c || {};
+      return {
+        torso: /^#[0-9a-fA-F]{6}$/.test(c.torso||"") ? c.torso : "#4a5fd6",
+        leftArm: /^#[0-9a-fA-F]{6}$/.test(c.leftArm||"") ? c.leftArm : (c.torso || "#4a5fd6"),
+        rightArm: /^#[0-9a-fA-F]{6}$/.test(c.rightArm||"") ? c.rightArm : (c.torso || "#4a5fd6"),
+        leftLeg: /^#[0-9a-fA-F]{6}$/.test(c.leftLeg||"") ? c.leftLeg : "#2a2a2e",
+        rightLeg: /^#[0-9a-fA-F]{6}$/.test(c.rightLeg||"") ? c.rightLeg : "#2a2a2e",
+        heightScale: clampCustom(c.heightScale, 0.85, 1.15, 1),
+        headScale: clampCustom(c.headScale, 0.8, 1.2, 1)
+      };
+    }
+
+    // builds a full blocky character rig; returns references to each part.
+    // `custom` is a normalized customization object (see normalizeCustom) -
+    // colors per body part plus an overall heightScale and a headScale.
+    //
+    // IMPORTANT: the head's Y position is always computed FROM the torso's
+    // actual top edge plus a fixed neck gap, instead of a hardcoded number.
+    // That's what fixes the old bug where a default (uncustomized) character
+    // spawned with its head sunk into its torso - any headScale/heightScale
+    // combination now always leaves a clean gap, by construction.
+    function buildCharacterRig(custom){
+      const c = normalizeCustom(typeof custom === "object" ? custom : { torso: custom });
       const grp = new THREE.Group();
 
       const skin = new THREE.MeshLambertMaterial({ color: 0xf0c090 });
-      const shirt = new THREE.MeshLambertMaterial({ color: color || 0x4a5fd6 });
-      const pants = new THREE.MeshLambertMaterial({ color: 0x2a2a2e });
+      const torsoMat = new THREE.MeshLambertMaterial({ color: c.torso });
+      const lArmMat = new THREE.MeshLambertMaterial({ color: c.leftArm });
+      const rArmMat = new THREE.MeshLambertMaterial({ color: c.rightArm });
+      const lLegMat = new THREE.MeshLambertMaterial({ color: c.leftLeg });
+      const rLegMat = new THREE.MeshLambertMaterial({ color: c.rightLeg });
 
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.5), shirt);
-      torso.position.y = 1.35;
+      const TORSO_H = 1.1, TORSO_Y = 1.35;
+      const HEAD_BASE_SIZE = 0.58, NECK_GAP = 0.08;
+
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, TORSO_H, 0.5), torsoMat);
+      torso.position.y = TORSO_Y;
       torso.castShadow = true;
       grp.add(torso);
 
-      const rigHead = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.58), skin);
-      rigHead.position.y = 2.05;
+      const headSize = HEAD_BASE_SIZE * c.headScale;
+      const torsoTopY = TORSO_Y + TORSO_H / 2;
+      const headY = torsoTopY + headSize / 2 + NECK_GAP; // always clear of the torso, whatever the scale
+      const rigHead = new THREE.Mesh(new THREE.BoxGeometry(headSize, headSize, headSize), skin);
+      rigHead.position.y = headY;
+      rigHead.userData.baseY = headY; // read by the walk/idle bob + ragdoll-reset code below
       rigHead.castShadow = true;
       grp.add(rigHead);
 
-      const rigLeftArm = makeLimbMesh(shirt, 0.3, 1.0, 0.3, 1.85);
+      const rigLeftArm = makeLimbMesh(lArmMat, 0.3, 1.0, 0.3, 1.85);
       rigLeftArm.position.x = -0.62;
       grp.add(rigLeftArm);
 
-      const rigRightArm = makeLimbMesh(shirt, 0.3, 1.0, 0.3, 1.85);
+      const rigRightArm = makeLimbMesh(rArmMat, 0.3, 1.0, 0.3, 1.85);
       rigRightArm.position.x = 0.62;
       grp.add(rigRightArm);
 
-      const rigLeftLeg = makeLimbMesh(pants, 0.35, 1.05, 0.35, 0.78);
+      const rigLeftLeg = makeLimbMesh(lLegMat, 0.35, 1.05, 0.35, 0.78);
       rigLeftLeg.position.x = -0.24;
       grp.add(rigLeftLeg);
 
-      const rigRightLeg = makeLimbMesh(pants, 0.35, 1.05, 0.35, 0.78);
+      const rigRightLeg = makeLimbMesh(rLegMat, 0.35, 1.05, 0.35, 0.78);
       rigRightLeg.position.x = 0.24;
       grp.add(rigRightLeg);
 
-      grp.scale.set(0.86, 0.86, 0.86);
+      // heightScale stretches the whole rig vertically only (x/z stay put),
+      // so a taller/shorter character keeps its proportions and the head
+      // stays correctly seated on the neck - it's a uniform child transform,
+      // so nothing can ever end up colliding.
+      grp.scale.set(0.86, 0.86 * c.heightScale, 0.86);
 
       return { group: grp, head: rigHead, leftArm: rigLeftArm, rightArm: rigRightArm, leftLeg: rigLeftLeg, rightLeg: rigRightLeg };
     }
 
     let ownNameSprite = null;
     function buildCharacter(){
-      const rig = buildCharacterRig(0x4a5fd6);
+      const rig = buildCharacterRig(getMyCustom());
       character = rig.group;
       head = rig.head; leftArm = rig.leftArm; rightArm = rig.rightArm;
       leftLeg = rig.leftLeg; rightLeg = rig.rightLeg;
@@ -3092,8 +3360,22 @@
       return REMOTE_COLORS[h % REMOTE_COLORS.length];
     }
 
+    function customFromPlayerData(id, data){
+      // if the player never customized (or is on an older client), fall
+      // back to their old per-id shirt color so they still look distinct
+      return normalizeCustom({
+        torso: data.torso || data.color || ("#" + colorForId(id).toString(16).padStart(6,"0")),
+        leftArm: data.leftArmColor,
+        rightArm: data.rightArmColor,
+        leftLeg: data.leftLegColor,
+        rightLeg: data.rightLegColor,
+        heightScale: data.heightScale,
+        headScale: data.headScale
+      });
+    }
+
     function addRemotePlayer(id, data){
-      const rig = buildCharacterRig(colorForId(id));
+      const rig = buildCharacterRig(customFromPlayerData(id, data));
       rig.group.position.set(data.x||0, data.y||0, data.z||0);
       rig.group.rotation.y = data.ry||0;
       scene.add(rig.group);
@@ -3320,11 +3602,20 @@
 
       onlineRef.onDisconnect().remove();
 
+      const myCustom = getMyCustom();
       onlineRef.set({
         name: currentUsername(),
         x: character.position.x, y: character.position.y, z: character.position.z,
         ry: character.rotation.y,
-        ts: firebase.database.ServerValue.TIMESTAMP
+        ts: firebase.database.ServerValue.TIMESTAMP,
+        color: myCustom.torso,
+        torso: myCustom.torso,
+        leftArmColor: myCustom.leftArm,
+        rightArmColor: myCustom.rightArm,
+        leftLegColor: myCustom.leftLeg,
+        rightLegColor: myCustom.rightLeg,
+        heightScale: myCustom.heightScale,
+        headScale: myCustom.headScale
       }).catch(err => {
         console.error("BlockVerse multiplayer: failed to write player position (permission denied usually means the database rules aren't published yet).", err);
         showMultiplayerError();
@@ -3657,7 +3948,7 @@
         rig.rightArm.rotation.z = -Math.cos(walkT) * 0.06;
         // bob the head/torso only (not the group), so this never fights the
         // ground/gravity position logic driving rig.group.position.y
-        if(rig.head) rig.head.position.y = 2.05 + Math.abs(Math.sin(walkT)) * 0.035;
+        if(rig.head) rig.head.position.y = (rig.head.userData.baseY != null ? rig.head.userData.baseY : 2.05) + Math.abs(Math.sin(walkT)) * 0.035;
       } else {
         // ease the walk pose back out (stops immediately once you stop
         // moving, instead of the walk swing lingering) before the idle
@@ -3670,14 +3961,16 @@
           // a gentle arm sway, so standing still visibly reads as "idle"
           // rather than just "not walking"
           const breathe = Math.sin(idleT);
-          const targetHeadY = 2.05 + breathe * 0.02;
+          const headBaseY = rig.head.userData.baseY != null ? rig.head.userData.baseY : 2.05;
+          const targetHeadY = headBaseY + breathe * 0.02;
           if(rig.head) rig.head.position.y += (targetHeadY - rig.head.position.y) * 0.15;
           rig.leftArm.rotation.z += Math.sin(idleT) * 0.05;
           rig.rightArm.rotation.z -= Math.sin(idleT) * 0.05;
           rig.leftArm.rotation.x += Math.sin(idleT * 0.5) * 0.03;
           rig.rightArm.rotation.x -= Math.sin(idleT * 0.5) * 0.03;
         } else if(rig.head){
-          rig.head.position.y += (2.05 - rig.head.position.y) * 0.2;
+          const headBaseY = rig.head.userData.baseY != null ? rig.head.userData.baseY : 2.05;
+          rig.head.position.y += (headBaseY - rig.head.position.y) * 0.2;
         }
       }
     }
@@ -3844,7 +4137,7 @@
 
     function finishRespawn(){
       // reset all part transforms back to their rest pose
-      head.position.set(0, 2.05, 0);
+      head.position.set(0, head.userData.baseY != null ? head.userData.baseY : 2.05, 0);
       head.rotation.set(0,0,0);
       leftArm.position.set(-0.62, 1.85, 0); leftArm.rotation.set(0,0,0);
       rightArm.position.set(0.62, 1.85, 0); rightArm.rotation.set(0,0,0);
