@@ -662,14 +662,59 @@
   .customize-slider-val{ color:var(--text-2); font-variant-numeric:tabular-nums; }
   .customize-layout input[type="range"]{ width:100%; accent-color:#4a5fd6; }
   .customize-hint{ margin-top:16px; font-size:11.5px; color:var(--text-3); line-height:1.4; }
+
   .customize-color-row{
-    display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:var(--text-1);
+    display:flex; align-items:center; gap:12px; padding:9px 6px; border-radius:10px; margin-bottom:2px; transition:background .15s;
   }
-  .customize-color-row input[type="color"]{
-    width:38px; height:30px; border-radius:8px; border:1px solid var(--border-soft); background:none; padding:0; cursor:pointer;
+  .customize-color-row:hover{ background:var(--grey-1); }
+  .customize-color-row .ccr-info{ flex:1; min-width:0; }
+  .customize-color-row .ccr-label{ font-size:13px; color:var(--text-1); font-weight:600; }
+  .customize-color-row .ccr-hex{ font-size:11px; color:var(--text-3); margin-top:1px; text-transform:uppercase; letter-spacing:0.3px; }
+  .customize-color-row .ccr-swatch-wrap{ position:relative; width:36px; height:36px; flex-shrink:0; }
+  .customize-color-row .ccr-swatch-wrap input[type="color"]{
+    position:absolute; inset:0; width:100%; height:100%; border-radius:50%; border:2px solid var(--border-soft);
+    background:none; padding:0; cursor:pointer; -webkit-appearance:none; appearance:none;
   }
-  .customize-canvas-wrap{ width:220px; height:280px; border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#7fc4ec,#bfe4f7); }
+  .customize-color-row .ccr-swatch-wrap input[type="color"]::-webkit-color-swatch-wrapper{ padding:0; border-radius:50%; }
+  .customize-color-row .ccr-swatch-wrap input[type="color"]::-webkit-color-swatch{ border:none; border-radius:50%; }
+  .customize-color-row .ccr-swatch-wrap input[type="color"]:hover{ border-color:#4a5fd6; }
+
+  .customize-presets{ display:flex; flex-wrap:wrap; gap:7px; margin-top:14px; }
+  .customize-preset-swatch{
+    width:22px; height:22px; border-radius:50%; border:2px solid transparent; cursor:pointer; transition:transform .12s, border-color .12s;
+  }
+  .customize-preset-swatch:hover{ transform:scale(1.15); border-color:#f2f2f2; }
+
+  .customize-canvas-wrap{
+    width:220px; height:280px; border-radius:12px; overflow:hidden; position:relative;
+    background:linear-gradient(180deg,#7fc4ec,#bfe4f7); cursor:pointer;
+  }
   .customize-canvas-wrap canvas{ width:100%; height:100%; display:block; }
+  .customize-inspect-hint{
+    position:absolute; left:0; right:0; bottom:0; padding:8px 0; text-align:center;
+    background:linear-gradient(0deg,rgba(10,10,11,0.55),transparent); color:#fff; font-size:11.5px; font-weight:600;
+    opacity:0; transition:opacity .15s; pointer-events:none; display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .customize-canvas-wrap:hover .customize-inspect-hint{ opacity:1; }
+  .customize-inspect-hint svg{ width:14px; height:14px; }
+
+  /* ---- inspect (full free-look) page ---- */
+  .inspect-screen{
+    position:fixed; inset:0; z-index:200; background:linear-gradient(180deg,#7fc4ec,#bfe4f7);
+    display:flex; align-items:center; justify-content:center; touch-action:none; cursor:grab;
+  }
+  .inspect-screen.dragging{ cursor:grabbing; }
+  .inspect-screen canvas{ width:100%; height:100%; display:block; }
+  .inspect-close-btn{
+    position:absolute; top:18px; left:18px; width:42px; height:42px; border-radius:50%;
+    background:rgba(10,10,11,0.55); border:1px solid rgba(255,255,255,0.25); color:#fff;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2;
+  }
+  .inspect-close-btn svg{ width:19px; height:19px; }
+  .inspect-hint-bar{
+    position:absolute; bottom:22px; left:50%; transform:translateX(-50%); color:#0a0a0b;
+    background:rgba(255,255,255,0.85); padding:8px 16px; border-radius:20px; font-size:12px; font-weight:600; z-index:2;
+  }
   .profile-3d-toggle{
     background:var(--grey-1); border:1px solid var(--border); color:var(--text-0);
     font-size:12.5px; font-weight:700; padding:8px 18px; border-radius:20px; cursor:pointer;
@@ -1013,7 +1058,13 @@
         </div>
 
         <div class="customize-panel customize-panel-center">
-          <div class="customize-canvas-wrap"><canvas id="customizeCanvas"></canvas></div>
+          <div class="customize-canvas-wrap" id="customizeCanvasWrap">
+            <canvas id="customizeCanvas"></canvas>
+            <div class="customize-inspect-hint">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+              Tap to inspect
+            </div>
+          </div>
           <button class="submit-btn" id="customizeSaveBtn" style="max-width:220px;">Save character</button>
           <div class="msg" id="customizeMsg"></div>
         </div>
@@ -1022,30 +1073,42 @@
           <div class="customize-panel-title">Colors</div>
 
           <div class="customize-color-row">
-            <span>Torso</span>
-            <input type="color" id="custTorso" value="#4a5fd6">
+            <div class="ccr-swatch-wrap"><input type="color" id="custTorso" value="#4a5fd6"></div>
+            <div class="ccr-info"><div class="ccr-label">Torso</div><div class="ccr-hex" id="custTorsoHex">#4A5FD6</div></div>
           </div>
           <div class="customize-color-row">
-            <span>Left hand</span>
-            <input type="color" id="custLeftArm" value="#4a5fd6">
+            <div class="ccr-swatch-wrap"><input type="color" id="custLeftArm" value="#4a5fd6"></div>
+            <div class="ccr-info"><div class="ccr-label">Left hand</div><div class="ccr-hex" id="custLeftArmHex">#4A5FD6</div></div>
           </div>
           <div class="customize-color-row">
-            <span>Right hand</span>
-            <input type="color" id="custRightArm" value="#4a5fd6">
+            <div class="ccr-swatch-wrap"><input type="color" id="custRightArm" value="#4a5fd6"></div>
+            <div class="ccr-info"><div class="ccr-label">Right hand</div><div class="ccr-hex" id="custRightArmHex">#4A5FD6</div></div>
           </div>
           <div class="customize-color-row">
-            <span>Left leg</span>
-            <input type="color" id="custLeftLeg" value="#2a2a2e">
+            <div class="ccr-swatch-wrap"><input type="color" id="custLeftLeg" value="#2a2a2e"></div>
+            <div class="ccr-info"><div class="ccr-label">Left leg</div><div class="ccr-hex" id="custLeftLegHex">#2A2A2E</div></div>
           </div>
           <div class="customize-color-row">
-            <span>Right leg</span>
-            <input type="color" id="custRightLeg" value="#2a2a2e">
+            <div class="ccr-swatch-wrap"><input type="color" id="custRightLeg" value="#2a2a2e"></div>
+            <div class="ccr-info"><div class="ccr-label">Right leg</div><div class="ccr-hex" id="custRightLegHex">#2A2A2E</div></div>
           </div>
+
+          <div class="customize-panel-title" style="margin:18px 0 8px;">Quick presets</div>
+          <div class="customize-presets" id="customizePresets"></div>
         </div>
       </div>
     </div>
 
   </div>
+</div>
+
+<!-- INSPECT OVERLAY (free-look character viewer) -->
+<div class="inspect-screen hidden" id="inspectScreen">
+  <button class="inspect-close-btn" id="inspectCloseBtn" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+  </button>
+  <canvas id="inspectCanvas"></canvas>
+  <div class="inspect-hint-bar">Drag to look around</div>
 </div>
 
 <!-- GAME SCREEN (3D Baseplate) -->
@@ -2843,6 +2906,43 @@
 
   /* ============ customize page (live 3D preview) ============ */
   let customizeViewer = null; // { renderer, scene, camera, group, raf }
+  const CUSTOM_PRESETS = [
+    { torso:"#4a5fd6", leftArm:"#4a5fd6", rightArm:"#4a5fd6", leftLeg:"#2a2a2e", rightLeg:"#2a2a2e" },
+    { torso:"#d64a6a", leftArm:"#d64a6a", rightArm:"#d64a6a", leftLeg:"#2a2a2e", rightLeg:"#2a2a2e" },
+    { torso:"#4ad6a0", leftArm:"#4ad6a0", rightArm:"#4ad6a0", leftLeg:"#1c3b2e", rightLeg:"#1c3b2e" },
+    { torso:"#d6b34a", leftArm:"#d6b34a", rightArm:"#d6b34a", leftLeg:"#3a2e14", rightLeg:"#3a2e14" },
+    { torso:"#8a4ad6", leftArm:"#8a4ad6", rightArm:"#8a4ad6", leftLeg:"#241a33", rightLeg:"#241a33" },
+    { torso:"#e5484d", leftArm:"#2a2a2e", rightArm:"#2a2a2e", leftLeg:"#e5484d", rightLeg:"#2a2a2e" },
+    { torso:"#0a0a0b", leftArm:"#0a0a0b", rightArm:"#0a0a0b", leftLeg:"#0a0a0b", rightLeg:"#0a0a0b" },
+    { torso:"#f2f2f2", leftArm:"#f2f2f2", rightArm:"#f2f2f2", leftLeg:"#4a4a4e", rightLeg:"#4a4a4e" }
+  ];
+
+  function refreshHexLabels(){
+    ["Torso","LeftArm","RightArm","LeftLeg","RightLeg"].forEach(id => {
+      const input = document.getElementById("cust" + id);
+      const label = document.getElementById("cust" + id + "Hex");
+      if(input && label) label.textContent = input.value.toUpperCase();
+    });
+  }
+
+  function renderCustomizePresets(){
+    const wrap = document.getElementById("customizePresets");
+    wrap.innerHTML = CUSTOM_PRESETS.map(p =>
+      '<div class="customize-preset-swatch" style="background:' + p.torso + ';" data-preset=\'' + JSON.stringify(p) + '\'></div>'
+    ).join("");
+    wrap.querySelectorAll(".customize-preset-swatch").forEach(el => {
+      el.addEventListener("click", () => {
+        const p = JSON.parse(el.getAttribute("data-preset"));
+        document.getElementById("custTorso").value = p.torso;
+        document.getElementById("custLeftArm").value = p.leftArm;
+        document.getElementById("custRightArm").value = p.rightArm;
+        document.getElementById("custLeftLeg").value = p.leftLeg;
+        document.getElementById("custRightLeg").value = p.rightLeg;
+        refreshHexLabels();
+        rebuildCustomizePreview();
+      });
+    });
+  }
 
   function readCustomFromInputs(){
     return {
@@ -2859,7 +2959,7 @@
   function rebuildCustomizePreview(){
     if(!customizeViewer) return;
     if(customizeViewer.group){ customizeViewer.scene.remove(customizeViewer.group); }
-    const rig = buildCharacterRig(readCustomFromInputs());
+    const rig = BaseplateGame.buildCharacterRig(readCustomFromInputs());
     rig.group.scale.multiplyScalar(1); // (already scaled inside buildCharacterRig)
     rig.group.position.y = -1.1;
     customizeViewer.group = rig.group;
@@ -2876,6 +2976,7 @@
   function stopCustomizeViewer(){
     if(customizeViewer && customizeViewer.raf) cancelAnimationFrame(customizeViewer.raf);
     customizeViewer = null;
+    if(inspectViewer) closeInspectScreen();
   }
 
   function openCustomizePage(){
@@ -2889,6 +2990,8 @@
     document.getElementById("custHeadRange").value = Math.round(custom.headScale * 100);
     document.getElementById("custHeightVal").textContent = Math.round(custom.heightScale * 100) + "%";
     document.getElementById("custHeadVal").textContent = Math.round(custom.headScale * 100) + "%";
+    refreshHexLabels();
+    renderCustomizePresets();
     const msg = document.getElementById("customizeMsg");
     msg.style.display = "none";
 
@@ -2910,15 +3013,21 @@
 
   function wireCustomizePage(){
     const liveIds = ["custTorso","custLeftArm","custRightArm","custLeftLeg","custRightLeg"];
-    liveIds.forEach(id => document.getElementById(id).addEventListener("input", rebuildCustomizePreview));
+    liveIds.forEach(id => document.getElementById(id).addEventListener("input", () => {
+      refreshHexLabels();
+      rebuildCustomizePreview();
+      if(inspectViewer) rebuildInspectPreview();
+    }));
 
     document.getElementById("custHeightRange").addEventListener("input", (e) => {
       document.getElementById("custHeightVal").textContent = e.target.value + "%";
       rebuildCustomizePreview();
+      if(inspectViewer) rebuildInspectPreview();
     });
     document.getElementById("custHeadRange").addEventListener("input", (e) => {
       document.getElementById("custHeadVal").textContent = e.target.value + "%";
       rebuildCustomizePreview();
+      if(inspectViewer) rebuildInspectPreview();
     });
 
     document.getElementById("customizeSaveBtn").addEventListener("click", () => {
@@ -2930,8 +3039,105 @@
       msg.style.display = "flex";
       setTimeout(() => { msg.style.display = "none"; }, 2500);
     });
+
+    document.getElementById("customizeCanvasWrap").addEventListener("click", openInspectScreen);
   }
   wireCustomizePage();
+
+  /* ============ inspect overlay (full free-look character viewer) ============ */
+  let inspectViewer = null; // { renderer, scene, camera, group, raf, yaw, pitch }
+
+  function rebuildInspectPreview(){
+    if(!inspectViewer) return;
+    if(inspectViewer.group) inspectViewer.scene.remove(inspectViewer.group);
+    const rig = BaseplateGame.buildCharacterRig(readCustomFromInputs());
+    rig.group.position.y = -1.1;
+    inspectViewer.group = rig.group;
+    inspectViewer.scene.add(rig.group);
+  }
+
+  function updateInspectCamera(){
+    if(!inspectViewer) return;
+    const dist = 4.6;
+    const pitch = inspectViewer.pitch, yaw = inspectViewer.yaw;
+    const x = Math.sin(yaw) * Math.cos(pitch) * dist;
+    const z = Math.cos(yaw) * Math.cos(pitch) * dist;
+    const y = 0.9 + Math.sin(pitch) * dist;
+    inspectViewer.camera.position.set(x, y, z);
+    inspectViewer.camera.lookAt(0, 0.5, 0);
+  }
+
+  function inspectViewerTick(){
+    if(!inspectViewer) return;
+    inspectViewer.renderer.render(inspectViewer.scene, inspectViewer.camera);
+    inspectViewer.raf = requestAnimationFrame(inspectViewerTick);
+  }
+
+  function openInspectScreen(){
+    const screen = document.getElementById("inspectScreen");
+    screen.classList.remove("hidden");
+    if(customizeViewer && customizeViewer.raf){ cancelAnimationFrame(customizeViewer.raf); customizeViewer.raf = null; }
+
+    const canvas = document.getElementById("inspectCanvas");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 100);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.55);
+    dir.position.set(3, 5, 4); scene.add(dir);
+
+    inspectViewer = { renderer, scene, camera, group: null, raf: null, yaw: Math.PI, pitch: 0.15 };
+    rebuildInspectPreview();
+    updateInspectCamera();
+    inspectViewerTick();
+
+    let dragging = false, lastX = 0, lastY = 0;
+    function onDown(x, y){ dragging = true; lastX = x; lastY = y; screen.classList.add("dragging"); }
+    function onMove(x, y){
+      if(!dragging || !inspectViewer) return;
+      inspectViewer.yaw -= (x - lastX) * 0.008;
+      inspectViewer.pitch = Math.max(-1.1, Math.min(1.1, inspectViewer.pitch + (y - lastY) * 0.008));
+      lastX = x; lastY = y;
+      updateInspectCamera();
+    }
+    function onUp(){ dragging = false; screen.classList.remove("dragging"); }
+
+    screen._mouseDown = (e) => onDown(e.clientX, e.clientY);
+    screen._mouseMove = (e) => onMove(e.clientX, e.clientY);
+    screen._mouseUp = onUp;
+    screen._touchStart = (e) => { const t = e.touches[0]; onDown(t.clientX, t.clientY); };
+    screen._touchMove = (e) => { const t = e.touches[0]; onMove(t.clientX, t.clientY); e.preventDefault(); };
+    screen._touchEnd = onUp;
+
+    screen.addEventListener("mousedown", screen._mouseDown);
+    window.addEventListener("mousemove", screen._mouseMove);
+    window.addEventListener("mouseup", screen._mouseUp);
+    screen.addEventListener("touchstart", screen._touchStart, { passive:true });
+    screen.addEventListener("touchmove", screen._touchMove, { passive:false });
+    screen.addEventListener("touchend", screen._touchEnd);
+  }
+
+  function closeInspectScreen(){
+    const screen = document.getElementById("inspectScreen");
+    screen.classList.add("hidden");
+    if(inspectViewer && inspectViewer.raf) cancelAnimationFrame(inspectViewer.raf);
+    inspectViewer = null;
+    if(screen._mouseDown){
+      screen.removeEventListener("mousedown", screen._mouseDown);
+      window.removeEventListener("mousemove", screen._mouseMove);
+      window.removeEventListener("mouseup", screen._mouseUp);
+      screen.removeEventListener("touchstart", screen._touchStart);
+      screen.removeEventListener("touchmove", screen._touchMove);
+      screen.removeEventListener("touchend", screen._touchEnd);
+    }
+    // back to the customize page (where inspect is always launched from) -
+    // resume its own live-spinning preview
+    if(customizeViewer) customizeViewerTick();
+  }
+  document.getElementById("inspectCloseBtn").addEventListener("click", closeInspectScreen);
 
   function openFriendProfilePage(key){
     const name = displayNameFor(key);
@@ -4507,7 +4713,7 @@
       }, 90);
     }
 
-    return { start, stop, isRunning: () => running };
+    return { start, stop, isRunning: () => running, buildCharacterRig, normalizeCustom };
   })();
 
   document.getElementById("playBaseplateBtn").addEventListener("click", () => BaseplateGame.start());
