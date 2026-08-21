@@ -2634,28 +2634,40 @@
 
       grp.scale.set(0.86, 0.86, 0.86);
 
-      return { group: grp, head: rigHead, leftArm: rigLeftArm, rightArm: rigRightArm, leftLeg: rigLeftLeg, rightLeg: rigRightLeg };
+      return { group: grp, head: rigHead, leftArm: rigLeftArm, rightArm: rigRightArm, leftLeg: rigLeftLeg, rightLeg: rigRightLeg, shirtMat: shirt };
     }
 
+    let characterShirtMat = null;
     function buildCharacter(){
       const rig = buildCharacterRig(0x4a5fd6);
       character = rig.group;
       head = rig.head; leftArm = rig.leftArm; rightArm = rig.rightArm;
       leftLeg = rig.leftLeg; rightLeg = rig.rightLeg;
+      characterShirtMat = rig.shirtMat;
       character.position.set(0, 0, 0);
       scene.add(character);
     }
 
     // ---- remote players (other real people from Firebase) ----
-    const REMOTE_COLORS = [0xd64a6a, 0x4ad6a0, 0xd6b34a, 0x8a4ad6, 0x4ab0d6];
+    const REMOTE_COLORS = [0xd64a6a, 0x4ad6a0, 0xd6b34a, 0x8a4ad6, 0x4ab0d6, 0x4a5fd6, 0xd64ac6, 0x4ad64a];
+    // Color is derived from the player's stable username (not their per-session
+    // uid), so it comes out the same on every screen instead of a random hash
+    // per browser session.
     function colorForId(id){
       let h = 0;
       for(let i=0;i<id.length;i++) h = (h*31 + id.charCodeAt(i)) >>> 0;
       return REMOTE_COLORS[h % REMOTE_COLORS.length];
     }
+    function colorToHexString(colorNum){ return "#" + colorNum.toString(16).padStart(6, "0"); }
+    function hexStringToColor(hex){
+      if(!hex) return null;
+      const n = parseInt(hex.replace("#",""), 16);
+      return Number.isNaN(n) ? null : n;
+    }
 
     function addRemotePlayer(id, data){
-      const rig = buildCharacterRig(colorForId(id));
+      const color = hexStringToColor(data.color) ?? colorForId((data.name || id).toLowerCase());
+      const rig = buildCharacterRig(color);
       rig.group.position.set(data.x||0, data.y||0, data.z||0);
       rig.group.rotation.y = data.ry||0;
       scene.add(rig.group);
@@ -2706,36 +2718,53 @@
     }
 
     function makeChatBubbleSprite(text){
+      const SS = 2; // supersample for crisper text on the sprite
       const canvas = document.createElement("canvas");
-      canvas.width = 320; canvas.height = 160;
+      canvas.width = 320 * SS; canvas.height = 170 * SS;
       const ctx = canvas.getContext("2d");
-      ctx.font = "26px Arial";
-      const lines = wrapChatLines(ctx, text, 270);
-      const lineH = 30;
-      const boxH = lines.length * lineH + 24;
-      const boxW = Math.min(300, Math.max(...lines.map(l => ctx.measureText(l).width)) + 30);
-      const boxX = (canvas.width - boxW) / 2;
-      const boxY = canvas.height - boxH - 18;
+      ctx.scale(SS, SS);
+      ctx.font = "600 25px Arial";
+      const lines = wrapChatLines(ctx, text, 268);
+      const lineH = 29;
+      const padX = 18, padY = 16;
+      const boxH = lines.length * lineH + padY * 2 - 6;
+      const boxW = Math.min(300, Math.max(...lines.map(l => ctx.measureText(l).width)) + padX * 2);
+      const cw = canvas.width / SS, ch = canvas.height / SS;
+      const boxX = (cw - boxW) / 2;
+      const boxY = ch - boxH - 22;
 
-      ctx.fillStyle = "rgba(242,242,242,0.96)";
-      roundRectPath(ctx, boxX, boxY, boxW, boxH, 10);
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.35)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 3;
+      ctx.fillStyle = "rgba(250,250,251,0.97)";
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 14);
       ctx.fill();
-      // little pointer tail
+      ctx.restore();
+
+      ctx.fillStyle = "rgba(250,250,251,0.97)";
       ctx.beginPath();
-      ctx.moveTo(canvas.width/2 - 8, boxY + boxH);
-      ctx.lineTo(canvas.width/2 + 8, boxY + boxH);
-      ctx.lineTo(canvas.width/2, boxY + boxH + 12);
+      ctx.moveTo(cw/2 - 9, boxY + boxH - 1);
+      ctx.lineTo(cw/2 + 9, boxY + boxH - 1);
+      ctx.lineTo(cw/2, boxY + boxH + 13);
       ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = "#0a0a0b";
+      ctx.strokeStyle = "rgba(0,0,0,0.06)";
+      ctx.lineWidth = 1;
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 14);
+      ctx.stroke();
+
+      ctx.fillStyle = "#131315";
       ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
       lines.forEach((line, i) => {
-        ctx.fillText(line, canvas.width/2, boxY + 26 + i*lineH);
+        ctx.fillText(line, cw/2, boxY + padY + 17 + i*lineH);
       });
 
       const tex = new THREE.CanvasTexture(canvas);
-      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+      tex.anisotropy = 4;
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
       const sprite = new THREE.Sprite(mat);
       sprite.scale.set(2.4, 2.4 * (canvas.height/canvas.width), 1);
       return sprite;
@@ -2825,8 +2854,14 @@
 
       onlineRef.onDisconnect().remove();
 
+      // Recolor our own rig to the same deterministic color remote viewers
+      // will compute from our username, so everyone sees the same color.
+      const myColor = colorForId(currentUsername().toLowerCase());
+      if(characterShirtMat) characterShirtMat.color.setHex(myColor);
+
       onlineRef.set({
         name: currentUsername(),
+        color: colorToHexString(myColor),
         x: character.position.x, y: character.position.y, z: character.position.z,
         ry: character.rotation.y,
         ts: firebase.database.ServerValue.TIMESTAMP
@@ -2944,6 +2979,77 @@
       activeBubbles.clear();
     }
 
+    /* ---- multi-language profanity filter ----
+       Covers common swear roots across a broad set of languages (English,
+       Spanish, French, German, Italian, Portuguese, Dutch, Russian, Polish,
+       Turkish, Arabic (romanized), Hindi (romanized), Indonesian/Malay,
+       Tagalog, Swedish, Japanese (romanized), Korean (romanized), Vietnamese,
+       Chinese (pinyin)). It's a practical, not exhaustive, list - there's no
+       way to cover literally every one of the world's ~7000 languages, but
+       this catches common profanity in most languages people are likely to
+       type here. If the whole message matches, the whole message is replaced
+       with hashtags rather than just the flagged word. */
+    const PROFANITY_WORDS = [
+      // English
+      "fuck","fucking","fucker","shit","bitch","asshole","bastard","cunt","dick","piss","slut","whore","nigger","nigga","faggot","retard","cock","pussy","twat","wanker","motherfucker",
+      // Spanish
+      "mierda","puta","puto","pendejo","cabron","cabrón","joder","coño","gilipollas","verga","chinga","chingar","maricon","maricón",
+      // French
+      "merde","putain","salope","connard","connasse","enculé","enfoiré","batard","bâtard","pute",
+      // German
+      "scheisse","scheiße","fick","ficken","hure","arschloch","wichser","fotze","hurensohn",
+      // Italian
+      "cazzo","stronzo","stronza","puttana","vaffanculo","merda","troia","figa",
+      // Portuguese
+      "merda","porra","caralho","puta","filho da puta","foder","cacete","desgraça",
+      // Dutch
+      "kut","klootzak","hoer","tering","kanker","lul",
+      // Russian (romanized + cyrillic)
+      "blyat","blya","suka","pizda","huy","ebat","хуй","блять","сука","пизда","ебать",
+      // Polish
+      "kurwa","chuj","pierdole","jebac","jebać",
+      // Turkish
+      "siktir","orospu","amk","yarrak","piç",
+      // Arabic (romanized)
+      "kalb","sharmoota","sharmuta","kus","zebi","khara",
+      // Hindi/Urdu (romanized)
+      "chutiya","madarchod","bhosdike","gandu","randi","harami","lund","bhenchod",
+      // Indonesian/Malay
+      "anjing","bangsat","kontol","memek","babi","goblok",
+      // Tagalog
+      "putangina","gago","tangina","tarantado","ulol",
+      // Swedish
+      "fitta","jävla","helvete","skit",
+      // Japanese (romanized)
+      "kuso","chikushou","bakayaro",
+      // Korean (romanized)
+      "sibal","sibal","gaeseki","byeongshin",
+      // Vietnamese
+      "dcm","djcm","lon","cac",
+      // Chinese (pinyin)
+      "nmsl","cnm","tmd","sha bi","shabi"
+    ];
+
+    function normalizeForFilter(text){
+      return text.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // strip accents
+        .replace(/0/g,"o").replace(/1/g,"i").replace(/3/g,"e").replace(/4/g,"a")
+        .replace(/5/g,"s").replace(/7/g,"t").replace(/@/g,"a").replace(/\$/g,"s")
+        .replace(/[^a-z\u0400-\u04FF ]/g, ""); // keep latin + cyrillic letters and spaces only
+    }
+
+    function containsProfanity(text){
+      const normalized = normalizeForFilter(text);
+      const compact = normalized.replace(/\s+/g, ""); // catches "f u c k" style spacing tricks too
+      return PROFANITY_WORDS.some(w => normalized.includes(w) || compact.includes(w.replace(/\s+/g,"")));
+    }
+
+    function filterChatText(text){
+      if(!containsProfanity(text)) return text;
+      // whole message gets hashed out, spaces preserved so word shape stays readable
+      return text.split("").map(ch => (ch === " " ? " " : "#")).join("");
+    }
+
     function sendChatMessage(text){
       text = (text || "").trim().slice(0, 140);
       if(!text) return;
@@ -2955,7 +3061,7 @@
       fbDb.ref("rooms/baseplate/chat").push({
         uid: playerId,
         name: currentUsername(),
-        text: text,
+        text: filterChatText(text),
         ts: firebase.database.ServerValue.TIMESTAMP
       }).catch(err => {
         console.error("BlockVerse chat: failed to send message (often a rules/publish issue).", err);
@@ -3420,11 +3526,12 @@
 
     function openCharacterPreview(name){
       previewName = name;
+      document.getElementById("charPreviewOverlay").classList.remove("hidden");
       initCharPreview();
       resizePreviewCanvas();
 
       if(previewRig) previewScene.remove(previewRig.group);
-      previewRig = buildCharacterRig(colorForId(name));
+      previewRig = buildCharacterRig(colorForId(name.toLowerCase()));
       previewRig.group.position.set(0, 0, 0);
       previewScene.add(previewRig.group);
 
@@ -3432,7 +3539,6 @@
       document.getElementById("charPreviewTag").textContent = t("playingNow");
       refreshCharPreviewAction();
 
-      document.getElementById("charPreviewOverlay").classList.remove("hidden");
       if(previewAnimId) cancelAnimationFrame(previewAnimId);
       previewTick();
     }
