@@ -279,14 +279,14 @@
   .game-chat-btn:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
   .game-chat-btn svg{ width:17px; height:17px; }
   .game-chat-panel{
-    position:absolute; top:64px; left:16px; z-index:25; width:392px; max-width:88vw;
+    position:absolute; top:64px; left:16px; z-index:25; width:430px; max-width:90vw;
     background:rgba(16,16,18,0.86); border:1px solid rgba(255,255,255,0.08); border-radius:14px;
     backdrop-filter:blur(6px); display:flex; flex-direction:column; overflow:hidden;
     box-shadow:0 14px 34px rgba(0,0,0,0.4); animation:modalIn .18s ease both;
   }
   .game-chat-log-wrap{ position:relative; }
   .game-chat-log{
-    height:340px; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px;
+    height:210px; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px;
     scroll-behavior:smooth; overscroll-behavior:contain;
   }
   .game-chat-log::-webkit-scrollbar{ width:7px; }
@@ -613,12 +613,16 @@
     width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
     border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
     font-weight:700; font-size:14px; color:var(--text-0); flex-shrink:0;
-    position:relative; overflow:hidden;
+    position:relative;
   }
-  .friend-avatar svg{ width:100%; height:100%; display:block; }
-  /* Small dot ring on the avatar circle: green = online (currently in Baseplate), grey = offline. */
+  .friend-avatar .avatar-img{
+    width:100%; height:100%; border-radius:50%; overflow:hidden; display:flex;
+  }
+  .friend-avatar .avatar-img svg{ width:100%; height:100%; display:block; }
+  /* Status dot sits on top of the avatar's corner, outside the circular
+     clip, instead of overlapping/blending into the artwork underneath. */
   .friend-avatar .status-dot{
-    position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border-radius:50%;
+    position:absolute; top:-2px; right:-2px; width:11px; height:11px; border-radius:50%;
     border:2px solid var(--bg-2); background:var(--text-3); box-sizing:content-box; z-index:2;
   }
   .friend-avatar .status-dot.online{ background:#3ecf6e; }
@@ -627,34 +631,23 @@
   .friend-info .f-sub{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
   .friend-actions{ display:flex; gap:8px; flex-shrink:0; }
 
-  /* ---------- Friend profile modal ---------- */
-  .profile-modal{
-    width:100%; max-width:520px; display:flex; flex-direction:column;
-    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:16px;
-    box-shadow:0 24px 70px rgba(0,0,0,0.6); animation:modalIn .22s cubic-bezier(.2,.9,.3,1.1) both;
-    overflow:hidden;
+  /* ---------- Friend profile page ---------- */
+  .friend-profile-panel{
+    display:flex; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:16px;
+    overflow:hidden; margin-top:4px; max-width:640px; animation:fadeUp .3s ease both;
   }
-  .profile-modal-head{
-    padding:16px 18px; border-bottom:1px solid var(--border-soft);
-    display:flex; align-items:center; justify-content:space-between;
-  }
-  .profile-modal-head h3{ margin:0; font-size:15px; color:var(--text-0); }
-  .profile-modal-body{ display:flex; gap:0; }
-  .profile-modal-info{ flex:1; min-width:0; padding:22px 20px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; }
-  .profile-big-avatar{
-    width:84px; height:84px; border-radius:50%; overflow:hidden; border:1px solid var(--border);
-    background:linear-gradient(135deg,var(--grey-3),var(--grey-1)); position:relative;
-  }
+  .friend-profile-info{ flex:1; min-width:0; padding:34px 26px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; }
+  .profile-big-avatar{ width:96px; height:96px; border-radius:50%; overflow:hidden; border:1px solid var(--border); background:linear-gradient(135deg,var(--grey-3),var(--grey-1)); }
   .profile-big-avatar svg{ width:100%; height:100%; display:block; }
-  .profile-name{ font-size:17px; font-weight:700; color:var(--text-0); margin-top:4px; }
-  .profile-status{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-2); }
+  .profile-name{ font-size:19px; font-weight:700; color:var(--text-0); margin-top:6px; }
+  .profile-status{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); }
   .profile-status .status-dot{ width:9px; height:9px; border-radius:50%; background:var(--text-3); }
   .profile-status .status-dot.online{ background:#3ecf6e; }
-  .profile-modal-viewer{
-    width:210px; flex-shrink:0; border-left:1px solid var(--border-soft); background:var(--bg-1);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:16px;
+  .friend-profile-viewer{
+    width:230px; flex-shrink:0; border-left:1px solid var(--border-soft); background:var(--bg-1);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:20px;
   }
-  .profile-viewer-canvas-wrap{ width:170px; height:170px; border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#7fc4ec,#bfe4f7); }
+  .profile-viewer-canvas-wrap{ width:180px; height:180px; border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#7fc4ec,#bfe4f7); }
   .profile-viewer-canvas-wrap canvas{ width:100%; height:100%; display:block; }
   .profile-3d-toggle{
     background:var(--grey-1); border:1px solid var(--border); color:var(--text-0);
@@ -663,9 +656,9 @@
   }
   .profile-3d-toggle:hover{ background:var(--grey-3); transform:scale(1.04); }
   .profile-3d-toggle.active{ background:#f2f2f2; color:#0a0a0b; border-color:#f2f2f2; }
-  @media (max-width:480px){
-    .profile-modal-body{ flex-direction:column; }
-    .profile-modal-viewer{ width:auto; border-left:none; border-top:1px solid var(--border-soft); }
+  @media (max-width:560px){
+    .friend-profile-panel{ flex-direction:column; }
+    .friend-profile-viewer{ width:auto; border-left:none; border-top:1px solid var(--border-soft); }
   }
   .friend-btn{
     padding:7px 13px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;
@@ -835,7 +828,6 @@
     <span class="notif-bell-dot hidden" id="notifBellDot"></span>
   </button>
   <div id="notifPanelRoot"></div>
-  <div id="profileModalRoot"></div>
 
   <div class="main">
 
@@ -953,6 +945,24 @@
       <div class="friend-section" id="friendSuggestSection">
         <h3><span data-i18n="peopleYouMayKnow">People you may know</span></h3>
         <div id="friendSuggestList"></div>
+      </div>
+    </div>
+
+    <div id="pageFriendProfile" class="hidden">
+      <div class="back-link" data-back="friends">&#8592; <span>Back to friends</span></div>
+      <div class="main-header">
+        <h2 id="friendProfileHeading">Player</h2>
+      </div>
+      <div class="friend-profile-panel">
+        <div class="friend-profile-info">
+          <div class="profile-big-avatar" id="friendProfileAvatar"></div>
+          <div class="profile-name" id="friendProfileName">Player</div>
+          <div class="profile-status" id="friendProfileStatus"><span class="status-dot"></span>Offline</div>
+        </div>
+        <div class="friend-profile-viewer">
+          <div class="profile-viewer-canvas-wrap"><canvas id="profileViewerCanvas"></canvas></div>
+          <button class="profile-3d-toggle" id="profile3dToggle">3D</button>
+        </div>
       </div>
     </div>
 
@@ -2242,12 +2252,20 @@
   function avatarFaceSvg(key){
     const shirt = colorForKey(key);
     return (
-      '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">' +
-        '<rect width="100" height="100" fill="' + shirt + '" opacity="0.22"/>' +
-        '<rect x="20" y="66" width="60" height="40" rx="8" fill="' + shirt + '"/>' +
-        '<rect x="28" y="18" width="44" height="44" rx="9" fill="#f0c090"/>' +
-        '<rect x="36" y="38" width="7" height="7" rx="1.5" fill="#2a2a2e"/>' +
-        '<rect x="57" y="38" width="7" height="7" rx="1.5" fill="#2a2a2e"/>' +
+      '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect width="100" height="100" fill="' + shirt + '" opacity="0.16"/>' +
+        // legs
+        '<rect x="38" y="78" width="9" height="18" rx="2" fill="#2a2a2e"/>' +
+        '<rect x="53" y="78" width="9" height="18" rx="2" fill="#2a2a2e"/>' +
+        // arms hanging at the sides
+        '<rect x="20" y="46" width="10" height="30" rx="3" fill="' + shirt + '"/>' +
+        '<rect x="70" y="46" width="10" height="30" rx="3" fill="' + shirt + '"/>' +
+        // torso
+        '<rect x="32" y="44" width="36" height="36" rx="5" fill="' + shirt + '"/>' +
+        // head
+        '<rect x="34" y="10" width="32" height="32" rx="7" fill="#f0c090"/>' +
+        '<rect x="41" y="24" width="6" height="6" rx="1.5" fill="#2a2a2e"/>' +
+        '<rect x="53" y="24" width="6" height="6" rx="1.5" fill="#2a2a2e"/>' +
       '</svg>'
     );
   }
@@ -2571,7 +2589,7 @@
       : '';
     return (
       '<div class="friend-row' + (clickable ? ' clickable' : '') + '" data-user="' + key + '"' + (clickable ? ' data-open-profile="' + key + '"' : '') + '>' +
-        '<div class="friend-avatar">' + avatarFaceSvg(key) + dotHtml + '</div>' +
+        '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(key) + '</div>' + dotHtml + '</div>' +
         '<div class="friend-info">' +
           '<div class="f-name">' + escapeHtml(displayNameFor(key)) + '</div>' +
           subHtml +
@@ -2663,9 +2681,9 @@
     head.position.y = 2.05; group.add(head);
 
     const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.0, 0.3), shirt);
-    lArm.position.set(-0.62, 1.85, 0); group.add(lArm);
+    lArm.position.set(-0.62, 1.35, 0); group.add(lArm);
     const rArm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.0, 0.3), shirt);
-    rArm.position.set(0.62, 1.85, 0); group.add(rArm);
+    rArm.position.set(0.62, 1.35, 0); group.add(rArm);
 
     const lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.05, 0.35), pants);
     lLeg.position.set(-0.24, 0.78, 0); group.add(lLeg);
@@ -2705,54 +2723,34 @@
     profileViewer = null;
   }
 
-  function openProfileModal(key){
-    const root = document.getElementById("profileModalRoot");
-    if(!root) return;
+  function openFriendProfilePage(key){
     const name = displayNameFor(key);
     const online = isKeyOnline(key);
-    root.innerHTML =
-      '<div class="modal-overlay" id="profileModalOverlay">' +
-        '<div class="profile-modal">' +
-          '<div class="profile-modal-head">' +
-            '<h3>' + escapeHtml(name) + '</h3>' +
-            '<button class="modal-close" id="profileModalClose">&times;</button>' +
-          '</div>' +
-          '<div class="profile-modal-body">' +
-            '<div class="profile-modal-info">' +
-              '<div class="profile-big-avatar">' + avatarFaceSvg(key) + '</div>' +
-              '<div class="profile-name">' + escapeHtml(name) + '</div>' +
-              '<div class="profile-status"><span class="status-dot' + (online ? " online" : "") + '"></span>' + (online ? t("online") : t("offline")) + '</div>' +
-            '</div>' +
-            '<div class="profile-modal-viewer">' +
-              '<div class="profile-viewer-canvas-wrap"><canvas id="profileViewerCanvas"></canvas></div>' +
-              '<button class="profile-3d-toggle" id="profile3dToggle">3D</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
+    document.getElementById("friendProfileHeading").textContent = name;
+    document.getElementById("friendProfileName").textContent = name;
+    document.getElementById("friendProfileAvatar").innerHTML = avatarFaceSvg(key);
+    const statusEl = document.getElementById("friendProfileStatus");
+    statusEl.innerHTML = '<span class="status-dot' + (online ? " online" : "") + '"></span>' + (online ? t("online") : t("offline"));
 
-    document.getElementById("profileModalOverlay").addEventListener("click", (e) => {
-      if(e.target.id === "profileModalOverlay") closeProfileModal();
-    });
-    document.getElementById("profileModalClose").addEventListener("click", closeProfileModal);
+    showPage("friendProfile");
+
+    const toggleBtn = document.getElementById("profile3dToggle");
+    toggleBtn.textContent = "3D";
+    toggleBtn.classList.remove("active");
 
     const canvas = document.getElementById("profileViewerCanvas");
     profileViewer = initProfileViewer(canvas, colorForKey(key));
     profileViewerTick();
 
-    const toggleBtn = document.getElementById("profile3dToggle");
-    toggleBtn.addEventListener("click", () => {
+    // clone the button to drop any previously-bound click listener before rebinding
+    const freshBtn = toggleBtn.cloneNode(true);
+    toggleBtn.parentNode.replaceChild(freshBtn, toggleBtn);
+    freshBtn.addEventListener("click", () => {
       if(!profileViewer) return;
       profileViewer.spinning = !profileViewer.spinning;
-      toggleBtn.textContent = profileViewer.spinning ? "2D" : "3D";
-      toggleBtn.classList.toggle("active", profileViewer.spinning);
+      freshBtn.textContent = profileViewer.spinning ? "2D" : "3D";
+      freshBtn.classList.toggle("active", profileViewer.spinning);
     });
-  }
-
-  function closeProfileModal(){
-    stopProfileViewer();
-    const root = document.getElementById("profileModalRoot");
-    if(root) root.innerHTML = "";
   }
 
   /* ============ notification bell / panel ============ */
@@ -2872,7 +2870,7 @@
     else if(cancel) cancelFriendRequest(cancel.getAttribute("data-cancel"));
     else if(accept) acceptFriendRequest(accept.getAttribute("data-accept"));
     else if(decline) declineFriendRequest(decline.getAttribute("data-decline"));
-    else if(openProfile) openProfileModal(openProfile.getAttribute("data-open-profile"));
+    else if(openProfile) openFriendProfilePage(openProfile.getAttribute("data-open-profile"));
   });
 
   /* ============ dashboard nav ============ */
@@ -2881,14 +2879,16 @@
     settingsHub: document.getElementById("pageSettingsHub"),
     security: document.getElementById("pageSecurity"),
     account: document.getElementById("pageAccount"),
-    friends: document.getElementById("pageFriends")
+    friends: document.getElementById("pageFriends"),
+    friendProfile: document.getElementById("pageFriendProfile")
   };
   function showPage(name){
+    if(name !== "friendProfile" && profileViewer) stopProfileViewer(); // free the WebGL context when leaving the profile page
     Object.keys(pages).forEach(k => pages[k].classList.toggle("hidden", k !== name));
     const settingsPages = ["settingsHub", "security", "account"];
     document.querySelectorAll(".sb-item").forEach(i => {
       const p = i.getAttribute("data-page");
-      i.classList.toggle("active", p === name || (p === "settings" && settingsPages.includes(name)));
+      i.classList.toggle("active", p === name || (p === "settings" && settingsPages.includes(name)) || (p === "friends" && name === "friendProfile"));
     });
     if(name === "account"){ renderThemeRow(); applyTranslations(); }
     if(name === "security"){ renderDevices(); }
@@ -3144,39 +3144,72 @@
     }
 
     function makeChatBubbleSprite(text){
-      const canvas = document.createElement("canvas");
-      canvas.width = 320; canvas.height = 160;
-      const ctx = canvas.getContext("2d");
-      ctx.font = "26px Arial";
-      const lines = wrapChatLines(ctx, text, 270);
-      const lineH = 30;
-      const boxH = lines.length * lineH + 24;
-      const boxW = Math.min(300, Math.max(...lines.map(l => ctx.measureText(l).width)) + 30);
-      const boxX = (canvas.width - boxW) / 2;
-      const boxY = canvas.height - boxH - 18;
+      const measure = document.createElement("canvas").getContext("2d");
+      measure.font = "600 26px Arial";
+      const lines = wrapChatLines(measure, text, 260);
+      const lineH = 32, padX = 22, padY = 16, tailH = 14;
+      const textW = Math.max(...lines.map(l => measure.measureText(l).width));
+      const boxW = Math.min(300, Math.max(60, textW + padX * 2));
+      const boxH = lines.length * lineH + padY * 2;
 
-      ctx.fillStyle = "rgba(242,242,242,0.96)";
-      roundRectPath(ctx, boxX, boxY, boxW, boxH, 10);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(boxW + 16);
+      canvas.height = Math.ceil(boxH + tailH + 16);
+      const ctx = canvas.getContext("2d");
+      ctx.font = "600 26px Arial";
+      const boxX = 8, boxY = 8;
+
+      // soft drop shadow behind the bubble
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.35)";
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 3;
+      ctx.fillStyle = "rgba(255,255,255,0.97)";
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 13);
       ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = "rgba(0,0,0,0.07)";
+      ctx.lineWidth = 1.5;
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 13);
+      ctx.stroke();
+
       // little pointer tail
       ctx.beginPath();
-      ctx.moveTo(canvas.width/2 - 8, boxY + boxH);
-      ctx.lineTo(canvas.width/2 + 8, boxY + boxH);
-      ctx.lineTo(canvas.width/2, boxY + boxH + 12);
+      ctx.moveTo(canvas.width/2 - 8, boxY + boxH - 1);
+      ctx.lineTo(canvas.width/2 + 8, boxY + boxH - 1);
+      ctx.lineTo(canvas.width/2, boxY + boxH + tailH);
       ctx.closePath();
+      ctx.fillStyle = "rgba(255,255,255,0.97)";
       ctx.fill();
 
       ctx.fillStyle = "#0a0a0b";
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       lines.forEach((line, i) => {
-        ctx.fillText(line, canvas.width/2, boxY + 26 + i*lineH);
+        ctx.fillText(line, canvas.width/2, boxY + padY + lineH/2 + i*lineH);
       });
 
       const tex = new THREE.CanvasTexture(canvas);
-      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, opacity: 0 });
       const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(2.4, 2.4 * (canvas.height/canvas.width), 1);
+      const scaleFactor = 0.0105; // world units per canvas px - keeps bubble size proportional to its text
+      sprite.scale.set(canvas.width * scaleFactor, canvas.height * scaleFactor, 1);
       return sprite;
+    }
+
+    function animateSpriteOpacity(sprite, from, to, duration, onDone){
+      if(!sprite || !sprite.material) return;
+      const start = performance.now();
+      sprite.material.opacity = from;
+      function step(now){
+        if(!sprite.material) return; // disposed mid-animation
+        const p = Math.min(1, (now - start) / duration);
+        sprite.material.opacity = from + (to - from) * p;
+        if(p < 1) requestAnimationFrame(step);
+        else if(onDone) onDone();
+      }
+      requestAnimationFrame(step);
     }
 
     function roundRectPath(ctx, x, y, w, h, r){
@@ -3194,15 +3227,22 @@
     function showChatBubbleOnGroup(group, text){
       if(!group) return;
       const prev = activeBubbles.get(group);
-      if(prev){ group.remove(prev.sprite); clearTimeout(prev.timeoutId); }
+      if(prev){
+        clearTimeout(prev.timeoutId);
+        group.remove(prev.sprite);
+        disposeObject3D(prev.sprite);
+      }
       const sprite = makeChatBubbleSprite(text);
       sprite.position.set(0, 3.55, 0);
       group.add(sprite);
+      animateSpriteOpacity(sprite, 0, 1, 140); // fade in
       const timeoutId = setTimeout(() => {
-        group.remove(sprite);
-        disposeObject3D(sprite);
-        activeBubbles.delete(group);
-      }, 5000);
+        animateSpriteOpacity(sprite, 1, 0, 220, () => {
+          group.remove(sprite);
+          disposeObject3D(sprite);
+          activeBubbles.delete(group);
+        });
+      }, 4600);
       activeBubbles.set(group, { sprite, timeoutId });
     }
 
@@ -3341,6 +3381,27 @@
       mpErrorShown = false;
     }
 
+    /* ---- chat profanity filter ----
+       Censors common slurs/profanity (and simple leetspeak substitutions
+       like "fuk", "b1tch", "sh!t") both before sending, so the stored
+       message is already clean for everyone, and again on display, so any
+       older uncensored history still gets masked. */
+    const PROFANITY_LIST = [
+      "fuck","fuk","fck","f u c k","shit","sh1t","bitch","b1tch","bytch","cunt",
+      "dick","d1ck","pussy","pussi","asshole","asswhole","ass hole","nigger","nigga",
+      "n1gger","n1gga","faggot","fag","retard","whore","slut","cock","cok",
+      "bastard","damn it","motherfucker","mf","jerkoff","dumbass","dipshit"
+    ];
+    function buildProfanityRegex(){
+      const escaped = PROFANITY_LIST.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*"));
+      return new RegExp("\\b(" + escaped.join("|") + ")\\b", "gi");
+    }
+    const profanityRegex = buildProfanityRegex();
+    function censorText(text){
+      if(!text) return text;
+      return text.replace(profanityRegex, (m) => m.length <= 1 ? "*" : m[0] + "*".repeat(m.length - 1));
+    }
+
     /* ---- in-game chat ---- */
     let chatRef = null;
     let chatReady = false; // becomes true once initial backlog has streamed in, so we don't bubble-pop old history
@@ -3375,7 +3436,7 @@
       const wasNearBottom = isChatScrolledNearBottom();
       const row = document.createElement("div");
       row.className = "cm";
-      row.innerHTML = "<b>" + escapeHtml(name) + ":</b> " + escapeHtml(text);
+      row.innerHTML = "<b>" + escapeHtml(name) + ":</b> " + escapeHtml(censorText(text));
       log.appendChild(row);
       while(log.children.length > 100) log.removeChild(log.firstChild);
       if(wasNearBottom){
@@ -3396,7 +3457,7 @@
         appendChatLine(msg.name || "Player", msg.text || "", snap.key);
         if(!chatReady) return; // skip bubbles for the history that loads in on join
         const targetGroup = msg.uid === playerId ? character : (remotePlayers[msg.uid] && remotePlayers[msg.uid].group);
-        showChatBubbleOnGroup(targetGroup, msg.text || "");
+        showChatBubbleOnGroup(targetGroup, censorText(msg.text || ""));
       }, (err) => {
         console.error("BlockVerse chat: lost connection to chat (check database rules are published).", err);
         showMultiplayerError();
@@ -3417,7 +3478,7 @@
     }
 
     function sendChatMessage(text){
-      text = (text || "").trim().slice(0, 140);
+      text = censorText((text || "").trim().slice(0, 140));
       if(!text) return;
       if(!playerId || !fbUid){
         console.error("BlockVerse chat: can't send - not connected to the server yet (check Firebase Anonymous auth is enabled and the database rules are published).");
