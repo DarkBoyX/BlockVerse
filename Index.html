@@ -319,6 +319,24 @@
   }
   .game-chat-input-row button:hover{ background:#dcdcdc; }
 
+  .cm-name{ cursor:pointer; text-decoration-style:dotted; }
+  .cm-name:hover{ text-decoration:underline; color:#8ab4ff; }
+  .cm-whisper{ color:#c9a8ff; font-style:italic; }
+  .cm-whisper b{ color:#c9a8ff; }
+
+  .chat-whisper-chip{
+    display:flex; align-items:center; gap:6px; margin:0 10px 8px; padding:6px 10px; border-radius:8px;
+    background:rgba(155,120,255,0.16); border:1px solid rgba(155,120,255,0.35); color:#c9a8ff; font-size:11.5px; font-weight:600;
+  }
+  .chat-whisper-chip svg{ width:13px; height:13px; flex-shrink:0; }
+  .chat-whisper-chip span{ flex:1; }
+  .chat-whisper-chip button{
+    width:18px; height:18px; border-radius:5px; background:none; border:none; color:#c9a8ff; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .chat-whisper-chip button:hover{ background:rgba(255,255,255,0.12); }
+  .chat-whisper-chip button svg{ width:12px; height:12px; }
+
   .game-chat-head{
     display:flex; align-items:center; justify-content:space-between; padding:9px 12px;
     border-bottom:1px solid rgba(255,255,255,0.07); font-size:12px; font-weight:700; color:#e4e4e6; letter-spacing:0.2px;
@@ -1336,6 +1354,13 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 9l7 7 7-7"/></svg>
         New messages
       </div>
+    </div>
+    <div class="chat-whisper-chip hidden" id="chatWhisperChip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l-4-4 4-4"/><path d="M5 8h11a4 4 0 010 8h-1"/></svg>
+      <span id="chatWhisperChipText"></span>
+      <button id="chatWhisperChipClear" aria-label="Cancel whisper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
     </div>
     <div class="game-chat-input-row">
       <input type="text" id="gameChatInput" maxlength="140" placeholder="Message...">
@@ -4159,7 +4184,12 @@
         } else {
           rp.walkT = 0;
           rp.idleT = (rp.idleT || 0) + dt * 1.6;
-          applyWalkPose(rp, rp.walkT, false, rp.idleT);
+          if(rp.emote === "dance"){
+            rp.emoteT = (rp.emoteT || 0) + dt;
+            applyDancePose(rp, rp.emoteT);
+          } else {
+            applyWalkPose(rp, rp.walkT, false, rp.idleT);
+          }
         }
       });
     }
@@ -4217,6 +4247,7 @@
             const rp = remotePlayers[id];
             rp.target.x = data[id].x||0; rp.target.y = data[id].y||0;
             rp.target.z = data[id].z||0; rp.target.ry = data[id].ry||0;
+            rp.emote = data[id].emote || null;
           }
         });
         // remove players who left
@@ -4318,16 +4349,20 @@
     }
 
     // builds the raw alternation pattern once (shared by both regexes
-    // below). Boundaries use \p{L}/\p{N} (Unicode letter/number), NOT \b -
-    // JS's \b only understands [A-Za-z0-9_], so it silently fails to bound
-    // non-Latin scripts like Arabic at all. This version correctly stops
-    // "ass" from matching inside "class"/"password" while still working
-    // for Arabic, Cyrillic, etc.
+    // below). "ass" gets Unicode-aware word boundaries (\p{L}/\p{N}, not
+    // JS's \b, which only understands [A-Za-z0-9_] and silently fails to
+    // bound non-Latin scripts like Arabic) so it doesn't false-positive on
+    // "class"/"password"/"assassin". Every other word is matched as a
+    // plain substring on purpose, so compound/concatenated profanity like
+    // "dogshit" or "fuckthis" still gets caught even though "shit"/"fuck"
+    // never appear as a standalone word there.
+    const BOUNDARY_PROTECTED = new Set(["ass"]);
     function buildProfanityPattern(){
-      const parts = PROFANITY_LIST.map(w =>
-        normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")
-      );
-      return "(?<![\\p{L}\\p{N}])(" + parts.join("|") + ")(?![\\p{L}\\p{N}])";
+      const parts = PROFANITY_LIST.map(w => {
+        const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+        return BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
     }
     const profanityPatternSrc = buildProfanityPattern();
     // used only for replace() (censoring) - String.replace resets a global
@@ -4336,27 +4371,32 @@
     const profanityRegex = new RegExp(profanityPatternSrc, "giu");
 
     // true if ANY normalized substring of the text matches the filter -
-    // used for the local "does this look bad" check (report flow, etc.).
-    // Builds a FRESH non-global regex every call on purpose: a shared
-    // global-flagged regex's .test() mutates .lastIndex as a side effect,
-    // so reusing one instance across many unrelated .test() calls (chat
-    // send, report check, moderation list...) could make a later call
-    // start searching mid-string and silently miss a real match. A fresh
-    // instance has no state to leak between calls.
+    // this is the "is this message bad" check used both to decide whether
+    // to censor a message and, in the report flow, as the automated check
+    // on a reported message. Builds a FRESH non-global regex every call on
+    // purpose: a shared global-flagged regex's .test() mutates .lastIndex
+    // as a side effect, so reusing one instance across many unrelated
+    // .test() calls (chat send, report check, moderation list...) could
+    // make a later call start searching mid-string and silently miss a
+    // real match. A fresh instance has no state to leak between calls.
+    //
+    // NOTE on "AI": this app is a static site with no backend, so there is
+    // no safe way to call a real language model from the client without
+    // exposing an API key to anyone who opens dev tools. This detector is
+    // the honest best-effort substitute - normalized, multi-language,
+    // substring-aware - not an actual model call.
     function looksLikeProfanity(text){
       if(!text) return false;
       return new RegExp(profanityPatternSrc, "iu").test(normalizeForFilter(text));
     }
 
+    // if the message is flagged at all, the ENTIRE message is masked
+    // (not just the matched word) - every non-space character becomes a
+    // "*", so the shape/length stays visible but nothing readable leaks
     function censorText(text){
       if(!text) return text;
-      let out = text.replace(profanityRegex, (m) => m.length <= 1 ? "*" : m[0] + "*".repeat(m.length - 1));
-      if(looksLikeProfanity(text) && out === text){
-        // normalization-only match (e.g. leetspeak) that the raw regex
-        // missed - censor the whole message rather than let it through
-        out = "*".repeat(Math.min(text.length, 24));
-      }
-      return out;
+      if(!looksLikeProfanity(text)) return text;
+      return text.replace(/\S/g, "*");
     }
 
     /* ---- in-game chat ---- */
@@ -4385,19 +4425,23 @@
 
     let chatMessages = []; // { key, name, accountKey, uid, text } - feeds the moderation tab
 
-    function appendChatLine(name, text, msgKey, accountKey, uid){
+    function appendChatLine(name, text, msgKey, accountKey, uid, isWhisper){
       const log = chatLogEl();
       if(!log) return;
       if(msgKey){
         if(chatSeenKeys.has(msgKey)) return; // already rendered - avoid duplicates on reconnect
         chatSeenKeys.add(msgKey);
       }
-      chatMessages.push({ key: msgKey, name, accountKey: accountKey || "", uid: uid || "", text });
+      chatMessages.push({ key: msgKey, name, accountKey: accountKey || "", uid: uid || "", text, isWhisper: !!isWhisper });
       if(chatMessages.length > 100) chatMessages.shift();
       const wasNearBottom = isChatScrolledNearBottom();
       const row = document.createElement("div");
-      row.className = "cm";
-      row.innerHTML = "<b>" + escapeHtml(name) + ":</b> " + escapeHtml(censorText(text));
+      row.className = "cm" + (isWhisper ? " cm-whisper" : "");
+      const mine = currentAccountKey && currentAccountKey();
+      const clickable = accountKey && accountKey !== mine && !isWhisper; // keep whisper-row names non-clickable to avoid mangled display names as whisper targets
+      row.innerHTML =
+        "<b" + (clickable ? ' class="cm-name" data-key="' + escapeHtml(accountKey) + '" data-name="' + escapeHtml(name) + '"' : "") + ">" +
+        escapeHtml(name) + ":</b> " + escapeHtml(censorText(text));
       log.appendChild(row);
       while(log.children.length > 100) log.removeChild(log.firstChild);
       if(wasNearBottom){
@@ -4416,15 +4460,29 @@
       chatRef = fbDb.ref("rooms/baseplate/chat").limitToLast(50);
       chatRef.on("child_added", (snap) => {
         const msg = snap.val() || {};
+        if(msg.name && msg.accountKey) knownUsers[msg.name.toLowerCase()] = msg.accountKey; // learn name->key regardless of whisper visibility
+
         // messages from BEFORE this join are intentionally not shown - chat
         // is ephemeral per-session: leave (or refresh) and old text is gone
         // for you, even though it's still live for anyone who stayed
         // connected. Only what's said while you're actually in the room
         // ever renders.
         if(!chatReady) return;
-        appendChatLine(msg.name || "Player", msg.text || "", snap.key, msg.accountKey, msg.uid);
+
+        // whispers only render for the sender and the intended recipient -
+        // everyone else's client silently skips them (this app has no real
+        // backend/per-account auth to enforce this at the database level,
+        // so it's a client-side filter like the rest of the app's social
+        // features, not a cryptographic guarantee)
+        if(msg.whisperTo){
+          const myKey = currentAccountKey && currentAccountKey();
+          if(msg.whisperTo !== myKey && msg.accountKey !== myKey) return;
+        }
+
+        const displayName = msg.whisperTo ? (msg.uid === playerId ? ("You → " + (msg.whisperToName || "")) : (msg.name + " (whisper)")) : msg.name;
+        appendChatLine(displayName || "Player", msg.text || "", snap.key, msg.accountKey, msg.uid, !!msg.whisperTo);
         const targetGroup = msg.uid === playerId ? character : (remotePlayers[msg.uid] && remotePlayers[msg.uid].group);
-        showChatBubbleOnGroup(targetGroup, censorText(msg.text || ""));
+        if(!msg.whisperTo) showChatBubbleOnGroup(targetGroup, censorText(msg.text || "")); // whispers don't show as a bubble above the head - keeps them actually private-feeling
       }, (err) => {
         console.error("BlockVerse chat: lost connection to chat (check database rules are published).", err);
         showMultiplayerError();
@@ -4437,6 +4495,9 @@
       chatReady = false;
       chatSeenKeys = new Set();
       chatMessages = [];
+      knownUsers = {};
+      clearWhisperTarget();
+      stopDance();
       const log = chatLogEl();
       if(log) log.innerHTML = "";
       const pill = chatNewMsgPill();
@@ -4445,27 +4506,87 @@
       activeBubbles.clear();
     }
 
-    function sendChatMessage(text){
-      text = censorText((text || "").trim().slice(0, 140));
-      if(!text) return;
+    /* ---- whisper targeting ---- */
+    let knownUsers = {}; // lowercase display name -> accountKey, learned from messages seen this session
+    let activeWhisperTarget = null; // { key, name } or null
+
+    function setWhisperTarget(key, name){
+      activeWhisperTarget = { key, name };
+      updateWhisperChip();
+    }
+    function clearWhisperTarget(){
+      activeWhisperTarget = null;
+      updateWhisperChip();
+    }
+    function updateWhisperChip(){
+      const chip = document.getElementById("chatWhisperChip");
+      const chipText = document.getElementById("chatWhisperChipText");
+      const input = document.getElementById("gameChatInput");
+      if(!chip) return;
+      if(activeWhisperTarget){
+        chip.classList.remove("hidden");
+        chipText.textContent = "Whisper to " + activeWhisperTarget.name;
+        if(input) input.placeholder = "Message " + activeWhisperTarget.name + "...";
+      } else {
+        chip.classList.add("hidden");
+        if(input) input.placeholder = "Message...";
+      }
+    }
+
+    function sendChatMessage(raw){
+      raw = (raw || "").trim().slice(0, 140);
+      if(!raw) return;
       if(!playerId || !fbUid){
         console.error("BlockVerse chat: can't send - not connected to the server yet (check Firebase Anonymous auth is enabled and the database rules are published).");
         showMultiplayerError();
         return;
       }
       const myKey = currentAccountKey && currentAccountKey();
+      const lower = raw.toLowerCase();
+
+      // /dance [1] - plays a dance emote until you move or jump; doesn't post a chat line
+      if(lower === "/dance" || lower === "/dance 1"){
+        startDance();
+        appendSystemChatLine("You started dancing - move or jump to stop.");
+        return;
+      }
+
+      let whisperKey = activeWhisperTarget && activeWhisperTarget.key;
+      let whisperName = activeWhisperTarget && activeWhisperTarget.name;
+      let body = raw;
+
+      // /whisper username message - one-off private message regardless of
+      // whether a whisper target is currently selected via click
+      if(lower.startsWith("/whisper ")){
+        const rest = raw.slice(9).trim();
+        const spaceIdx = rest.indexOf(" ");
+        if(spaceIdx === -1){ appendSystemChatLine("Usage: /whisper username message"); return; }
+        const targetName = rest.slice(0, spaceIdx);
+        body = rest.slice(spaceIdx + 1).trim();
+        const foundKey = knownUsers[targetName.toLowerCase()];
+        if(!foundKey){ appendSystemChatLine("Couldn't find " + targetName + " - they need to have said something in chat first."); return; }
+        if(foundKey === myKey){ appendSystemChatLine("You can't whisper yourself."); return; }
+        if(!body){ appendSystemChatLine("Usage: /whisper username message"); return; }
+        whisperKey = foundKey; whisperName = targetName;
+      }
+
+      body = censorText(body.slice(0, 140));
+      if(!body) return;
+
       checkMyChatBan(myKey).then(banUntil => {
         if(banUntil && banUntil > Date.now()){
           appendSystemChatLine("You're muted for " + formatBanRemaining(banUntil) + " for breaking chat rules.");
           return;
         }
-        fbDb.ref("rooms/baseplate/chat").push({
+        const payload = {
           uid: playerId,
           accountKey: myKey || "",
           name: currentUsername(),
-          text: text,
+          text: body,
           ts: firebase.database.ServerValue.TIMESTAMP
-        }).catch(err => {
+        };
+        if(whisperKey){ payload.whisperTo = whisperKey; payload.whisperToName = whisperName || ""; }
+        fbDb.ref("rooms/baseplate/chat").push(payload).catch(err => {
           console.error("BlockVerse chat: failed to send message (often a rules/publish issue).", err);
           showMultiplayerError();
         });
@@ -4551,6 +4672,18 @@
         scrollChatToBottom(true);
         pill.classList.add("hidden");
       });
+
+      // click a name in the log to whisper them - click it again to cancel
+      log.addEventListener("click", (e) => {
+        const nameEl = e.target.closest(".cm-name");
+        if(!nameEl) return;
+        const key = nameEl.getAttribute("data-key");
+        const name = nameEl.getAttribute("data-name");
+        if(activeWhisperTarget && activeWhisperTarget.key === key) clearWhisperTarget();
+        else setWhisperTarget(key, name);
+        input.focus();
+      });
+      document.getElementById("chatWhisperChipClear").addEventListener("click", clearWhisperTarget);
 
       wireChatModeration();
     }
@@ -4713,6 +4846,7 @@
 
       const len = Math.hypot(mx, mz);
       const moving = len > 0.05;
+      if(moving && myEmote) stopDance(); // moving always cancels an emote
       let targetVelX = 0, targetVelZ = 0;
       if(moving){
         mx /= len; mz /= len;
@@ -4744,7 +4878,12 @@
       } else {
         walkT = 0;
         idleT += dt * 1.6;
-        applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head }, walkT, false, idleT);
+        if(myEmote === "dance"){
+          myEmoteT += dt;
+          applyDancePose({ leftLeg, rightLeg, leftArm, rightArm, head }, myEmoteT);
+        } else {
+          applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head }, walkT, false, idleT);
+        }
       }
 
       // jump / gravity
@@ -4770,7 +4909,37 @@
     }
 
     function doJump(){
-      if(onGround){ vy = JUMP_VELOCITY; onGround = false; }
+      if(onGround){
+        if(myEmote) stopDance(); // jumping always cancels an emote
+        vy = JUMP_VELOCITY; onGround = false;
+      }
+    }
+
+    /* ---- /dance emote ---- */
+    let myEmote = null, myEmoteT = 0;
+    function startDance(){
+      myEmote = "dance"; myEmoteT = 0;
+      if(onlineRef) onlineRef.update({ emote: "dance" }).catch(()=>{});
+    }
+    function stopDance(){
+      if(!myEmote) return;
+      myEmote = null;
+      if(onlineRef) onlineRef.update({ emote: null }).catch(()=>{});
+    }
+    // shared by the local character and remote players - a simple arm-swing
+    // + leg-step + head-bob loop, distinct from the walk/idle poses
+    function applyDancePose(rig, t){
+      const s = Math.sin(t * 6.2);
+      rig.leftArm.rotation.z = 0.85 + s * 0.4;
+      rig.rightArm.rotation.z = -0.85 - s * 0.4;
+      rig.leftArm.rotation.x = Math.sin(t * 6.2 + 1.2) * 0.35;
+      rig.rightArm.rotation.x = Math.sin(t * 6.2 + 1.2) * 0.35;
+      rig.leftLeg.rotation.x = s * 0.22;
+      rig.rightLeg.rotation.x = -s * 0.22;
+      if(rig.head){
+        const baseY = rig.head.userData && rig.head.userData.baseY != null ? rig.head.userData.baseY : 2.05;
+        rig.head.position.y = baseY + Math.abs(s) * 0.07;
+      }
     }
 
     // Shared pose helper for both the local character and remote players, so
