@@ -3933,20 +3933,52 @@
     }
 
     function makeNameSprite(text){
+      const dpr = 2; // render at 2x for crisp text, then scale back down via sprite.scale
       const canvas = document.createElement("canvas");
-      canvas.width = 256; canvas.height = 64;
+      const padX = 16, padY = 9, h = 40;
+      const measure = document.createElement("canvas").getContext("2d");
+      measure.font = "700 22px 'Segoe UI', Arial, sans-serif";
+      const textW = measure.measureText(text).width;
+      const boxW = Math.min(240, textW + padX * 2);
+      canvas.width = Math.ceil((boxW + 4) * dpr);
+      canvas.height = Math.ceil((h + 4) * dpr);
       const ctx = canvas.getContext("2d");
-      ctx.font = "bold 30px Arial";
+      ctx.scale(dpr, dpr);
+      ctx.font = "700 22px 'Segoe UI', Arial, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillStyle = "rgba(10,10,11,0.55)";
-      const w = ctx.measureText(text).width + 24;
-      ctx.fillRect(128 - w/2, 12, w, 40);
-      ctx.fillStyle = "#f2f2f2";
-      ctx.fillText(text, 128, 40);
+      ctx.textBaseline = "middle";
+
+      // soft shadow + rounded pill background so it reads clearly over any
+      // sky/ground color behind it
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.4)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 2;
+      ctx.fillStyle = "rgba(14,14,16,0.72)";
+      roundRectPath(ctx, 2, 2, boxW, h, h / 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.14)";
+      ctx.lineWidth = 1.2;
+      roundRectPath(ctx, 2, 2, boxW, h, h / 2);
+      ctx.stroke();
+
+      // thin dark outline behind the text itself, so it stays legible even
+      // over a bright background peeking through the translucent pill
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.lineJoin = "round";
+      ctx.strokeText(text, boxW / 2 + 2, h / 2 + 2, boxW - padX);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, boxW / 2 + 2, h / 2 + 2, boxW - padX);
+
       const tex = new THREE.CanvasTexture(canvas);
-      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+      tex.anisotropy = 4;
+      const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
       const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(1.6, 0.4, 1);
+      const scaleFactor = 0.0068; // world units per (unscaled) canvas px
+      sprite.scale.set(canvas.width / dpr * scaleFactor, canvas.height / dpr * scaleFactor, 1);
       return sprite;
     }
 
@@ -3965,8 +3997,9 @@
     }
 
     function makeChatBubbleSprite(text){
+      const dpr = 2; // render at 2x for crisp text on high-DPI screens
       const measure = document.createElement("canvas").getContext("2d");
-      measure.font = "600 26px Arial";
+      measure.font = "600 26px 'Segoe UI', Arial, sans-serif";
       const lines = wrapChatLines(measure, text, 260);
       const lineH = 32, padX = 22, padY = 16, tailH = 14;
       const textW = Math.max(...lines.map(l => measure.measureText(l).width));
@@ -3974,10 +4007,11 @@
       const boxH = lines.length * lineH + padY * 2;
 
       const canvas = document.createElement("canvas");
-      canvas.width = Math.ceil(boxW + 16);
-      canvas.height = Math.ceil(boxH + tailH + 16);
+      const cssW = Math.ceil(boxW + 16), cssH = Math.ceil(boxH + tailH + 16);
+      canvas.width = cssW * dpr; canvas.height = cssH * dpr;
       const ctx = canvas.getContext("2d");
-      ctx.font = "600 26px Arial";
+      ctx.scale(dpr, dpr);
+      ctx.font = "600 26px 'Segoe UI', Arial, sans-serif";
       const boxX = 8, boxY = 8;
 
       // soft drop shadow behind the bubble
@@ -3986,36 +4020,40 @@
       ctx.shadowBlur = 12;
       ctx.shadowOffsetY = 3;
       ctx.fillStyle = "rgba(255,255,255,0.97)";
-      roundRectPath(ctx, boxX, boxY, boxW, boxH, 13);
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 15);
       ctx.fill();
       ctx.restore();
 
-      ctx.strokeStyle = "rgba(0,0,0,0.07)";
+      ctx.strokeStyle = "rgba(0,0,0,0.08)";
       ctx.lineWidth = 1.5;
-      roundRectPath(ctx, boxX, boxY, boxW, boxH, 13);
+      roundRectPath(ctx, boxX, boxY, boxW, boxH, 15);
       ctx.stroke();
 
       // little pointer tail
       ctx.beginPath();
-      ctx.moveTo(canvas.width/2 - 8, boxY + boxH - 1);
-      ctx.lineTo(canvas.width/2 + 8, boxY + boxH - 1);
-      ctx.lineTo(canvas.width/2, boxY + boxH + tailH);
+      ctx.moveTo(cssW/2 - 8, boxY + boxH - 1);
+      ctx.lineTo(cssW/2 + 8, boxY + boxH - 1);
+      ctx.lineTo(cssW/2, boxY + boxH + tailH);
       ctx.closePath();
       ctx.fillStyle = "rgba(255,255,255,0.97)";
+      ctx.shadowColor = "rgba(0,0,0,0.2)";
+      ctx.shadowBlur = 4;
       ctx.fill();
 
       ctx.fillStyle = "#0a0a0b";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       lines.forEach((line, i) => {
-        ctx.fillText(line, canvas.width/2, boxY + padY + lineH/2 + i*lineH);
+        ctx.fillText(line, cssW/2, boxY + padY + lineH/2 + i*lineH);
       });
 
       const tex = new THREE.CanvasTexture(canvas);
+      tex.anisotropy = 4;
       const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, opacity: 0 });
       const sprite = new THREE.Sprite(mat);
-      const scaleFactor = 0.0105; // world units per canvas px - keeps bubble size proportional to its text
-      sprite.scale.set(canvas.width * scaleFactor, canvas.height * scaleFactor, 1);
+      const scaleFactor = 0.0105; // world units per (unscaled) canvas px - keeps bubble size proportional to its text
+      sprite.scale.set(cssW * scaleFactor, cssH * scaleFactor, 1);
+      sprite.userData.baseScale = { x: sprite.scale.x, y: sprite.scale.y };
       return sprite;
     }
 
@@ -4023,10 +4061,17 @@
       if(!sprite || !sprite.material) return;
       const start = performance.now();
       sprite.material.opacity = from;
+      const base = sprite.userData.baseScale;
+      const popIn = base && to > from; // only pop-scale on fade-IN, not fade-out
+      if(popIn) sprite.scale.set(base.x * 0.75, base.y * 0.75, 1);
       function step(now){
         if(!sprite.material) return; // disposed mid-animation
         const p = Math.min(1, (now - start) / duration);
         sprite.material.opacity = from + (to - from) * p;
+        if(popIn){
+          const ease = 1 - Math.pow(1 - p, 3); // easeOutCubic - slight overshoot-free pop
+          sprite.scale.set(base.x * (0.75 + 0.25 * ease), base.y * (0.75 + 0.25 * ease), 1);
+        }
         if(p < 1) requestAnimationFrame(step);
         else if(onDone) onDone();
       }
@@ -4226,7 +4271,7 @@
     const PROFANITY_LIST = [
       // English
       "fuck","fuk","fck","shit","bitch","bytch","cunt","dick","pussy","pussi",
-      "asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
+      "ass","asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
       "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
       // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
       "كس","كسم","خرا","زبي","شرموطة","شرموط","قحبة","منيك","كلب ابن","ابن كلب","عرص","متناك",
@@ -4272,33 +4317,39 @@
       return s;
     }
 
-    function buildProfanityRegex(){
-      const escaped = PROFANITY_LIST.map(w =>
-        normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*")
+    // builds the raw alternation pattern once (shared by both regexes
+    // below). Boundaries use \p{L}/\p{N} (Unicode letter/number), NOT \b -
+    // JS's \b only understands [A-Za-z0-9_], so it silently fails to bound
+    // non-Latin scripts like Arabic at all. This version correctly stops
+    // "ass" from matching inside "class"/"password" while still working
+    // for Arabic, Cyrillic, etc.
+    function buildProfanityPattern(){
+      const parts = PROFANITY_LIST.map(w =>
+        normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")
       );
-      return new RegExp("(" + escaped.join("|") + ")", "gi");
+      return "(?<![\\p{L}\\p{N}])(" + parts.join("|") + ")(?![\\p{L}\\p{N}])";
     }
-    const profanityRegex = buildProfanityRegex();
+    const profanityPatternSrc = buildProfanityPattern();
+    // used only for replace() (censoring) - String.replace resets a global
+    // regex's lastIndex at the start of every call, so this one is safe to
+    // share across calls
+    const profanityRegex = new RegExp(profanityPatternSrc, "giu");
 
     // true if ANY normalized substring of the text matches the filter -
-    // used for the local "does this look bad" check (report flow, etc.)
-    // where we want a yes/no rather than a censored string back
+    // used for the local "does this look bad" check (report flow, etc.).
+    // Builds a FRESH non-global regex every call on purpose: a shared
+    // global-flagged regex's .test() mutates .lastIndex as a side effect,
+    // so reusing one instance across many unrelated .test() calls (chat
+    // send, report check, moderation list...) could make a later call
+    // start searching mid-string and silently miss a real match. A fresh
+    // instance has no state to leak between calls.
     function looksLikeProfanity(text){
       if(!text) return false;
-      return profanityRegex.test(normalizeForFilter(text));
+      return new RegExp(profanityPatternSrc, "iu").test(normalizeForFilter(text));
     }
 
     function censorText(text){
       if(!text) return text;
-      const normalized = normalizeForFilter(text);
-      // map matches found in the normalized string back onto the original
-      // string by position (normalization never changes character count
-      // except for symbol->letter swaps, which are 1:1, and squashed
-      // repeats, which we handle by matching against the ORIGINAL text's
-      // own repeated-letter collapse separately) - simplest reliable
-      // approach: also run the raw regex against the untouched text for
-      // exact hits, then do a second pass with normalization to catch
-      // obfuscated ones and mask the whole matched span conservatively.
       let out = text.replace(profanityRegex, (m) => m.length <= 1 ? "*" : m[0] + "*".repeat(m.length - 1));
       if(looksLikeProfanity(text) && out === text){
         // normalization-only match (e.g. leetspeak) that the raw regex
@@ -4794,6 +4845,8 @@
           return;
         }
         if(menuOpen){
+          const typing = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
+          if(typing) return; // don't treat keystrokes as menu shortcuts while typing into a field (e.g. the report reason box)
           const k = e.key.toLowerCase();
           if(k === "l") { closeMenu(); BaseplateGame.stop(); }
           else if(k === "r") { closeMenu(); respawn(); }
