@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>BlockVerse</title>
 <style>
   :root{
@@ -543,12 +546,19 @@
   .char-preview-info{ padding:16px 18px 18px; text-align:center; }
   .char-preview-name{ font-size:16px; font-weight:700; color:#f2f2f2; margin-bottom:2px; }
   .char-preview-tag{ font-size:11.5px; color:#7a7a80; margin-bottom:14px; }
+  .char-preview-actions{ display:flex; gap:8px; }
   .char-preview-action{
-    width:100%; padding:10px 0; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer;
+    flex:1; padding:10px 0; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer;
     background:#f2f2f2; color:#0a0a0b; border:1px solid #f2f2f2; transition:background .15s, opacity .15s;
   }
   .char-preview-action:hover{ background:#dcdcdc; }
   .char-preview-action.disabled{ background:#232326; color:#7a7a80; border-color:#2a2a2e; cursor:default; pointer-events:none; }
+  .char-preview-action.unfriend{ background:#232326; color:#dcdce0; border-color:#2c2c30; }
+  .char-preview-action.unfriend:hover{ background:#2c2c30; }
+  .char-preview-action.block{ flex:0 0 auto; padding:10px 16px; background:#232326; color:#ff8a8f; border-color:#2c2c30; }
+  .char-preview-action.block:hover{ background:#3a1e1f; }
+  .char-preview-action.block.active{ background:#e5484d; color:#fff; border-color:#e5484d; }
+  .char-preview-action.block.active:hover{ background:#c73e42; }
 
   /* ---------- In-game friend request toasts (bottom-right) ---------- */
   .ingame-toast-stack{
@@ -1237,6 +1247,7 @@
           <div class="profile-big-avatar" id="friendProfileAvatar"></div>
           <div class="profile-name" id="friendProfileName">Player</div>
           <div class="profile-status" id="friendProfileStatus"><span class="status-dot"></span>Offline</div>
+          <div id="friendProfileActions" style="margin-top:14px; width:100%; max-width:260px;"></div>
         </div>
         <div class="friend-profile-viewer">
           <div class="profile-viewer-canvas-wrap"><canvas id="profileViewerCanvas"></canvas></div>
@@ -1512,7 +1523,10 @@
       <div class="char-preview-info">
         <div class="char-preview-name" id="charPreviewName">Player</div>
         <div class="char-preview-tag" id="charPreviewTag">Playing now</div>
-        <button class="char-preview-action" id="charPreviewActionBtn">Add friend</button>
+        <div class="char-preview-actions">
+          <button class="char-preview-action" id="charPreviewActionBtn">Add friend</button>
+          <button class="char-preview-action block" id="charPreviewBlockBtn">Block</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1577,6 +1591,7 @@
   }
   function saveMyCustom(custom){
     localStorage.setItem(customStorageKey(), JSON.stringify(custom));
+    if(typeof updateHubAvatar === "function") updateHubAvatar(); // instant self-update, doesn't need the Firebase round-trip below
     // best-effort sync to Firebase so the same account sees its look on
     // another device too; safe to fail silently (e.g. offline)
     try{
@@ -2746,25 +2761,58 @@
     for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
     return AVATAR_COLORS[h % AVATAR_COLORS.length];
   }
+  // caches other users' saved customization so their little avatar icons
+  // (friend list, sidebar, etc.) can actually reflect their real look
+  // instead of a generic colored silhouette. Not live-subscribed (would be
+  // a lot of open listeners for a long friends list) - refetched whenever
+  // the relevant list re-renders, which happens often enough in practice
+  // (friend accept/decline, page reopen, etc.) to feel current.
+  let avatarCustomCache = {}; // key -> custom object | false (checked, none saved) | undefined (not yet checked)
+  function fetchAvatarCustom(key){
+    if(avatarCustomCache[key] !== undefined) return;
+    avatarCustomCache[key] = null; // in-flight marker
+    fbDb.ref("blockverse_users/" + key + "/avatar").once("value").then(snap => {
+      avatarCustomCache[key] = snap.val() || false;
+      if(key === currentAccountKey()) updateHubAvatar();
+      renderFriendsPage();
+    }).catch(() => { avatarCustomCache[key] = false; });
+  }
+
   function avatarFaceSvg(key){
-    const shirt = colorForKey(key);
+    const mine = key === currentAccountKey();
+    let custom = mine ? getMyCustom() : avatarCustomCache[key];
+    if(!mine && (custom === undefined)) fetchAvatarCustom(key);
+    if(!custom){
+      const shirt = colorForKey(key);
+      custom = { torso: shirt, leftArm: shirt, rightArm: shirt, leftLeg: "#2a2a2e", rightLeg: "#2a2a2e", heightScale: 1, headScale: 1 };
+    }
+    const headSize = Math.round(32 * (custom.headScale || 1));
+    const headX = 50 - headSize / 2, headY = 26 - headSize / 2;
     return (
       '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">' +
-        '<rect width="100" height="100" fill="' + shirt + '" opacity="0.16"/>' +
+        '<rect width="100" height="100" fill="' + custom.torso + '" opacity="0.16"/>' +
         // legs
-        '<rect x="38" y="78" width="9" height="18" rx="2" fill="#2a2a2e"/>' +
-        '<rect x="53" y="78" width="9" height="18" rx="2" fill="#2a2a2e"/>' +
+        '<rect x="38" y="78" width="9" height="18" rx="2" fill="' + custom.leftLeg + '"/>' +
+        '<rect x="53" y="78" width="9" height="18" rx="2" fill="' + custom.rightLeg + '"/>' +
         // arms hanging at the sides
-        '<rect x="20" y="46" width="10" height="30" rx="3" fill="' + shirt + '"/>' +
-        '<rect x="70" y="46" width="10" height="30" rx="3" fill="' + shirt + '"/>' +
+        '<rect x="20" y="46" width="10" height="30" rx="3" fill="' + custom.leftArm + '"/>' +
+        '<rect x="70" y="46" width="10" height="30" rx="3" fill="' + custom.rightArm + '"/>' +
         // torso
-        '<rect x="32" y="44" width="36" height="36" rx="5" fill="' + shirt + '"/>' +
-        // head
-        '<rect x="34" y="10" width="32" height="32" rx="7" fill="#f0c090"/>' +
-        '<rect x="41" y="24" width="6" height="6" rx="1.5" fill="#2a2a2e"/>' +
-        '<rect x="53" y="24" width="6" height="6" rx="1.5" fill="#2a2a2e"/>' +
+        '<rect x="32" y="44" width="36" height="36" rx="5" fill="' + custom.torso + '"/>' +
+        // head (sized by their actual headScale so bigger/smaller heads show up here too)
+        '<rect x="' + headX + '" y="' + headY + '" width="' + headSize + '" height="' + headSize + '" rx="7" fill="#f0c090"/>' +
+        '<rect x="' + (headX + headSize*0.22) + '" y="' + (headY + headSize*0.42) + '" width="' + (headSize*0.18) + '" height="' + (headSize*0.18) + '" rx="1.5" fill="#2a2a2e"/>' +
+        '<rect x="' + (headX + headSize*0.6) + '" y="' + (headY + headSize*0.42) + '" width="' + (headSize*0.18) + '" height="' + (headSize*0.18) + '" rx="1.5" fill="#2a2a2e"/>' +
       '</svg>'
     );
+  }
+
+  function updateHubAvatar(){
+    const el = document.getElementById("hubAvatar");
+    if(!el) return;
+    const key = currentAccountKey();
+    if(!key) return;
+    el.innerHTML = avatarFaceSvg(key);
   }
 
   function fuRef(key, path){ return fbDb.ref("blockverse_users/" + key + (path ? "/" + path : "")); }
@@ -2775,7 +2823,7 @@
 
   // Live mirrors, kept in sync via Firebase listeners.
   let fbUsernameDirectory = {};      // key -> { username }
-  const fbFriendMirror = { friends: [], incoming: [], outgoing: [] };
+  const fbFriendMirror = { friends: [], incoming: [], outgoing: [], blocked: [] };
   let fbInvites = [];                 // [{ id, fromKey, fromName, ts }] - pending game invites for me
   let friendListenersKey = null;
   let friendListenersReady = false;
@@ -2833,6 +2881,11 @@
       renderFriendsPage(); refreshCharPreviewAction();
     });
 
+    fuRef(myKey, "blocked").on("value", snap => {
+      fbFriendMirror.blocked = snap.val() ? Object.keys(snap.val()) : [];
+      renderFriendsPage(); refreshCharPreviewAction();
+    });
+
     const incomingRef = fuRef(myKey, "incoming");
     incomingRef.on("value", snap => {
       fbFriendMirror.incoming = snap.val() ? Object.keys(snap.val()) : [];
@@ -2886,13 +2939,14 @@
       fuRef(friendListenersKey, "friends").off();
       fuRef(friendListenersKey, "outgoing").off();
       fuRef(friendListenersKey, "incoming").off();
+      fuRef(friendListenersKey, "blocked").off();
       fuRef(friendListenersKey, "notices").off();
       fuRef(friendListenersKey, "invites").off();
       fbDb.ref("blockverse_usernames").off();
     }
     friendListenersKey = null;
     friendListenersReady = false;
-    fbFriendMirror.friends = []; fbFriendMirror.incoming = []; fbFriendMirror.outgoing = [];
+    fbFriendMirror.friends = []; fbFriendMirror.incoming = []; fbFriendMirror.outgoing = []; fbFriendMirror.blocked = [];
     fbInvites = [];
     const stack = ingameToastStack();
     if(stack) stack.innerHTML = "";
@@ -3037,6 +3091,36 @@
     fuRef(fromKey, "outgoing/" + myKey).remove();
   }
 
+  function unfriendUser(targetKey){
+    const myKey = currentAccountKey();
+    if(!myKey || myKey === targetKey) return;
+    fuRef(myKey, "friends/" + targetKey).remove();
+    fuRef(targetKey, "friends/" + myKey).remove();
+  }
+
+  function blockUser(targetKey){
+    const myKey = currentAccountKey();
+    if(!myKey || myKey === targetKey) return;
+    // blocking someone always unfriends them first, and clears out any
+    // pending request either direction so they can't linger in your lists
+    if(fbFriendMirror.friends.includes(targetKey)) unfriendUser(targetKey);
+    fuRef(myKey, "outgoing/" + targetKey).remove();
+    fuRef(myKey, "incoming/" + targetKey).remove();
+    fuRef(targetKey, "outgoing/" + myKey).remove();
+    fuRef(targetKey, "incoming/" + myKey).remove();
+    fuRef(myKey, "blocked/" + targetKey).set(true);
+  }
+
+  function unblockUser(targetKey){
+    const myKey = currentAccountKey();
+    if(!myKey || myKey === targetKey) return;
+    fuRef(myKey, "blocked/" + targetKey).remove();
+  }
+
+  function isBlocked(targetKey){
+    return fbFriendMirror.blocked.includes(targetKey);
+  }
+
   /* ============ game invites ============ */
   // Per-target 5 minute cooldown so the same friend can't be spammed with
   // invites. This is purely a client-side UX throttle (tracked in-memory,
@@ -3118,20 +3202,24 @@
     const suggestSection = document.getElementById("friendSuggestSection");
 
     function actionsFor(key){
-      if(fbFriendMirror.friends.includes(key)) return '<span class="friend-btn disabled">' + t("alreadyFriends") + '</span>';
-      if(fbFriendMirror.outgoing.includes(key)) return '<button class="friend-btn" data-cancel="' + key + '">' + t("requestSent") + '</button>';
-      if(fbFriendMirror.incoming.includes(key)) return (
+      let primary;
+      if(fbFriendMirror.friends.includes(key)) primary = '<button class="friend-btn" data-unfriend="' + key + '">Unfriend</button>';
+      else if(fbFriendMirror.outgoing.includes(key)) primary = '<button class="friend-btn" data-cancel="' + key + '">' + t("requestSent") + '</button>';
+      else if(fbFriendMirror.incoming.includes(key)) primary = (
         '<button class="friend-btn primary" data-accept="' + key + '">' + t("accept") + '</button>' +
         '<button class="friend-btn danger" data-decline="' + key + '">' + t("decline") + '</button>'
       );
-      return '<button class="friend-btn primary" data-add="' + key + '">' + t("sendRequest") + '</button>';
+      else primary = '<button class="friend-btn primary" data-add="' + key + '">' + t("sendRequest") + '</button>';
+      const blocked = isBlocked(key);
+      const blockBtn = '<button class="friend-btn ' + (blocked ? 'danger' : '') + '" data-toggle-block="' + key + '">' + (blocked ? "Unblock" : "Block") + '</button>';
+      return primary + blockBtn;
     }
 
     // Your friends list: avatar circle per friend with a green (online, i.e.
     // currently in Baseplate) or grey (offline) status dot.
     listCountEl.textContent = fbFriendMirror.friends.length;
     listListEl.innerHTML = fbFriendMirror.friends.length
-      ? fbFriendMirror.friends.map(k => friendRowHtml(k, "", { showStatus:true, clickable:true })).join("")
+      ? fbFriendMirror.friends.map(k => friendRowHtml(k, actionsFor(k), { showStatus:true, clickable:true })).join("")
       : '<div class="friend-empty">' + t("noFriendsYet") + '</div>';
 
     // Search results: the shared Firebase username directory, so this finds
@@ -3157,7 +3245,8 @@
 
     // People you may know: other directory accounts that aren't already friends/pending
     const suggestions = Object.keys(fbUsernameDirectory).filter(k =>
-      k !== myKey && !fbFriendMirror.friends.includes(k) && !fbFriendMirror.outgoing.includes(k) && !fbFriendMirror.incoming.includes(k)
+      k !== myKey && !fbFriendMirror.friends.includes(k) && !fbFriendMirror.outgoing.includes(k) &&
+      !fbFriendMirror.incoming.includes(k) && !fbFriendMirror.blocked.includes(k)
     ).slice(0, 8);
     suggestListEl.innerHTML = suggestions.length
       ? suggestions.map(k => friendRowHtml(k, actionsFor(k))).join("")
@@ -3168,6 +3257,7 @@
 
   /* ============ friend profile modal (mini 3D character viewer) ============ */
   let profileViewer = null; // { renderer, scene, camera, group, spinning, raf }
+  let profileViewerAvatarRef = null; // live Firebase listener on the viewed user's avatar customization
 
   function buildProfileCharacter(colorHex){
     const color = parseInt(colorHex.replace("#",""), 16);
@@ -3199,7 +3289,7 @@
     return group;
   }
 
-  function initProfileViewer(canvas, colorHex){
+  function initProfileViewer(canvas, custom){
     const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
     renderer.setSize(170, 170, false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -3210,9 +3300,10 @@
     scene.add(new THREE.AmbientLight(0xffffff, 0.75));
     const dir = new THREE.DirectionalLight(0xffffff, 0.55);
     dir.position.set(3, 5, 4); scene.add(dir);
-    const group = buildProfileCharacter(colorHex);
-    scene.add(group);
-    return { renderer, scene, camera, group, spinning:false, raf:null };
+    const rig = BaseplateGame.buildCharacterRig(custom);
+    rig.group.position.y = -1.1;
+    scene.add(rig.group);
+    return { renderer, scene, camera, group: rig.group, spinning:false, raf:null };
   }
 
   function profileViewerTick(){
@@ -3224,6 +3315,7 @@
 
   function stopProfileViewer(){
     if(profileViewer && profileViewer.raf) cancelAnimationFrame(profileViewer.raf);
+    if(profileViewerAvatarRef){ profileViewerAvatarRef.off(); profileViewerAvatarRef = null; }
     profileViewer = null;
   }
 
@@ -3472,14 +3564,33 @@
     statusEl.innerHTML = '<span class="status-dot' + (online ? " online" : "") + '"></span>' + (online ? t("online") : t("offline"));
 
     showPage("friendProfile");
+    renderFriendProfileActions(key);
 
     const toggleBtn = document.getElementById("profile3dToggle");
     toggleBtn.textContent = "3D";
     toggleBtn.classList.remove("active");
 
     const canvas = document.getElementById("profileViewerCanvas");
-    profileViewer = initProfileViewer(canvas, colorForKey(key));
+    const fallback = normalizeCustomForKey(key);
+    profileViewer = initProfileViewer(canvas, fallback);
     profileViewerTick();
+
+    // live-listen so if this person changes their look while you're on
+    // their profile, it updates right in front of you - not just on open
+    if(profileViewerAvatarRef) profileViewerAvatarRef.off();
+    profileViewerAvatarRef = fbDb.ref("blockverse_users/" + key + "/avatar");
+    profileViewerAvatarRef.on("value", snap => {
+      if(!profileViewer) return;
+      const custom = snap.val() || fallback;
+      profileViewer.scene.remove(profileViewer.group);
+      BaseplateGame.disposeObject3D(profileViewer.group);
+      const rig = BaseplateGame.buildCharacterRig(custom);
+      rig.group.position.y = -1.1;
+      profileViewer.group = rig.group;
+      profileViewer.scene.add(rig.group);
+      avatarCustomCache[key] = snap.val() || false;
+      document.getElementById("friendProfileAvatar").innerHTML = avatarFaceSvg(key);
+    });
 
     // clone the button to drop any previously-bound click listener before rebinding
     const freshBtn = toggleBtn.cloneNode(true);
@@ -3489,6 +3600,49 @@
       profileViewer.spinning = !profileViewer.spinning;
       freshBtn.textContent = profileViewer.spinning ? "2D" : "3D";
       freshBtn.classList.toggle("active", profileViewer.spinning);
+    });
+  }
+
+  // fallback appearance for a user we haven't loaded real customization for
+  // yet (or who never customized) - a plain default rig tinted by their key,
+  // matching the coloring already used elsewhere (avatarFaceSvg, colorForId)
+  function normalizeCustomForKey(key){
+    const hex = "#" + colorForKey(key).toString(16).padStart(6, "0");
+    return { torso: hex, leftArm: hex, rightArm: hex, leftLeg: "#2a2a2e", rightLeg: "#2a2a2e", heightScale: 1, headScale: 1 };
+  }
+
+  function renderFriendProfileActions(key){
+    const wrap = document.getElementById("friendProfileActions");
+    if(!wrap) return;
+    const myKey = currentAccountKey();
+    if(!myKey || myKey === key){ wrap.innerHTML = ""; return; }
+
+    let friendBtnHtml;
+    if(fbFriendMirror.friends.includes(key)){
+      friendBtnHtml = '<button class="char-preview-action unfriend" id="fpUnfriendBtn">Unfriend</button>';
+    } else if(fbFriendMirror.outgoing.includes(key)){
+      friendBtnHtml = '<span class="char-preview-action disabled">' + t("requestPending") + '</span>';
+    } else if(fbFriendMirror.incoming.includes(key)){
+      friendBtnHtml = '<button class="char-preview-action" id="fpAcceptBtn">' + t("accept") + '</button>';
+    } else {
+      friendBtnHtml = '<button class="char-preview-action" id="fpAddFriendBtn">' + t("addFriend") + '</button>';
+    }
+    const blocked = isBlocked(key);
+    wrap.innerHTML =
+      '<div class="char-preview-actions">' + friendBtnHtml +
+      '<button class="char-preview-action block' + (blocked ? " active" : "") + '" id="fpBlockBtn">' + (blocked ? "Unblock" : "Block") + '</button>' +
+      '</div>';
+
+    const rerender = () => renderFriendProfileActions(key);
+    const unfriendBtn = document.getElementById("fpUnfriendBtn");
+    if(unfriendBtn) unfriendBtn.addEventListener("click", () => { unfriendUser(key); rerender(); });
+    const acceptBtn = document.getElementById("fpAcceptBtn");
+    if(acceptBtn) acceptBtn.addEventListener("click", () => { acceptFriendRequest(key); rerender(); });
+    const addBtn = document.getElementById("fpAddFriendBtn");
+    if(addBtn) addBtn.addEventListener("click", () => { sendFriendRequest(key); rerender(); });
+    document.getElementById("fpBlockBtn").addEventListener("click", () => {
+      if(blocked) unblockUser(key); else blockUser(key);
+      rerender();
     });
   }
 
@@ -3604,11 +3758,18 @@
     const cancel = e.target.closest("[data-cancel]");
     const accept = e.target.closest("[data-accept]");
     const decline = e.target.closest("[data-decline]");
+    const unfriend = e.target.closest("[data-unfriend]");
+    const toggleBlock = e.target.closest("[data-toggle-block]");
     const openProfile = e.target.closest("[data-open-profile]");
     if(add) sendFriendRequest(add.getAttribute("data-add"));
     else if(cancel) cancelFriendRequest(cancel.getAttribute("data-cancel"));
     else if(accept) acceptFriendRequest(accept.getAttribute("data-accept"));
     else if(decline) declineFriendRequest(decline.getAttribute("data-decline"));
+    else if(unfriend) unfriendUser(unfriend.getAttribute("data-unfriend"));
+    else if(toggleBlock){
+      const key = toggleBlock.getAttribute("data-toggle-block");
+      if(isBlocked(key)) unblockUser(key); else blockUser(key);
+    }
     else if(openProfile) openFriendProfilePage(openProfile.getAttribute("data-open-profile"));
   });
 
@@ -3643,22 +3804,47 @@
   }
 
   /* ---- mobile drawer (hamburger sidebar) ---- */
+  function isMobileLayout(){ return window.innerWidth <= 700; }
   function openMobileDrawer(){
-    document.querySelector(".sidebar").classList.add("mobile-open");
-    document.getElementById("sidebarDrawerOverlay").classList.add("show");
+    if(!isMobileLayout()) return;
+    const sb = document.querySelector(".sidebar");
+    const ov = document.getElementById("sidebarDrawerOverlay");
+    sb.classList.add("mobile-open");
+    ov.classList.add("show");
+    // inline styles as a hard guarantee this works even if some cascade
+    // issue ever stops the class-based rule from applying - inline always
+    // wins over a stylesheet rule of equal or lower specificity
+    sb.style.transform = "translateX(0)";
+    ov.style.display = "block";
   }
   function closeMobileDrawer(){
-    document.querySelector(".sidebar").classList.remove("mobile-open");
-    document.getElementById("sidebarDrawerOverlay").classList.remove("show");
+    const sb = document.querySelector(".sidebar");
+    const ov = document.getElementById("sidebarDrawerOverlay");
+    sb.classList.remove("mobile-open");
+    ov.classList.remove("show");
+    // only force the off-screen inline transform on mobile widths - on
+    // desktop the sidebar must stay untouched (no drawer behavior there)
+    if(isMobileLayout()) sb.style.transform = "translateX(-100%)";
+    else sb.style.transform = "";
+    ov.style.display = "none";
   }
   function toggleMobileDrawer(){
     if(document.querySelector(".sidebar").classList.contains("mobile-open")) closeMobileDrawer();
     else openMobileDrawer();
   }
   closeMobileDrawer(); // always start closed, regardless of any stale state
+  window.addEventListener("resize", () => {
+    // e.g. rotating a tablet across the 700px breakpoint - make sure we're
+    // never left with a stale inline transform from the other layout mode
+    if(!isMobileLayout() && document.querySelector(".sidebar").style.transform) closeMobileDrawer();
+  });
   document.getElementById("mobileMenuBtn").addEventListener("click", toggleMobileDrawer);
   document.getElementById("sidebarCloseBtn").addEventListener("click", closeMobileDrawer);
   document.getElementById("sidebarDrawerOverlay").addEventListener("click", closeMobileDrawer);
+  // belt-and-suspenders: catch the tap even if it lands on the SVG icon or
+  // anywhere else inside the button, on both click and touchend, so a slow
+  // or double-firing tap on real hardware can never get missed
+  document.getElementById("sidebarCloseBtn").addEventListener("touchend", (e) => { e.preventDefault(); closeMobileDrawer(); });
   // tapping any nav item inside the drawer should also close it (showPage()
   // already calls closeMobileDrawer(), but sb-items that don't call
   // showPage directly - like the user row / logout - need it too)
@@ -3699,7 +3885,7 @@
     document.getElementById("authScreenWrap").classList.add("hidden");
     document.getElementById("dashScreen").classList.remove("hidden");
     document.getElementById("hubUsername").textContent = account.username;
-    document.getElementById("hubAvatar").textContent = account.username.charAt(0).toUpperCase();
+    updateHubAvatar();
     document.getElementById("welcomeName").textContent = ", " + account.username;
     showPage("home");
     updateFriendBadge();
@@ -4478,6 +4664,9 @@
           const myKey = currentAccountKey && currentAccountKey();
           if(msg.whisperTo !== myKey && msg.accountKey !== myKey) return;
         }
+
+        // blocked senders are invisible to you - no log line, no bubble
+        if(msg.accountKey && fbFriendMirror.blocked.includes(msg.accountKey)) return;
 
         const displayName = msg.whisperTo ? (msg.uid === playerId ? ("You → " + (msg.whisperToName || "")) : (msg.name + " (whisper)")) : msg.name;
         appendChatLine(displayName || "Player", msg.text || "", snap.key, msg.accountKey, msg.uid, !!msg.whisperTo);
@@ -5317,12 +5506,14 @@
       if(!previewName) return;
       const targetKey = previewName.toLowerCase();
       const btn = document.getElementById("charPreviewActionBtn");
+      const blockBtn = document.getElementById("charPreviewBlockBtn");
       if(!btn) return;
-      btn.classList.remove("disabled");
+      btn.classList.remove("disabled", "unfriend");
       btn.onclick = null;
       if(fbFriendMirror.friends.includes(targetKey)){
-        btn.textContent = t("friendsAlready");
-        btn.classList.add("disabled");
+        btn.textContent = "Unfriend";
+        btn.classList.add("unfriend");
+        btn.onclick = () => { unfriendUser(targetKey); refreshCharPreviewAction(); };
       } else if(fbFriendMirror.outgoing.includes(targetKey)){
         btn.textContent = t("requestPending");
         btn.classList.add("disabled");
@@ -5332,6 +5523,16 @@
       } else {
         btn.textContent = t("addFriend");
         btn.onclick = () => { sendFriendRequest(targetKey); refreshCharPreviewAction(); };
+      }
+
+      if(blockBtn){
+        const blocked = isBlocked(targetKey);
+        blockBtn.textContent = blocked ? "Unblock" : "Block";
+        blockBtn.classList.toggle("active", blocked);
+        blockBtn.onclick = () => {
+          if(blocked) unblockUser(targetKey); else blockUser(targetKey);
+          refreshCharPreviewAction();
+        };
       }
     }
 
@@ -5520,7 +5721,7 @@
       }, 90);
     }
 
-    return { start, stop, isRunning: () => running, buildCharacterRig, normalizeCustom };
+    return { start, stop, isRunning: () => running, buildCharacterRig, normalizeCustom, disposeObject3D };
   })();
 
   document.getElementById("playBaseplateBtn").addEventListener("click", () => BaseplateGame.start());
@@ -5535,5 +5736,12 @@
   }
 </script>
 
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('BlockVerse: service worker registration failed (app still works fine as a normal page):', err));
+  });
+}
+</script>
 </body>
 </html>
