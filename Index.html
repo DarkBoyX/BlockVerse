@@ -293,22 +293,36 @@
     width:38px; height:38px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s; color:#e4e4e6;
   }
   .game-lb-btn:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+  .game-lb-btn.active{ background:rgba(74,95,214,0.55); border-color:rgba(74,95,214,0.7); }
   .game-lb-count{
     position:absolute; top:-3px; right:-3px; background:#4a6cf7; color:#fff; font-size:9.5px; font-weight:700;
     min-width:15px; height:15px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px;
   }
   .game-lb-panel{
-    position:absolute; top:64px; right:16px; z-index:20; width:220px; max-height:60vh; overflow-y:auto;
-    background:rgba(20,20,22,0.82); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(10px);
-    border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:4px;
+    position:absolute; top:64px; right:16px; z-index:20; width:230px; max-height:60vh; overflow-y:auto;
+    background:rgba(20,20,22,0.88); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(12px);
+    border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:3px;
+    box-shadow:0 12px 30px rgba(0,0,0,0.4); animation:lbPanelIn .16s ease both;
   }
+  @keyframes lbPanelIn{ from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);} }
   .game-lb-panel.hidden{ display:none; }
+  .game-lb-head{
+    display:flex; align-items:center; justify-content:space-between; padding:4px 6px 8px;
+    font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; color:#8a8a90;
+    border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:4px;
+  }
+  .game-lb-head .lb-hint{ font-size:9.5px; text-transform:none; letter-spacing:0; color:#5c5c62; font-weight:500; }
   .game-lb-row{
-    display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:9px; cursor:pointer;
+    display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:9px; cursor:pointer;
     transition:background .12s; color:#e4e4e6; font-size:12.5px;
   }
-  .game-lb-row:hover{ background:rgba(255,255,255,0.07); }
-  .game-lb-row .status-dot{ flex-shrink:0; }
+  .game-lb-row:hover{ background:rgba(255,255,255,0.08); }
+  .game-lb-row .game-lb-rank{ width:16px; flex-shrink:0; font-size:11px; color:#6a6a70; font-weight:700; text-align:center; }
+  .game-lb-row .game-lb-avatar{
+    width:24px; height:24px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700; color:#fff; background:linear-gradient(135deg,#5a6cd6,#3a4aa8);
+  }
+  .game-lb-row .status-dot{ width:8px; height:8px; border-radius:50%; background:#3ecf6e; flex-shrink:0; box-shadow:0 0 5px rgba(62,207,110,0.6); }
   .game-lb-row .lb-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .game-lb-row .lb-you{ color:#8a8a90; font-size:10.5px; margin-left:auto; flex-shrink:0; }
   @media (max-width:720px){
@@ -4040,6 +4054,8 @@
     let onGround = true;
     let walkT = 0;
     let idleT = 0;
+    let landSquashT = 0;       // 0..1, drives the landing squash/stretch pop
+    let baseScaleX = 1, baseScaleY = 1, baseScaleZ = 1; // set once the character rig exists, see buildCharacter()
     let velX = 0, velZ = 0;    // smoothed movement velocity
     let mouseSensitivity = 1;
     let ragdoll = false;
@@ -4201,6 +4217,7 @@
       leftLeg = rig.leftLeg; rightLeg = rig.rightLeg;
       character.position.set(0, 0, 0);
       scene.add(character);
+      baseScaleX = character.scale.x; baseScaleY = character.scale.y; baseScaleZ = character.scale.z;
 
       // username tag floating above your own head too, so it's visible to
       // you (and to remote players, since it's part of the shared rig)
@@ -4540,7 +4557,9 @@
             const rp = remotePlayers[id];
             rp.target.x = data[id].x||0; rp.target.y = data[id].y||0;
             rp.target.z = data[id].z||0; rp.target.ry = data[id].ry||0;
-            rp.emote = data[id].emote || null;
+            const newEmote = data[id].emote || null;
+            if(rp.emote === "dance" && newEmote !== "dance" && rp.group) rp.group.rotation.z = 0; // clear leftover hip sway
+            rp.emote = newEmote;
           }
         });
         // remove players who left
@@ -4922,6 +4941,20 @@
     }
 
     let chatWired = false;
+    // exposed so the global "/" keybind (see wireInput) can open chat and
+    // focus the input regardless of device/pointer type - unlike the chat
+    // button's own toggle, this is an explicit "I want to type" action
+    function openChatAndFocus(){
+      const panel = document.getElementById("gameChatPanel");
+      const input = document.getElementById("gameChatInput");
+      if(!panel || !input) return;
+      panel.classList.remove("hidden");
+      input.focus();
+      scrollChatToBottom(false);
+      const pill = chatNewMsgPill();
+      if(pill) pill.classList.add("hidden");
+    }
+
     function wireChat(){
       if(chatWired) return;
       chatWired = true;
@@ -5184,22 +5217,46 @@
       // jump / gravity
       vy += GRAVITY;
       character.position.y += vy;
+      const wasOnGround = onGround;
       if(character.position.y <= GROUND_Y){
         character.position.y = GROUND_Y;
+        if(!wasOnGround){ landSquashT = 1; } // just touched down - kick off the squash
         vy = 0;
         onGround = true;
       } else {
         onGround = false;
       }
 
-      // distinct jump pose: legs tuck up and arms lift while airborne, easing
-      // in/out so it doesn't pop instantly against the walk/idle pose
+      // distinct jump pose: rising = arms/legs pull up and in, falling = legs
+      // stretch down bracing for landing, so the pose actually reads the
+      // difference between going up and coming down instead of one static pose
       if(!onGround){
-        const jumpBlend = 0.35;
-        leftLeg.rotation.x += (-0.45 - leftLeg.rotation.x) * jumpBlend;
-        rightLeg.rotation.x += (-0.45 - rightLeg.rotation.x) * jumpBlend;
-        leftArm.rotation.x += (-0.6 - leftArm.rotation.x) * jumpBlend;
-        rightArm.rotation.x += (-0.6 - rightArm.rotation.x) * jumpBlend;
+        const rising = vy > 0;
+        const jumpBlend = 0.3;
+        if(rising){
+          leftLeg.rotation.x += (-0.55 - leftLeg.rotation.x) * jumpBlend;
+          rightLeg.rotation.x += (-0.55 - rightLeg.rotation.x) * jumpBlend;
+          leftArm.rotation.x += (-0.75 - leftArm.rotation.x) * jumpBlend;
+          rightArm.rotation.x += (-0.75 - rightArm.rotation.x) * jumpBlend;
+        } else {
+          leftLeg.rotation.x += (0.18 - leftLeg.rotation.x) * jumpBlend;
+          rightLeg.rotation.x += (0.18 - rightLeg.rotation.x) * jumpBlend;
+          leftArm.rotation.x += (-0.3 - leftArm.rotation.x) * jumpBlend;
+          rightArm.rotation.x += (-0.3 - rightArm.rotation.x) * jumpBlend;
+        }
+      }
+
+      // landing squash: a quick, easing-out vertical scale pop on touchdown,
+      // separate from heightScale so it never fights the customize slider
+      if(landSquashT > 0){
+        landSquashT -= dt * 6;
+        if(landSquashT < 0) landSquashT = 0;
+        const squash = Math.sin(landSquashT * Math.PI) * 0.12;
+        character.scale.y = baseScaleY * (1 - squash);
+        character.scale.x = baseScaleX * (1 + squash * 0.5);
+        character.scale.z = baseScaleZ * (1 + squash * 0.5);
+      } else if(character.scale.y !== baseScaleY){
+        character.scale.set(baseScaleX, baseScaleY, baseScaleZ);
       }
     }
 
@@ -5219,21 +5276,31 @@
     function stopDance(){
       if(!myEmote) return;
       myEmote = null;
+      character.rotation.z = 0; // clear the dance hip-sway so it doesn't linger into walk/idle
       if(onlineRef) onlineRef.update({ emote: null }).catch(()=>{});
     }
-    // shared by the local character and remote players - a simple arm-swing
-    // + leg-step + head-bob loop, distinct from the walk/idle poses
+    // shared by the local character and remote players - a punchier combo
+    // move: arm pump + hip-sway leg step + a torso/head bounce and a slight
+    // group-level bob, so it reads as an actual dance instead of an arm wiggle
     function applyDancePose(rig, t){
-      const s = Math.sin(t * 6.2);
-      rig.leftArm.rotation.z = 0.85 + s * 0.4;
-      rig.rightArm.rotation.z = -0.85 - s * 0.4;
-      rig.leftArm.rotation.x = Math.sin(t * 6.2 + 1.2) * 0.35;
-      rig.rightArm.rotation.x = Math.sin(t * 6.2 + 1.2) * 0.35;
-      rig.leftLeg.rotation.x = s * 0.22;
-      rig.rightLeg.rotation.x = -s * 0.22;
+      const beat = t * 6.4;
+      const s = Math.sin(beat);
+      const s2 = Math.sin(beat * 2 + 0.6);
+      rig.leftArm.rotation.z = 0.95 + s * 0.5;
+      rig.rightArm.rotation.z = -0.95 - s * 0.5;
+      rig.leftArm.rotation.x = Math.sin(beat + 1.2) * 0.4 - 0.15;
+      rig.rightArm.rotation.x = Math.sin(beat + 1.2) * 0.4 - 0.15;
+      rig.leftLeg.rotation.x = s * 0.28;
+      rig.rightLeg.rotation.x = -s * 0.28;
+      rig.leftLeg.rotation.z = Math.abs(s) * 0.06;
+      rig.rightLeg.rotation.z = -Math.abs(s) * 0.06;
       if(rig.head){
         const baseY = rig.head.userData && rig.head.userData.baseY != null ? rig.head.userData.baseY : 2.05;
-        rig.head.position.y = baseY + Math.abs(s) * 0.07;
+        rig.head.position.y = baseY + Math.abs(s) * 0.09;
+        rig.head.rotation.z = s2 * 0.08;
+      }
+      if(rig.group){
+        rig.group.rotation.z = s2 * 0.025; // subtle hip sway on the whole body
       }
     }
 
@@ -5314,6 +5381,17 @@
           const k = e.key.toLowerCase();
           if(k === "l") { closeMenu(); BaseplateGame.stop(); }
           else if(k === "r") { closeMenu(); respawn(); }
+          return;
+        }
+        const typingNow = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
+        if(!typingNow && e.key === "Tab"){
+          e.preventDefault(); // stop the browser's default focus-cycling
+          toggleLeaderboard();
+          return;
+        }
+        if(!typingNow && e.key === "/"){
+          e.preventDefault(); // don't let "/" land in whatever's focused - it means "open chat"
+          openChatAndFocus();
           return;
         }
         keys[e.key.toLowerCase()] = true;
@@ -5502,39 +5580,56 @@
       countEl.textContent = total;
       countEl.classList.remove("hidden");
 
-      let html = '<div class="game-lb-row"><span class="status-dot online"></span>' +
+      let html = '<div class="game-lb-head"><span>Online - ' + total + '</span><span class="lb-hint">Tab to close</span></div>';
+
+      html += '<div class="game-lb-row"><span class="game-lb-rank">1</span>' +
+        '<span class="game-lb-avatar">' + initials(me) + '</span>' +
+        '<span class="status-dot"></span>' +
         '<span class="lb-name">' + escapeHtml(me) + '</span><span class="lb-you">You</span></div>';
 
-      others.forEach(p => {
+      others.forEach((p, i) => {
         html += '<div class="game-lb-row" data-lb-name="' + escapeHtml(p.name) + '">' +
-          '<span class="status-dot online"></span>' +
+          '<span class="game-lb-rank">' + (i + 2) + '</span>' +
+          '<span class="game-lb-avatar">' + initials(p.name) + '</span>' +
+          '<span class="status-dot"></span>' +
           '<span class="lb-name">' + escapeHtml(p.name) + '</span></div>';
       });
       panel.innerHTML = html;
 
       panel.querySelectorAll("[data-lb-name]").forEach(row => {
         row.addEventListener("click", () => {
-          panel.classList.add("hidden");
+          closeLeaderboard();
           openCharacterPreview(row.getAttribute("data-lb-name"));
         });
       });
+    }
+    function openLeaderboard(){
+      const panel = document.getElementById("gameLbPanel");
+      const btn = document.getElementById("gameLbBtn");
+      renderLeaderboard();
+      panel.classList.remove("hidden");
+      btn.classList.add("active");
+    }
+    function closeLeaderboard(){
+      document.getElementById("gameLbPanel").classList.add("hidden");
+      document.getElementById("gameLbBtn").classList.remove("active");
+    }
+    function toggleLeaderboard(){
+      const panel = document.getElementById("gameLbPanel");
+      if(panel.classList.contains("hidden")) openLeaderboard(); else closeLeaderboard();
     }
     function wireLeaderboard(){
       if(lbWired) return;
       lbWired = true;
       const btn = document.getElementById("gameLbBtn");
       const panel = document.getElementById("gameLbPanel");
-      btn.addEventListener("click", () => {
-        const opening = panel.classList.contains("hidden");
-        if(opening) renderLeaderboard();
-        panel.classList.toggle("hidden");
-      });
+      btn.addEventListener("click", toggleLeaderboard);
       document.addEventListener("click", (e) => {
         if(!panel.classList.contains("hidden") && !panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)){
-          panel.classList.add("hidden");
+          closeLeaderboard();
         }
       });
-      // keep the panel + badge fresh while it's open or just idle in the background
+      // keep the badge fresh in the background, and live-refresh the panel while it's open
       setInterval(() => {
         const countEl = document.getElementById("gameLbCount");
         if(countEl) countEl.textContent = 1 + otherRealPlayers().length;
