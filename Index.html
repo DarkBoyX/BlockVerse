@@ -285,6 +285,36 @@
     width:38px; height:38px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s; color:#e4e4e6;
   }
   .game-chat-btn:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+
+  /* ---------- In-game leaderboard (top right) ---------- */
+  .game-lb-btn{
+    position:absolute; top:16px; right:16px; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,20,22,0.55); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(6px);
+    width:38px; height:38px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s; color:#e4e4e6;
+  }
+  .game-lb-btn:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+  .game-lb-count{
+    position:absolute; top:-3px; right:-3px; background:#4a6cf7; color:#fff; font-size:9.5px; font-weight:700;
+    min-width:15px; height:15px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px;
+  }
+  .game-lb-panel{
+    position:absolute; top:64px; right:16px; z-index:20; width:220px; max-height:60vh; overflow-y:auto;
+    background:rgba(20,20,22,0.82); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(10px);
+    border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:4px;
+  }
+  .game-lb-panel.hidden{ display:none; }
+  .game-lb-row{
+    display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:9px; cursor:pointer;
+    transition:background .12s; color:#e4e4e6; font-size:12.5px;
+  }
+  .game-lb-row:hover{ background:rgba(255,255,255,0.07); }
+  .game-lb-row .status-dot{ flex-shrink:0; }
+  .game-lb-row .lb-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .game-lb-row .lb-you{ color:#8a8a90; font-size:10.5px; margin-left:auto; flex-shrink:0; }
+  @media (max-width:720px){
+    .game-lb-btn{ width:32px; height:32px; top:12px; right:12px; }
+    .game-lb-panel{ top:52px; right:12px; width:60vw; max-width:240px; }
+  }
   .game-chat-btn svg{ width:17px; height:17px; }
   .game-chat-panel{
     position:absolute; top:64px; left:16px; z-index:25; width:430px; max-width:90vw;
@@ -297,6 +327,12 @@
     height:210px; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px;
     scroll-behavior:smooth; overscroll-behavior:contain;
   }
+  html{ color-scheme: dark; }
+  html, body{ scrollbar-width:thin; scrollbar-color: rgba(255,255,255,0.16) transparent; }
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:rgba(255,255,255,0.16); border-radius:8px; }
+  ::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,0.26); }
   .game-chat-log::-webkit-scrollbar{ width:7px; }
   .game-chat-log::-webkit-scrollbar-track{ background:transparent; }
   .game-chat-log::-webkit-scrollbar-thumb{ background:rgba(255,255,255,0.14); border-radius:8px; }
@@ -1181,6 +1217,11 @@
         <p class="s-desc" data-i18n="activeSessionsDesc">If you see a device you don't recognize, sign out and change your password.</p>
         <div id="deviceList"></div>
       </div>
+      <div class="settings-block">
+        <h3 data-i18n="blockedUsersTitle">Blocked users</h3>
+        <p class="s-desc" data-i18n="blockedUsersDesc">People you've blocked can't message you, invite you, or see your online status. Unblock anyone here.</p>
+        <div id="blockedUsersList"></div>
+      </div>
     </div>
 
     <!-- ACCOUNT PAGE -->
@@ -1352,6 +1393,13 @@
   <div class="game-chat-btn" id="gameChatBtn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
   </div>
+
+  <!-- Leaderboard: shows who's online right now, top-right of the game -->
+  <div class="game-lb-btn" id="gameLbBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-8H7v8M7 3h10v6a5 5 0 01-10 0V3z"/></svg>
+    <span class="game-lb-count hidden" id="gameLbCount">0</span>
+  </div>
+  <div class="game-lb-panel hidden" id="gameLbPanel"></div>
   <div class="game-chat-panel hidden" id="gameChatPanel">
     <div class="game-chat-head">
       <span>Chat</span>
@@ -1638,13 +1686,15 @@
       welcomeBack:"Welcome back", homeSub:"Here's what's happening in your BlockVerse.",
       noGamesTitle:"No games yet", noGamesSub:"Games will show up here once they're added.",
       settingsSub:"Manage your account, security, and session.",
-      security:"Security", securitySub:"Devices and sign-in activity",
+      security:"Privacy & Safety", securitySub:"Devices, blocking, and sign-in activity",
       account:"Account", accountSub:"Appearance and language",
       logoutSub:"End your current session",
       backToSettings:"Back to settings",
-      securityPageSub:"Devices that are currently signed in to your account.",
+      securityPageSub:"Devices signed in, and people you've blocked.",
       activeSessions:"Active sessions",
       activeSessionsDesc:"If you see a device you don't recognize, sign out and change your password.",
+      blockedUsersTitle:"Blocked users", blockedUsersDesc:"People you've blocked can't message you, invite you, or see your online status. Unblock anyone here.",
+      unblock:"Unblock", noBlockedUsers:"You haven't blocked anyone.",
       accountPageSub:"Customize how BlockVerse looks and speaks to you.",
       bgColorTitle:"Background color", bgColorDesc:"Choose the theme for the whole app.",
       langTitle:"Language", langDesc:"Choose the language for the whole platform.",
@@ -2350,7 +2400,44 @@
     { code:"fa", name:"Persian", native:"Farsi" },
     { code:"ms", name:"Malay", native:"Bahasa Melayu" },
     { code:"el", name:"Greek", native:"Ellinika" },
-    { code:"sv", name:"Swedish", native:"Svenska" }
+    { code:"sv", name:"Swedish", native:"Svenska" },
+    { code:"bn", name:"Bengali", native:"Bangla" },
+    { code:"ur", name:"Urdu", native:"Urdu" },
+    { code:"ta", name:"Tamil", native:"Tamil" },
+    { code:"te", name:"Telugu", native:"Telugu" },
+    { code:"mr", name:"Marathi", native:"Marathi" },
+    { code:"gu", name:"Gujarati", native:"Gujarati" },
+    { code:"pa", name:"Punjabi", native:"Punjabi" },
+    { code:"kn", name:"Kannada", native:"Kannada" },
+    { code:"ml", name:"Malayalam", native:"Malayalam" },
+    { code:"he", name:"Hebrew", native:"Ivrit" },
+    { code:"ro", name:"Romanian", native:"Romana" },
+    { code:"hu", name:"Hungarian", native:"Magyar" },
+    { code:"cs", name:"Czech", native:"Cestina" },
+    { code:"sk", name:"Slovak", native:"Slovencina" },
+    { code:"da", name:"Danish", native:"Dansk" },
+    { code:"fi", name:"Finnish", native:"Suomi" },
+    { code:"no", name:"Norwegian", native:"Norsk" },
+    { code:"bg", name:"Bulgarian", native:"Balgarski" },
+    { code:"hr", name:"Croatian", native:"Hrvatski" },
+    { code:"sr", name:"Serbian", native:"Srpski" },
+    { code:"sl", name:"Slovenian", native:"Slovenscina" },
+    { code:"lt", name:"Lithuanian", native:"Lietuviu" },
+    { code:"lv", name:"Latvian", native:"Latviesu" },
+    { code:"et", name:"Estonian", native:"Eesti" },
+    { code:"tl", name:"Filipino", native:"Filipino" },
+    { code:"sw", name:"Swahili", native:"Kiswahili" },
+    { code:"am", name:"Amharic", native:"Amarigna" },
+    { code:"zu", name:"Zulu", native:"isiZulu" },
+    { code:"af", name:"Afrikaans", native:"Afrikaans" },
+    { code:"km", name:"Khmer", native:"Khmer" },
+    { code:"my", name:"Burmese", native:"Myanmar" },
+    { code:"ne", name:"Nepali", native:"Nepali" },
+    { code:"si", name:"Sinhala", native:"Sinhala" },
+    { code:"az", name:"Azerbaijani", native:"Azerbaycanca" },
+    { code:"ka", name:"Georgian", native:"Kartuli" },
+    { code:"hy", name:"Armenian", native:"Hayeren" },
+    { code:"is", name:"Icelandic", native:"Islenska" }
   ];
   const LANG_KEY = "blockverse_lang";
   const THEME_KEY = "blockverse_theme";
@@ -3185,6 +3272,26 @@
     );
   }
 
+  function renderBlockedUsersList(){
+    const container = document.getElementById("blockedUsersList");
+    if(!container) return;
+    const blocked = fbFriendMirror.blocked || [];
+    if(blocked.length === 0){
+      container.innerHTML = '<div class="empty-state" style="padding:24px 16px;">' + t("noBlockedUsers") + '</div>';
+      return;
+    }
+    container.innerHTML = blocked.map(key =>
+      friendRowHtml(key, '<button class="friend-btn" data-unblock-settings="' + key + '">' + t("unblock") + '</button>')
+    ).join("");
+    container.querySelectorAll("[data-unblock-settings]").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        unblockUser(btn.getAttribute("data-unblock-settings"));
+        renderBlockedUsersList();
+      });
+    });
+  }
+
   function renderFriendsPage(){
     const myKey = currentAccountKey();
     if(!myKey) return;
@@ -3798,7 +3905,7 @@
     });
     closeMobileDrawer();
     if(name === "account"){ renderThemeRow(); applyTranslations(); }
-    if(name === "security"){ renderDevices(); }
+    if(name === "security"){ renderDevices(); renderBlockedUsersList(); }
     if(name === "friends"){ renderFriendsPage(); }
     if(name === "customize" && typeof openCustomizePage === "function") openCustomizePage();
   }
@@ -4736,7 +4843,6 @@
       // /dance [1] - plays a dance emote until you move or jump; doesn't post a chat line
       if(lower === "/dance" || lower === "/dance 1"){
         startDance();
-        appendSystemChatLine("You started dancing - move or jump to stop.");
         return;
       }
 
@@ -5107,7 +5213,7 @@
     /* ---- /dance emote ---- */
     let myEmote = null, myEmoteT = 0;
     function startDance(){
-      myEmote = "dance"; myEmoteT = 0;
+      myEmote = "dance"; myEmoteT = 0; idleT = 0; walkT = 0; // clear any lingering idle/walk pose so dance starts clean
       if(onlineRef) onlineRef.update({ emote: "dance" }).catch(()=>{});
     }
     function stopDance(){
@@ -5382,6 +5488,58 @@
       return Object.keys(livePlayers)
         .filter(id => id !== playerId)
         .map(id => ({ id, name: livePlayers[id].name || "Player" }));
+    }
+
+    /* ---- leaderboard: top-right "who's online" panel ---- */
+    let lbWired = false;
+    function renderLeaderboard(){
+      const panel = document.getElementById("gameLbPanel");
+      const countEl = document.getElementById("gameLbCount");
+      if(!panel) return;
+      const me = currentUsername();
+      const others = otherRealPlayers();
+      const total = 1 + others.length;
+      countEl.textContent = total;
+      countEl.classList.remove("hidden");
+
+      let html = '<div class="game-lb-row"><span class="status-dot online"></span>' +
+        '<span class="lb-name">' + escapeHtml(me) + '</span><span class="lb-you">You</span></div>';
+
+      others.forEach(p => {
+        html += '<div class="game-lb-row" data-lb-name="' + escapeHtml(p.name) + '">' +
+          '<span class="status-dot online"></span>' +
+          '<span class="lb-name">' + escapeHtml(p.name) + '</span></div>';
+      });
+      panel.innerHTML = html;
+
+      panel.querySelectorAll("[data-lb-name]").forEach(row => {
+        row.addEventListener("click", () => {
+          panel.classList.add("hidden");
+          openCharacterPreview(row.getAttribute("data-lb-name"));
+        });
+      });
+    }
+    function wireLeaderboard(){
+      if(lbWired) return;
+      lbWired = true;
+      const btn = document.getElementById("gameLbBtn");
+      const panel = document.getElementById("gameLbPanel");
+      btn.addEventListener("click", () => {
+        const opening = panel.classList.contains("hidden");
+        if(opening) renderLeaderboard();
+        panel.classList.toggle("hidden");
+      });
+      document.addEventListener("click", (e) => {
+        if(!panel.classList.contains("hidden") && !panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)){
+          panel.classList.add("hidden");
+        }
+      });
+      // keep the panel + badge fresh while it's open or just idle in the background
+      setInterval(() => {
+        const countEl = document.getElementById("gameLbCount");
+        if(countEl) countEl.textContent = 1 + otherRealPlayers().length;
+        if(!panel.classList.contains("hidden")) renderLeaderboard();
+      }, 3000);
     }
 
     function renderPlayerList(container, { clickable, onRowClick }){
@@ -5663,6 +5821,7 @@
       if(!wired){ wireInput(); wired = true; }
       wireMenu();
       wireChat();
+      wireLeaderboard();
 
       character.position.set(0,0,0);
       vy = 0; onGround = true; camYaw = Math.PI; camPitch = 0.28;
