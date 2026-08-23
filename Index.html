@@ -1129,6 +1129,7 @@
     <div class="field">
       <label for="suPassword" data-i18n="password">Password</label>
       <input type="password" id="suPassword" autocomplete="new-password" data-i18n-ph="passwordChoosePh" placeholder="Choose a password">
+      <div style="font-size:11px;color:var(--text-3);margin-top:5px;">At least 8 characters, with a letter, a number, and a symbol.</div>
     </div>
     <div class="field">
       <label for="suConfirm" data-i18n="confirmPassword">Confirm password</label>
@@ -1278,22 +1279,11 @@
     <div id="pageSecurity" class="hidden">
       <div class="back-link" data-back="settingsHub">&#8592; <span data-i18n="backToSettings">Back to settings</span></div>
       <div class="main-header">
-        <h2 data-i18n="security">Security</h2>
-        <p data-i18n="securityPageSub">Devices that are currently signed in to your account.</p>
-      </div>
-      <div class="settings-block">
-        <h3 data-i18n="activeSessions">Active sessions</h3>
-        <p class="s-desc" data-i18n="activeSessionsDesc">If you see a device you don't recognize, sign out and change your password.</p>
-        <div id="deviceList"></div>
-      </div>
-      <div class="settings-block">
-        <h3 data-i18n="blockedUsersTitle">Blocked users</h3>
-        <p class="s-desc" data-i18n="blockedUsersDesc">People you've blocked can't message you, invite you, or see your online status. Unblock anyone here.</p>
-        <div id="blockedUsersList"></div>
+        <h2 data-i18n="security">Privacy/Security</h2>
+        <p data-i18n="securityPageSub">Manage devices, blocking, and email verification.</p>
       </div>
       <div class="settings-block">
         <h3>Log in Verifications</h3>
-        <p class="s-desc" id="loginVerifyDesc">Add an email so every login needs a one-time code sent there, not just your password.</p>
         <div id="loginVerifyCurrent" style="margin-bottom:10px;"></div>
         <div style="display:flex; gap:8px;">
           <input type="text" id="loginVerifyEmailInput" placeholder="you@email.com" style="flex:1;">
@@ -1301,6 +1291,14 @@
           <button class="friend-btn" id="loginVerifyRemoveBtn" style="display:none;">Remove</button>
         </div>
         <div class="msg" id="loginVerifyMsg"></div>
+      </div>
+      <div class="settings-block">
+        <h3 data-i18n="activeSessions">Active sessions</h3>
+        <div id="deviceList"></div>
+      </div>
+      <div class="settings-block">
+        <h3 data-i18n="blockedUsersTitle">Blocked users</h3>
+        <div id="blockedUsersList"></div>
       </div>
     </div>
 
@@ -1726,6 +1724,38 @@
   // callers can fail loudly instead of hanging silently.
   setTimeout(() => { if(!fbUid) fbReadyResolve(null); }, 6000);
 
+  /* ============ live-update watcher ============ */
+  // watches a single small Firebase value that admin.html bumps when a new
+  // version is published. Anyone connected gets pulled out of the game (if
+  // they're in one) and shown a "please refresh" overlay - this is how the
+  // site tells everyone currently using it that it just changed under them.
+  let appVersionBaseline = null;
+  function watchAppVersion(){
+    fbDb.ref("blockverse_version").on("value", snap => {
+      const v = snap.val();
+      const version = v && v.version != null ? v.version : 0;
+      if(appVersionBaseline === null){ appVersionBaseline = version; return; } // first read just sets the baseline
+      if(version !== appVersionBaseline) showUpdateOverlay();
+    });
+  }
+  function showUpdateOverlay(){
+    if(document.getElementById("updateOverlay")) return; // already showing
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+      BaseplateGame.forceDisconnect("BlockVerse was just updated. Refresh the page to continue.", false);
+    }
+    const overlay = document.createElement("div");
+    overlay.id = "updateOverlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(8,8,10,0.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#f2f2f3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;text-align:center;padding:0 32px;";
+    overlay.innerHTML =
+      '<div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#3a3a40,#232326);border:1px solid #2a2a2e;transform:rotate(45deg);"></div>' +
+      '<div style="font-size:18px;font-weight:700;">A new update is available</div>' +
+      '<div style="font-size:13.5px;color:#c4c4c9;max-width:280px;">Refresh the page to keep playing on the latest version.</div>' +
+      '<button id="updateRefreshBtn" style="margin-top:6px;padding:12px 26px;background:#2c2c30;border:1px solid #3a3a40;border-radius:9px;color:#f2f2f3;font-size:14px;font-weight:600;cursor:pointer;">Refresh now</button>';
+    document.body.appendChild(overlay);
+    document.getElementById("updateRefreshBtn").addEventListener("click", () => location.reload());
+  }
+  fbReady.then(uid => { if(uid) watchAppVersion(); });
+
   /* ============ character customization (colors + body/size) ============ */
   const CUSTOM_DEFAULT = {
     torso: "#4a5fd6", leftArm: "#4a5fd6", rightArm: "#4a5fd6",
@@ -1789,7 +1819,7 @@
       welcomeBack:"Welcome back", homeSub:"Here's what's happening in your BlockVerse.",
       noGamesTitle:"No games yet", noGamesSub:"Games will show up here once they're added.",
       settingsSub:"Manage your account, security, and session.",
-      security:"Privacy & Safety", securitySub:"Devices, blocking, and sign-in activity",
+      security:"Privacy/Security", securitySub:"Manage devices, blocking, and email verification.",
       account:"Account", accountSub:"Appearance and language",
       logoutSub:"End your current session",
       backToSettings:"Back to settings",
@@ -2877,13 +2907,16 @@
   // gate that runs between "password matched" and actually finishing login -
   // if this account has a verification email on file, it stops here and asks
   // for a one-time code before calling finishLogin
+  let loginBusy = false; // guards against spamming submit while a code prompt (or the request itself) is pending
   async function attemptFinishLogin(key, account){
+    if(loginBusy) return;
+    loginBusy = true;
     let email = null;
     try{
       const snap = await fbDb.ref("blockverse_security/" + key + "/email").once("value");
       email = snap.val();
     }catch(e){}
-    if(!email){ finishLogin(key, account); return; }
+    if(!email){ loginBusy = false; finishLogin(key, account); return; }
 
     const code = generateLoginCode();
     try{
@@ -2891,6 +2924,7 @@
     }catch(e){
       showMsg(loginMsg, "Couldn't reach the server to send a code. Try again.", "error");
       loginSubmitBtn.classList.remove("loading");
+      loginBusy = false;
       return;
     }
     // NOTE: this app is fully client-side with no backend/email server, so
@@ -2900,10 +2934,18 @@
     showLoginCodePrompt(key, account, email, code);
   }
 
+  function removeLoginCodePrompt(){
+    const existing = document.getElementById("loginCodePromptWrap");
+    if(existing) existing.remove();
+  }
+
   function showLoginCodePrompt(key, account, email, code){
+    removeLoginCodePrompt(); // spamming submit shouldn't stack up duplicate prompts/inputs
     clearMsg(loginMsg);
     loginSubmitBtn.classList.remove("loading");
+    loginSubmitBtn.disabled = true; // one code prompt at a time - re-enabled if this one is cancelled/completed
     const wrap = document.createElement("div");
+    wrap.id = "loginCodePromptWrap";
     wrap.className = "field";
     wrap.style.animation = "fadeUp .3s ease both";
     wrap.innerHTML =
@@ -2925,15 +2967,19 @@
         }
         await fbDb.ref("blockverse_login_codes/" + key).remove();
         wrap.remove();
+        loginSubmitBtn.disabled = false;
+        loginBusy = false;
         finishLogin(key, account);
       }catch(e){
         showMsg(loginMsg, "Couldn't reach the server. Try again.", "error");
+        loginSubmitBtn.disabled = false;
+        loginBusy = false;
       }
     });
   }
 
   /* ============ accounts / auth ============ */
-  const STORE_KEY = "blockverse_accounts";
+  const STORE_KEY = "blockverse_accounts_v2"; // bumped from _v1 to invalidate old test accounts stored locally
   const SESSION_KEY = "blockverse_session";
   function getAccounts(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e){ return {}; } }
   function saveAccounts(a){ localStorage.setItem(STORE_KEY, JSON.stringify(a)); }
@@ -3124,7 +3170,12 @@
     if(username.length < 3){ showMsg(signupMsg, "Username needs at least 3 characters.", "error"); shakeField(usernameEl); return; }
     if(!selectedGender){ showMsg(signupMsg, "Pick male or female.", "error"); return; }
     if(password !== confirm){ showMsg(signupMsg, "Passwords don't match.", "error"); shakeField(confirmEl); return; }
-    if(password.length < 4){ showMsg(signupMsg, "Password needs at least 4 characters.", "error"); shakeField(passwordEl); return; }
+    if(password.length < 8){ showMsg(signupMsg, "Password needs to be at least 8 characters.", "error"); shakeField(passwordEl); return; }
+    if(!/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)){
+      showMsg(signupMsg, "Password needs at least one letter, one number, and one symbol.", "error");
+      shakeField(passwordEl);
+      return;
+    }
 
     const accounts = getAccounts();
     const key = username.toLowerCase();
@@ -3177,6 +3228,7 @@
   const loginSubmitBtn = document.getElementById("loginSubmitBtn");
   loginForm.addEventListener("submit", async function(e){
     e.preventDefault();
+    if(loginBusy) return; // ignore spammed submits while a request/code-prompt is already in flight
     clearMsg(loginMsg);
     const usernameEl = document.getElementById("loginUsername");
     const passwordEl = document.getElementById("loginPassword");
@@ -4518,7 +4570,7 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 2, 256);
       const tex = new THREE.CanvasTexture(canvas);
-      tex.colorSpace = THREE.SRGBColorSpace || tex.colorSpace;
+      tex.encoding = THREE.sRGBEncoding; // r128 API - colorSpace doesn't exist on this version
       return tex;
     }
 
@@ -4528,26 +4580,37 @@
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
 
       scene = new THREE.Scene();
       scene.background = makeSkyGradientTexture();
-      scene.fog = new THREE.Fog(0x8fd0f0, 40, 160);
+      scene.fog = new THREE.Fog(0xaee0f5, 55, 190);
 
       camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 500);
 
-      const hemi = new THREE.HemisphereLight(0xffffff, 0x3a5f2b, 0.9);
+      const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x3a5f2b, 1.0);
       scene.add(hemi);
-      const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+      const sun = new THREE.DirectionalLight(0xfff4dd, 1.05);
       sun.position.set(30, 45, 20);
       sun.castShadow = true;
-      sun.shadow.mapSize.set(1024, 1024);
-      sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
-      sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.left = -50; sun.shadow.camera.right = 50;
+      sun.shadow.camera.top = 50; sun.shadow.camera.bottom = -50;
+      sun.shadow.bias = -0.0015;
       scene.add(sun);
+      const fill = new THREE.DirectionalLight(0xbcd8ff, 0.25); // soft cool fill from the opposite side so shadows aren't pitch black
+      fill.position.set(-25, 20, -15);
+      scene.add(fill);
 
-      // baseplate
+      // baseplate - a tileable procedural grass texture instead of one flat color
       const groundGeo = new THREE.PlaneGeometry(300, 300);
-      const groundMat = new THREE.MeshLambertMaterial({ color: 0x2f9e44 });
+      const groundTex = makeGrassTexture();
+      groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+      groundTex.repeat.set(60, 60);
+      const groundMat = new THREE.MeshLambertMaterial({ map: groundTex });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI/2;
       ground.receiveShadow = true;
@@ -4555,15 +4618,62 @@
 
       // faint grid for scale reference
       const grid = new THREE.GridHelper(300, 60, 0x1f7a34, 0x1f7a34);
-      grid.material.opacity = 0.18;
+      grid.material.opacity = 0.1;
       grid.material.transparent = true;
       scene.add(grid);
 
       spawnTrees();
       spawnClouds();
+      spawnRocks();
+      spawnHills();
 
       buildCharacter();
       clock = new THREE.Clock();
+    }
+
+    // small tileable grass patch texture - a few shades of green scattered
+    // as blades/flecks so the ground doesn't read as one flat color
+    function makeGrassTexture(){
+      const canvas = document.createElement("canvas");
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#2f9e44";
+      ctx.fillRect(0, 0, 64, 64);
+      const shades = ["#279438", "#39ab4e", "#2a8f3c"];
+      for(let i = 0; i < 90; i++){
+        ctx.fillStyle = shades[i % shades.length];
+        const x = Math.random()*64, y = Math.random()*64;
+        ctx.fillRect(x, y, 2, 2);
+      }
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // a handful of low rocks scattered around for ground-level variety
+    function spawnRocks(){
+      const rockMat = new THREE.MeshLambertMaterial({ color: 0x8a8a86 });
+      for(let i = 0; i < 24; i++){
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 15 + Math.random() * 110;
+        const s = 0.4 + Math.random()*0.5;
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockMat);
+        rock.position.set(Math.cos(angle)*radius, s*0.4, Math.sin(angle)*radius);
+        rock.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+        rock.castShadow = true; rock.receiveShadow = true;
+        scene.add(rock);
+      }
+    }
+
+    // distant low-poly hills at the horizon so the world doesn't just stop
+    // at a flat edge - purely a backdrop, well outside the playable/fog range
+    function spawnHills(){
+      const hillMat = new THREE.MeshLambertMaterial({ color: 0x3f7a4a });
+      for(let i = 0; i < 10; i++){
+        const angle = (i / 10) * Math.PI * 2 + Math.random()*0.3;
+        const radius = 170 + Math.random()*30;
+        const hill = new THREE.Mesh(new THREE.SphereGeometry(28 + Math.random()*18, 10, 8, 0, Math.PI*2, 0, Math.PI/2), hillMat);
+        hill.position.set(Math.cos(angle)*radius, -6, Math.sin(angle)*radius);
+        scene.add(hill);
+      }
     }
 
     // ---- trees: simple trunk+leaves meshes scattered around, with a
@@ -4571,7 +4681,7 @@
     const treeColliders = []; // {x, z, radius}
     function spawnTrees(){
       const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2e });
-      const leafMat = new THREE.MeshLambertMaterial({ color: 0x2f7d3a });
+      const leafShades = [0x2f7d3a, 0x389146, 0x256b32, 0x3d9b4e];
       const positions = [];
       // scatter trees in a rough ring/grid around spawn, leaving the
       // center clear so it doesn't block where players land
@@ -4582,14 +4692,20 @@
       }
       positions.forEach(p => {
         const scale = 0.8 + Math.random() * 0.6;
+        const leafMat = new THREE.MeshLambertMaterial({ color: leafShades[Math.floor(Math.random()*leafShades.length)] });
         const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28*scale, 0.34*scale, 2.2*scale, 7), trunkMat);
         trunk.position.set(p.x, 1.1*scale, p.z);
         trunk.castShadow = true; trunk.receiveShadow = true;
         scene.add(trunk);
-        const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5*scale, 3.1*scale, 8), leafMat);
-        leaves.position.set(p.x, 3.4*scale, p.z);
-        leaves.castShadow = true;
-        scene.add(leaves);
+        // two stacked cones read as a fuller canopy than one big cone
+        const leaves1 = new THREE.Mesh(new THREE.ConeGeometry(1.5*scale, 2.3*scale, 8), leafMat);
+        leaves1.position.set(p.x, 3.0*scale, p.z);
+        leaves1.castShadow = true; leaves1.receiveShadow = true;
+        scene.add(leaves1);
+        const leaves2 = new THREE.Mesh(new THREE.ConeGeometry(1.05*scale, 1.7*scale, 8), leafMat);
+        leaves2.position.set(p.x, 4.15*scale, p.z);
+        leaves2.castShadow = true;
+        scene.add(leaves2);
         treeColliders.push({ x: p.x, z: p.z, radius: 0.55*scale });
       });
     }
@@ -4663,14 +4779,17 @@
     // spawned with its head sunk into its torso - any headScale/heightScale
     // combination now always leaves a clean gap, by construction.
     // simple smiley face drawn once and reused as a texture on every
-    // character's head (transparent background so the skin color still shows through)
+    // character's head - baked on an OPAQUE skin-colored background (not a
+    // transparent canvas) since mixing a transparent sub-material into a
+    // multi-material box can make faces render incorrectly/invisible
     let faceTexture = null;
     function getFaceTexture(){
       if(faceTexture) return faceTexture;
       const canvas = document.createElement("canvas");
       canvas.width = 128; canvas.height = 128;
       const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, 128, 128);
+      ctx.fillStyle = "#f0c090";
+      ctx.fillRect(0, 0, 128, 128);
       ctx.fillStyle = "#2b2b2b";
       ctx.beginPath(); ctx.arc(42, 52, 7, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(86, 52, 7, 0, Math.PI*2); ctx.fill();
@@ -4685,7 +4804,7 @@
       const grp = new THREE.Group();
 
       const skin = new THREE.MeshLambertMaterial({ color: 0xf0c090 });
-      const faceMat = new THREE.MeshLambertMaterial({ color: 0xf0c090, map: getFaceTexture(), transparent: true });
+      const faceMat = new THREE.MeshLambertMaterial({ color: 0xf0c090, map: getFaceTexture() });
       // BoxGeometry face order is [+X,-X,+Y,-Y,+Z,-Z] - put the smiley on
       // both Z faces so it reads correctly regardless of which way "front"
       // ends up facing after the model's own base rotation
