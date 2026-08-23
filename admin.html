@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlockVerse - Admin</title>
+<style>
+  :root{
+    --bg-0:#0a0a0b; --bg-1:#141416; --bg-2:#1b1b1e;
+    --border:#2a2a2e; --border-soft:#232326;
+    --text-0:#f2f2f3; --text-1:#c4c4c9; --text-2:#8a8a90; --text-3:#5c5c62;
+    --grey-1:#232326; --grey-2:#2c2c30; --grey-3:#3a3a40;
+    --danger:#e5484d; --success:#3ecf6e;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    background:
+      radial-gradient(circle at 20% 0%, #19191c 0%, transparent 45%),
+      radial-gradient(circle at 80% 100%, #16161a 0%, transparent 45%),
+      var(--bg-0);
+    color:var(--text-0); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  .card{
+    width:100%; max-width:420px; background:var(--bg-2); border:1px solid var(--border-soft);
+    border-radius:16px; padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    animation:fadeUp .4s ease both;
+  }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+  .logo{ text-align:center; margin-bottom:22px; }
+  .logo .cube{
+    display:inline-block; width:36px; height:36px;
+    background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
+    border:1px solid var(--border); border-radius:8px; margin-bottom:8px; transform:rotate(45deg);
+  }
+  .logo h1{ margin:0; font-size:19px; letter-spacing:0.5px; }
+  .logo p{ margin:4px 0 0; font-size:11.5px; color:var(--text-2); }
+
+  label{ display:block; font-size:12px; color:var(--text-1); margin:14px 0 6px; }
+  input[type="password"], input[type="text"]{
+    width:100%; padding:12px 13px; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:14px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{ border-color:var(--grey-3); box-shadow:0 0 0 3px rgba(255,255,255,0.06); }
+
+  .btn{
+    width:100%; margin-top:18px; padding:12px; background:var(--grey-2); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:14px; font-weight:600; cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  .btn:hover{ background:var(--grey-3); }
+  .btn:active{ transform:scale(0.98); }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn.danger{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  .btn.danger:hover{ background:#4a2224; }
+
+  .status-block{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px;
+    padding:16px; margin-bottom:6px;
+  }
+  .status-row{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; }
+  .status-row span:first-child{ color:var(--text-2); }
+  .status-row span:last-child{ color:var(--text-0); font-weight:600; }
+
+  .msg{ min-height:18px; font-size:12.5px; margin-top:10px; text-align:center; }
+  .msg.error{ color:var(--danger); }
+  .msg.success{ color:var(--success); }
+
+  .hidden{ display:none !important; }
+  .note{ font-size:11px; color:var(--text-3); margin-top:16px; line-height:1.5; text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="cube"></div>
+    <h1>BlockVerse Admin</h1>
+    <p>Publish updates &middot; disconnect live players</p>
+  </div>
+
+  <!-- gate screen -->
+  <div id="gateScreen">
+    <label for="gateInput">Admin passphrase</label>
+    <input type="password" id="gateInput" placeholder="Enter passphrase">
+    <button class="btn" id="gateBtn">Unlock</button>
+    <div class="msg" id="gateMsg"></div>
+    <p class="note">
+      Heads up: this is a basic client-side deterrent, not real authentication -
+      anyone with this file and the passphrase can publish an update. Keep this
+      file private and don't rely on it for real access control.
+    </p>
+  </div>
+
+  <!-- publish screen -->
+  <div id="publishScreen" class="hidden">
+    <div class="status-block">
+      <div class="status-row"><span>Current version</span><span id="curVersion">-</span></div>
+      <div class="status-row"><span>Last published</span><span id="curTs">-</span></div>
+    </div>
+    <button class="btn danger" id="publishBtn">Publish update &amp; disconnect players</button>
+    <div class="msg" id="publishMsg"></div>
+    <p class="note">
+      Publishing bumps the live version. Anyone currently in the game gets pulled
+      out immediately with a "please refresh" message; anyone just browsing the
+      site gets the same notice next time they interact with it.
+    </p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+  // same project as Index.html - this page just writes one small value there
+  const firebaseConfig = {
+    apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
+    authDomain: "blockverse-3526c.firebaseapp.com",
+    databaseURL: "https://blockverse-3526c-default-rtdb.firebaseio.com",
+    projectId: "blockverse-3526c",
+    storageBucket: "blockverse-3526c.firebasestorage.app",
+    messagingSenderId: "782192628812",
+    appId: "1:782192628812:web:79d50d2c34cd8ac969d0e9"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const auth = firebase.auth();
+
+  // CHANGE THIS before you rely on the gate for anything - it's just a
+  // deterrent (see the note in the UI), not real security
+  const ADMIN_PASSPHRASE = "blockverse-admin-2026";
+
+  const gateScreen = document.getElementById("gateScreen");
+  const publishScreen = document.getElementById("publishScreen");
+  const gateInput = document.getElementById("gateInput");
+  const gateBtn = document.getElementById("gateBtn");
+  const gateMsg = document.getElementById("gateMsg");
+  const publishBtn = document.getElementById("publishBtn");
+  const publishMsg = document.getElementById("publishMsg");
+  const curVersion = document.getElementById("curVersion");
+  const curTs = document.getElementById("curTs");
+
+  function showMsg(el, text, kind){ el.textContent = text; el.className = "msg " + kind; }
+
+  gateBtn.addEventListener("click", () => {
+    if(gateInput.value === ADMIN_PASSPHRASE){
+      gateScreen.classList.add("hidden");
+      publishScreen.classList.remove("hidden");
+      loadStatus();
+    } else {
+      showMsg(gateMsg, "Wrong passphrase.", "error");
+    }
+  });
+  gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
+
+  function loadStatus(){
+    db.ref("blockverse_version").once("value").then(snap => {
+      const v = snap.val();
+      curVersion.textContent = v && v.version != null ? v.version : "0";
+      curTs.textContent = v && v.ts ? new Date(v.ts).toLocaleString() : "Never";
+    }).catch(() => {
+      curVersion.textContent = "?"; curTs.textContent = "?";
+    });
+  }
+
+  publishBtn.addEventListener("click", async () => {
+    publishBtn.disabled = true;
+    showMsg(publishMsg, "", "");
+    try{
+      if(!auth.currentUser) await auth.signInAnonymously();
+      await db.ref("blockverse_version").transaction(current => {
+        const next = (current && current.version ? current.version : 0) + 1;
+        return { version: next, ts: firebase.database.ServerValue.TIMESTAMP };
+      });
+      showMsg(publishMsg, "Published! Live players are being disconnected now.", "success");
+      loadStatus();
+    }catch(e){
+      showMsg(publishMsg, "Couldn't publish - check your connection and try again.", "error");
+    }
+    publishBtn.disabled = false;
+  });
+</script>
+</body>
+</html>
