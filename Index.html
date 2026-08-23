@@ -1291,6 +1291,17 @@
         <p class="s-desc" data-i18n="blockedUsersDesc">People you've blocked can't message you, invite you, or see your online status. Unblock anyone here.</p>
         <div id="blockedUsersList"></div>
       </div>
+      <div class="settings-block">
+        <h3>Log in Verifications</h3>
+        <p class="s-desc" id="loginVerifyDesc">Add an email so every login needs a one-time code sent there, not just your password.</p>
+        <div id="loginVerifyCurrent" style="margin-bottom:10px;"></div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="loginVerifyEmailInput" placeholder="you@email.com" style="flex:1;">
+          <button class="friend-btn" id="loginVerifySaveBtn">Save</button>
+          <button class="friend-btn" id="loginVerifyRemoveBtn" style="display:none;">Remove</button>
+        </div>
+        <div class="msg" id="loginVerifyMsg"></div>
+      </div>
     </div>
 
     <!-- ACCOUNT PAGE -->
@@ -1299,6 +1310,16 @@
       <div class="main-header">
         <h2 data-i18n="account">Account</h2>
         <p data-i18n="accountPageSub">Customize how BlockVerse looks and speaks to you.</p>
+      </div>
+
+      <div class="settings-block">
+        <h3>Username</h3>
+        <p class="s-desc" id="usernameChangeDesc">Change how your name appears across BlockVerse. You can only do this once every 7 days.</p>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="usernameChangeInput" placeholder="New username" style="flex:1;">
+          <button class="friend-btn" id="usernameChangeBtn">Save</button>
+        </div>
+        <div class="msg" id="usernameChangeMsg"></div>
       </div>
 
       <div class="settings-block">
@@ -2718,6 +2739,199 @@
     });
   }
 
+  const USERNAME_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+  function renderUsernameChangeUI(){
+    const input = document.getElementById("usernameChangeInput");
+    const btn = document.getElementById("usernameChangeBtn");
+    const msg = document.getElementById("usernameChangeMsg");
+    const desc = document.getElementById("usernameChangeDesc");
+    const key = getSession();
+    if(!input || !key) return;
+    const account = getAccounts()[key];
+    input.value = "";
+    input.placeholder = account ? account.username : "New username";
+    clearMsg(msg);
+    btn.disabled = false; input.disabled = false;
+    fbDb.ref("blockverse_credentials/" + key + "/lastUsernameChange").once("value").then(snap => {
+      const last = snap.val() || 0;
+      const remaining = USERNAME_COOLDOWN_MS - (Date.now() - last);
+      if(remaining > 0){
+        const days = Math.ceil(remaining / (24*60*60*1000));
+        desc.textContent = "You changed your username recently. You can change it again in " + days + " day" + (days === 1 ? "" : "s") + ".";
+        btn.disabled = true; input.disabled = true;
+      } else {
+        desc.textContent = "Change how your name appears across BlockVerse. You can only do this once every 7 days.";
+      }
+    }).catch(()=>{});
+  }
+
+  async function doChangeUsername(){
+    const input = document.getElementById("usernameChangeInput");
+    const btn = document.getElementById("usernameChangeBtn");
+    const msg = document.getElementById("usernameChangeMsg");
+    const key = getSession();
+    if(!key) return;
+    const newName = (input.value || "").trim();
+    if(newName.length < 3 || newName.length > 24){
+      showMsg(msg, "Username must be 3-24 characters.", "error"); return;
+    }
+    if(!/^[A-Za-z0-9_]+$/.test(newName)){
+      showMsg(msg, "Letters, numbers, and underscores only.", "error"); return;
+    }
+    btn.disabled = true; btn.classList.add("loading");
+    try{
+      const lastSnap = await fbDb.ref("blockverse_credentials/" + key + "/lastUsernameChange").once("value");
+      const last = lastSnap.val() || 0;
+      if(Date.now() - last < USERNAME_COOLDOWN_MS){
+        showMsg(msg, "You can only change your username once every 7 days.", "error");
+        btn.disabled = false; btn.classList.remove("loading");
+        return;
+      }
+      // uniqueness is checked against everyone's chosen display name (not just
+      // the permanent account key), since that's what people will actually see
+      const allSnap = await fbDb.ref("blockverse_usernames").once("value");
+      const all = allSnap.val() || {};
+      const taken = Object.keys(all).some(k => k !== key && all[k] && String(all[k].username || "").toLowerCase() === newName.toLowerCase());
+      if(taken){
+        showMsg(msg, "That username is already taken.", "error");
+        btn.disabled = false; btn.classList.remove("loading");
+        return;
+      }
+      await fbDb.ref("blockverse_usernames/" + key + "/username").set(newName);
+      await fbDb.ref("blockverse_credentials/" + key + "/lastUsernameChange").set(firebase.database.ServerValue.TIMESTAMP);
+
+      const accounts = getAccounts();
+      if(accounts[key]){ accounts[key].username = newName; localStorage.setItem(STORE_KEY, JSON.stringify(accounts)); }
+      const hubEl = document.getElementById("hubUsername");
+      if(hubEl) hubEl.textContent = newName;
+      const welcomeEl = document.getElementById("welcomeName");
+      if(welcomeEl) welcomeEl.textContent = ", " + newName;
+
+      showMsg(msg, "Username changed! This is what everyone will see now.", "success");
+      renderUsernameChangeUI();
+    }catch(e){
+      showMsg(msg, "Couldn't reach the server. Try again.", "error");
+      btn.disabled = false; btn.classList.remove("loading");
+    }
+  }
+  document.getElementById("usernameChangeBtn").addEventListener("click", doChangeUsername);
+
+  /* ============ login verification (email + one-time code) ============ */
+  function maskEmail(email){
+    const at = email.indexOf("@");
+    if(at < 0) return email;
+    const local = email.slice(0, at), domain = email.slice(at); // domain includes "@"
+    const shown = local.slice(0, 5);
+    const masked = "#".repeat(Math.max(local.length - shown.length, 0));
+    return shown + masked + domain;
+  }
+  function generateLoginCode(){
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let out = "";
+    for(let i = 0; i < 7; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return out;
+  }
+
+  function renderLoginVerifyUI(){
+    const key = getSession();
+    const current = document.getElementById("loginVerifyCurrent");
+    const removeBtn = document.getElementById("loginVerifyRemoveBtn");
+    const input = document.getElementById("loginVerifyEmailInput");
+    if(!key || !current) return;
+    input.value = "";
+    fbDb.ref("blockverse_security/" + key + "/email").once("value").then(snap => {
+      const email = snap.val();
+      if(email){
+        current.innerHTML = '<span class="d-meta">Current: <b>' + escapeHtml(maskEmail(email)) + '</b></span>';
+        removeBtn.style.display = "";
+        input.placeholder = "Replace with a new email";
+      } else {
+        current.innerHTML = '<span class="d-meta">No email on file - logins only need your password right now.</span>';
+        removeBtn.style.display = "none";
+        input.placeholder = "you@email.com";
+      }
+    }).catch(()=>{});
+  }
+  document.getElementById("loginVerifySaveBtn").addEventListener("click", () => {
+    const key = getSession();
+    const input = document.getElementById("loginVerifyEmailInput");
+    const msg = document.getElementById("loginVerifyMsg");
+    const email = (input.value || "").trim();
+    if(!key) return;
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      showMsg(msg, "Enter a valid email.", "error"); return;
+    }
+    fbDb.ref("blockverse_security/" + key).set({ email, ts: firebase.database.ServerValue.TIMESTAMP })
+      .then(() => { showMsg(msg, "Saved. Future logins will need a code sent there.", "success"); renderLoginVerifyUI(); })
+      .catch(() => showMsg(msg, "Couldn't reach the server. Try again.", "error"));
+  });
+  document.getElementById("loginVerifyRemoveBtn").addEventListener("click", () => {
+    const key = getSession();
+    const msg = document.getElementById("loginVerifyMsg");
+    if(!key) return;
+    fbDb.ref("blockverse_security/" + key).remove()
+      .then(() => { showMsg(msg, "Removed. Logins no longer need a code.", "success"); renderLoginVerifyUI(); })
+      .catch(() => showMsg(msg, "Couldn't reach the server. Try again.", "error"));
+  });
+
+  // gate that runs between "password matched" and actually finishing login -
+  // if this account has a verification email on file, it stops here and asks
+  // for a one-time code before calling finishLogin
+  async function attemptFinishLogin(key, account){
+    let email = null;
+    try{
+      const snap = await fbDb.ref("blockverse_security/" + key + "/email").once("value");
+      email = snap.val();
+    }catch(e){}
+    if(!email){ finishLogin(key, account); return; }
+
+    const code = generateLoginCode();
+    try{
+      await fbDb.ref("blockverse_login_codes/" + key).set({ code, expiresAt: Date.now() + 10*60*1000 });
+    }catch(e){
+      showMsg(loginMsg, "Couldn't reach the server to send a code. Try again.", "error");
+      loginSubmitBtn.classList.remove("loading");
+      return;
+    }
+    // NOTE: this app is fully client-side with no backend/email server, so
+    // there's no way to actually deliver an email from here. The code is
+    // surfaced directly so the feature is usable/testable now - wiring in a
+    // real send (e.g. a free EmailJS account) just means replacing this block.
+    showLoginCodePrompt(key, account, email, code);
+  }
+
+  function showLoginCodePrompt(key, account, email, code){
+    clearMsg(loginMsg);
+    loginSubmitBtn.classList.remove("loading");
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    wrap.style.animation = "fadeUp .3s ease both";
+    wrap.innerHTML =
+      '<label>A code was sent to ' + escapeHtml(maskEmail(email)) + '</label>' +
+      '<input type="text" id="loginCodeInput" maxlength="7" placeholder="Enter the 7-character code" style="letter-spacing:2px;text-transform:none;">' +
+      '<div style="font-size:11px;color:var(--text-3);margin-top:6px;">Dev note: no email server is wired up yet, so here\'s the code directly: <b>' + code + '</b></div>' +
+      '<button type="button" class="submit-btn" id="loginCodeSubmitBtn" style="margin-top:10px;">Verify & log in</button>';
+    loginForm.insertBefore(wrap, loginMsg);
+    document.getElementById("loginCodeInput").focus();
+    document.getElementById("loginCodeSubmitBtn").addEventListener("click", async () => {
+      const entered = (document.getElementById("loginCodeInput").value || "").trim();
+      try{
+        const snap = await fbDb.ref("blockverse_login_codes/" + key).once("value");
+        const rec = snap.val();
+        if(!rec || rec.code !== entered || Date.now() > rec.expiresAt){
+          showMsg(loginMsg, "That code is wrong or expired.", "error");
+          shakeField(document.getElementById("loginCodeInput"));
+          return;
+        }
+        await fbDb.ref("blockverse_login_codes/" + key).remove();
+        wrap.remove();
+        finishLogin(key, account);
+      }catch(e){
+        showMsg(loginMsg, "Couldn't reach the server. Try again.", "error");
+      }
+    });
+  }
+
   /* ============ accounts / auth ============ */
   const STORE_KEY = "blockverse_accounts";
   const SESSION_KEY = "blockverse_session";
@@ -2734,24 +2948,47 @@
   let sessionListenerRef = null;
   let claimListenerRef = null;
   let forcedLogoutHandled = false;
+  let sessionConfirmedAt = 0;      // last time we know our session row genuinely existed
+  let connectedInfoRef = null;
+
+  function writeSessionRow(key, ref){
+    const info = detectDeviceLabel();
+    ref.set({ device: info.label, type: info.type, ts: firebase.database.ServerValue.TIMESTAMP }).catch(()=>{});
+    ref.onDisconnect().remove();
+    sessionConfirmedAt = Date.now();
+  }
 
   function registerSession(key){
     if(!key || typeof fbDb === "undefined" || !fbDb) return;
     try{
-      const info = detectDeviceLabel();
       const ref = fbDb.ref("blockverse_sessions/" + key + "/" + mySessionId);
-      ref.set({ device: info.label, type: info.type, ts: firebase.database.ServerValue.TIMESTAMP }).catch(()=>{});
-      ref.onDisconnect().remove();
+      writeSessionRow(key, ref);
 
       // watch our OWN session entry - if it disappears while we still think
-      // we're logged in, another device hit "log out" on us remotely
+      // we're logged in, another device hit "log out" on us remotely.
+      // BUT: a dropped connection (phone screen locked, tab backgrounded for
+      // a while, wifi hiccup) also fires onDisconnect and removes this same
+      // row - that's not a real kick, so we re-write the row the moment we
+      // reconnect and only trust a "missing" value if it's been more than a
+      // few seconds since we last confirmed presence (i.e. not just a reconnect blip)
       sessionListenerRef = ref;
       forcedLogoutHandled = false;
+      connectedInfoRef = fbDb.ref(".info/connected");
+      connectedInfoRef.on("value", snap => {
+        if(snap.val() === true && getSession() === key) writeSessionRow(key, ref);
+      });
       ref.on("value", snap => {
-        if(!snap.exists() && getSession() === key && !forcedLogoutHandled){
-          forcedLogoutHandled = true;
-          handleRemoteLogout();
-        }
+        if(snap.exists()){ sessionConfirmedAt = Date.now(); return; }
+        if(getSession() !== key || forcedLogoutHandled) return;
+        // give reconnect logic a moment to heal the row before treating this as a real kick
+        setTimeout(() => {
+          if(forcedLogoutHandled || getSession() !== key) return;
+          ref.once("value").then(recheck => {
+            if(recheck.exists()) return; // it healed itself - just a reconnect blip, not a real kick
+            forcedLogoutHandled = true;
+            handleRemoteLogout();
+          }).catch(()=>{});
+        }, 4000);
       });
     }catch(e){}
   }
@@ -2759,6 +2996,7 @@
   function stopSessionTracking(){
     if(sessionListenerRef){ sessionListenerRef.off(); sessionListenerRef.set(null).catch(()=>{}); sessionListenerRef = null; }
     if(claimListenerRef){ claimListenerRef.off(); claimListenerRef = null; }
+    if(connectedInfoRef){ connectedInfoRef.off(); connectedInfoRef = null; }
   }
 
   // another device removed our session row (they clicked "Log out" on us in
@@ -2956,7 +3194,7 @@
     let account = accounts[key];
 
     if(account && account.password === password){
-      finishLogin(key, account);
+      attemptFinishLogin(key, account);
       // backfill the Firebase-side credential in the background - covers
       // accounts created before this feature existed, or ones whose first
       // backfill attempt failed (e.g. rules weren't published yet at the
@@ -2990,7 +3228,7 @@
         };
         accounts[key] = account;
         saveAccounts(accounts);
-        finishLogin(key, account);
+        attemptFinishLogin(key, account);
         return;
       }
     }catch(err){
@@ -4102,8 +4340,8 @@
       i.classList.toggle("active", p === name || (p === "settings" && settingsPages.includes(name)) || (p === "friends" && name === "friendProfile"));
     });
     closeMobileDrawer();
-    if(name === "account"){ renderThemeRow(); applyTranslations(); }
-    if(name === "security"){ renderDevices(); renderBlockedUsersList(); }
+    if(name === "account"){ renderThemeRow(); applyTranslations(); renderUsernameChangeUI(); }
+    if(name === "security"){ renderDevices(); renderBlockedUsersList(); renderLoginVerifyUI(); }
     if(name === "friends"){ renderFriendsPage(); }
     if(name === "customize" && typeof openCustomizePage === "function") openCustomizePage();
   }
@@ -6053,7 +6291,12 @@
     }
 
     /* ---- in-game menu ---- */
-    function currentUsername(){ return getSession() || "You"; }
+    function currentUsername(){
+      const key = getSession();
+      if(!key) return "You";
+      const accounts = getAccounts();
+      return (accounts[key] && accounts[key].username) || key;
+    }
     function initials(name){ return (name || "?").trim().slice(0,2).toUpperCase(); }
 
     function showTab(id){
