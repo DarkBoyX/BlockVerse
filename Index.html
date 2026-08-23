@@ -1689,8 +1689,26 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
   /* ============ Firebase (multiplayer) ============ */
+  /* ============ EmailJS (real login-code delivery) ============ */
+  const EMAILJS_PUBLIC_KEY = "oREembLjFov6CfvWf";
+  const EMAILJS_SERVICE_ID = "service_frdmxw9";
+  const EMAILJS_TEMPLATE_ID = "template_c0gjcdm";
+  if(typeof emailjs !== "undefined") emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+  // sends the login code for real. If EmailJS isn't reachable/misconfigured,
+  // resolves false so the caller can fall back to showing the code on-screen
+  // instead of silently leaving the person stuck with no code at all.
+  function sendLoginCodeEmail(toEmail, code){
+    if(typeof emailjs === "undefined") return Promise.resolve(false);
+    return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: toEmail,
+      passcode: code,
+      code: code // sent under both names since templates vary in which variable they expect
+    }).then(() => true).catch((err) => { console.error("EmailJS send failed:", err); return false; });
+  }
+
   const firebaseConfig = {
     apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
     authDomain: "blockverse-3526c.firebaseapp.com",
@@ -2927,11 +2945,8 @@
       loginBusy = false;
       return;
     }
-    // NOTE: this app is fully client-side with no backend/email server, so
-    // there's no way to actually deliver an email from here. The code is
-    // surfaced directly so the feature is usable/testable now - wiring in a
-    // real send (e.g. a free EmailJS account) just means replacing this block.
-    showLoginCodePrompt(key, account, email, code);
+    const delivered = await sendLoginCodeEmail(email, code);
+    showLoginCodePrompt(key, account, email, code, delivered);
   }
 
   function removeLoginCodePrompt(){
@@ -2939,7 +2954,7 @@
     if(existing) existing.remove();
   }
 
-  function showLoginCodePrompt(key, account, email, code){
+  function showLoginCodePrompt(key, account, email, code, delivered){
     removeLoginCodePrompt(); // spamming submit shouldn't stack up duplicate prompts/inputs
     clearMsg(loginMsg);
     loginSubmitBtn.classList.remove("loading");
@@ -2951,7 +2966,9 @@
     wrap.innerHTML =
       '<label>A code was sent to ' + escapeHtml(maskEmail(email)) + '</label>' +
       '<input type="text" id="loginCodeInput" maxlength="7" placeholder="Enter the 7-character code" style="letter-spacing:2px;text-transform:none;">' +
-      '<div style="font-size:11px;color:var(--text-3);margin-top:6px;">Dev note: no email server is wired up yet, so here\'s the code directly: <b>' + code + '</b></div>' +
+      (delivered
+        ? '<div style="font-size:11px;color:var(--text-3);margin-top:6px;">Check your inbox (and spam folder) for the code.</div>'
+        : '<div style="font-size:11px;color:var(--danger);margin-top:6px;">Couldn\'t email the code - showing it here so you\'re not locked out: <b>' + code + '</b></div>') +
       '<button type="button" class="submit-btn" id="loginCodeSubmitBtn" style="margin-top:10px;">Verify & log in</button>';
     loginForm.insertBefore(wrap, loginMsg);
     document.getElementById("loginCodeInput").focus();
