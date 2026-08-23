@@ -38,6 +38,18 @@
     overflow-x:hidden;
     transition:background .3s;
   }
+  /* falling grid of white-outlined boxes over a black fill, drifting downward behind the auth card */
+  .auth-box-grid{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-color:#000;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.22) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.22) 1px, transparent 1px);
+    background-size:46px 46px;
+    animation:boxGridFall 6s linear infinite;
+    opacity:0.55;
+  }
+  @keyframes boxGridFall{ from{ background-position:0 0, 0 0; } to{ background-position:0 46px, 0 0; } }
   .center-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
   .hidden{ display:none !important; }
 
@@ -53,6 +65,7 @@
 
   /* ---------- Auth card ---------- */
   .auth-wrap{
+    position:relative; z-index:1;
     width:100%; max-width:420px; background:var(--bg-2);
     border:1px solid var(--border-soft); border-radius:16px; padding:34px 30px;
     box-shadow:0 20px 60px rgba(0,0,0,0.6); animation:fadeUp .5s ease both;
@@ -62,8 +75,9 @@
     display:inline-block; width:40px; height:40px;
     background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
     border:1px solid var(--border); border-radius:9px; margin-bottom:10px;
-    transform:rotate(45deg); animation:floatCube 3.2s ease-in-out infinite;
+    transform:rotate(45deg); animation:floatCube 3.2s ease-in-out infinite, cubeGlow 4s ease-in-out infinite;
   }
+  @keyframes cubeGlow{ 0%,100%{ box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ box-shadow:0 0 20px rgba(255,255,255,0.3); } }
   .logo h1{ margin:0; font-size:23px; letter-spacing:1px; color:var(--text-0); }
   .logo p{ margin:5px 0 0; font-size:12px; color:var(--text-2); letter-spacing:0.3px; }
 
@@ -83,16 +97,26 @@
   }
   .tab-btn.active{ color:var(--text-0); }
 
+  /* slide+fade transition between the login and signup forms */
+  #loginForm, #signupForm{ transition:opacity .18s ease, transform .18s ease; }
+  .auth-form-out-left{ opacity:0; transform:translateX(-16px); }
+  .auth-form-out-right{ opacity:0; transform:translateX(16px); }
+  .auth-form-in-left{ opacity:0; transform:translateX(-16px); }
+  .auth-form-in-right{ opacity:0; transform:translateX(16px); }
+
   .field{ animation:fadeUp .4s ease both; }
+  .field:nth-of-type(1){ animation-delay:.03s; }
+  .field:nth-of-type(2){ animation-delay:.08s; }
+  .field:nth-of-type(3){ animation-delay:.13s; }
   label{ display:block; font-size:12px; color:var(--text-1); margin:14px 0 6px; letter-spacing:0.2px; }
   input[type="text"], input[type="password"]{
     width:100%; padding:12px 13px; background:var(--bg-1); border:1px solid var(--border);
     border-radius:9px; color:var(--text-0); font-size:14px; outline:none;
-    transition:border-color .18s, background .18s, box-shadow .18s;
+    transition:border-color .18s, background .18s, box-shadow .18s, transform .12s;
   }
   input::placeholder{ color:var(--text-3); }
   input:hover{ border-color:var(--grey-3); }
-  input:focus{ border-color:var(--grey-3); background:var(--bg-2); box-shadow:0 0 0 3px rgba(255,255,255,0.05); }
+  input:focus{ border-color:var(--grey-3); background:var(--bg-2); box-shadow:0 0 0 3px rgba(255,255,255,0.06); transform:translateY(-1px); }
   input.shake-error{ animation:shake .35s ease; border-color:var(--danger); }
 
   .gender-options{ display:flex; gap:10px; margin-top:6px; }
@@ -110,9 +134,9 @@
     position:relative; width:100%; margin-top:24px; padding:13px;
     background:var(--grey-2); border:1px solid var(--border); border-radius:9px;
     color:var(--text-0); font-size:15px; font-weight:600; cursor:pointer; overflow:hidden;
-    transition:background .18s, border-color .18s, transform .08s;
+    transition:background .18s, border-color .18s, transform .12s, box-shadow .18s;
   }
-  .submit-btn:hover{ background:var(--grey-3); border-color:var(--grey-3); }
+  .submit-btn:hover{ background:var(--grey-3); border-color:var(--grey-3); box-shadow:0 6px 16px rgba(0,0,0,0.4); transform:translateY(-1px); }
   .submit-btn:active{ transform:scale(0.98); }
   .submit-btn::after{
     content:""; position:absolute; top:0; left:-60%; width:40%; height:100%;
@@ -1070,6 +1094,7 @@
 
 <!-- ================= AUTH SCREEN ================= -->
 <div class="center-screen" id="authScreenWrap">
+<div class="auth-box-grid"></div>
 <div class="auth-wrap" id="authScreen">
   <div class="logo">
     <div class="cube"></div>
@@ -2790,15 +2815,29 @@
   const signupForm = document.getElementById("signupForm");
 
   tabLogin.addEventListener("click", () => {
+    if(tabLogin.classList.contains("active")) return;
     tabLogin.classList.add("active"); tabSignup.classList.remove("active");
     tabSlider.style.transform = "translateX(0%)";
-    loginForm.classList.remove("hidden"); signupForm.classList.add("hidden");
+    swapAuthForm(signupForm, loginForm, -1);
   });
   tabSignup.addEventListener("click", () => {
+    if(tabSignup.classList.contains("active")) return;
     tabSignup.classList.add("active"); tabLogin.classList.remove("active");
     tabSlider.style.transform = "translateX(100%)";
-    signupForm.classList.remove("hidden"); loginForm.classList.add("hidden");
+    swapAuthForm(loginForm, signupForm, 1);
   });
+  // slide+fade the outgoing form out, then slide+fade the incoming one in,
+  // instead of an instant hide/show swap
+  function swapAuthForm(outEl, inEl, dir){
+    outEl.classList.add(dir > 0 ? "auth-form-out-left" : "auth-form-out-right");
+    setTimeout(() => {
+      outEl.classList.add("hidden");
+      outEl.classList.remove("auth-form-out-left", "auth-form-out-right");
+      inEl.classList.remove("hidden");
+      inEl.classList.add(dir > 0 ? "auth-form-in-right" : "auth-form-in-left");
+      requestAnimationFrame(() => inEl.classList.remove("auth-form-in-right", "auth-form-in-left"));
+    }, 180);
+  }
 
   let selectedGender = null;
   const genderMale = document.getElementById("genderMale");
@@ -4385,11 +4424,34 @@
     // That's what fixes the old bug where a default (uncustomized) character
     // spawned with its head sunk into its torso - any headScale/heightScale
     // combination now always leaves a clean gap, by construction.
+    // simple smiley face drawn once and reused as a texture on every
+    // character's head (transparent background so the skin color still shows through)
+    let faceTexture = null;
+    function getFaceTexture(){
+      if(faceTexture) return faceTexture;
+      const canvas = document.createElement("canvas");
+      canvas.width = 128; canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, 128, 128);
+      ctx.fillStyle = "#2b2b2b";
+      ctx.beginPath(); ctx.arc(42, 52, 7, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(86, 52, 7, 0, Math.PI*2); ctx.fill();
+      ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.strokeStyle = "#2b2b2b";
+      ctx.beginPath(); ctx.arc(64, 68, 26, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke();
+      faceTexture = new THREE.CanvasTexture(canvas);
+      return faceTexture;
+    }
+
     function buildCharacterRig(custom){
       const c = normalizeCustom(typeof custom === "object" ? custom : { torso: custom });
       const grp = new THREE.Group();
 
       const skin = new THREE.MeshLambertMaterial({ color: 0xf0c090 });
+      const faceMat = new THREE.MeshLambertMaterial({ color: 0xf0c090, map: getFaceTexture(), transparent: true });
+      // BoxGeometry face order is [+X,-X,+Y,-Y,+Z,-Z] - put the smiley on
+      // both Z faces so it reads correctly regardless of which way "front"
+      // ends up facing after the model's own base rotation
+      const headMats = [skin, skin, skin, skin, faceMat, faceMat];
       const torsoMat = new THREE.MeshLambertMaterial({ color: c.torso });
       const lArmMat = new THREE.MeshLambertMaterial({ color: c.leftArm });
       const rArmMat = new THREE.MeshLambertMaterial({ color: c.rightArm });
@@ -4407,7 +4469,7 @@
       const headSize = HEAD_BASE_SIZE * c.headScale;
       const torsoTopY = TORSO_Y + TORSO_H / 2;
       const headY = torsoTopY + headSize / 2 + NECK_GAP; // always clear of the torso, whatever the scale
-      const rigHead = new THREE.Mesh(new THREE.BoxGeometry(headSize, headSize, headSize), skin);
+      const rigHead = new THREE.Mesh(new THREE.BoxGeometry(headSize, headSize, headSize), headMats);
       rigHead.position.y = headY;
       rigHead.userData.baseY = headY; // read by the walk/idle bob + ragdoll-reset code below
       rigHead.castShadow = true;
@@ -5385,23 +5447,52 @@
       smDist += (camDist - smDist) * 0.2;
 
       const dist = smDist;
+
+      // third-person orbit camera: sits behind/above the character and
+      // always looks AT the character - this alone breaks down at close
+      // range (it just ends up hovering above you looking straight down),
+      // so it's only used at longer distances and blended out below
       const offX = Math.sin(smYaw) * Math.cos(smPitch) * dist;
       const offZ = Math.cos(smYaw) * Math.cos(smPitch) * dist;
       const offY = 2.2 + Math.sin(smPitch) * dist;
-      camera.position.set(
-        character.position.x + offX,
-        character.position.y + offY,
-        character.position.z + offZ
-      );
-      camera.lookAt(
-        character.position.x,
-        character.position.y + 1.5,
-        character.position.z
-      );
+      const orbitPos = {
+        x: character.position.x + offX,
+        y: character.position.y + offY,
+        z: character.position.z + offZ
+      };
+      const orbitTarget = {
+        x: character.position.x,
+        y: character.position.y + 1.5,
+        z: character.position.z
+      };
+
+      // true first-person camera: sits at eye height and looks in whatever
+      // direction yaw/pitch point, completely independent of where the
+      // character model is - this is what actually lets you look up and down
+      const tilt = smPitch - 0.28; // 0.28 is the neutral/level pitch used elsewhere
+      const horiz = Math.cos(tilt);
+      const dirX = -Math.sin(smYaw) * horiz;
+      const dirZ = -Math.cos(smYaw) * horiz;
+      const dirY = -Math.sin(tilt);
+      const eyeY = character.position.y + 1.65;
+      const fpsPos = { x: character.position.x, y: eyeY, z: character.position.z };
+      const fpsTarget = { x: fpsPos.x + dirX * 10, y: fpsPos.y + dirY * 10, z: fpsPos.z + dirZ * 10 };
+
+      // blend smoothly between the two so zooming in/out never pops
+      const blend = Math.max(0, Math.min(1, (dist - CAM_DIST_MIN) / 2.2));
+      const px = fpsPos.x + (orbitPos.x - fpsPos.x) * blend;
+      const py = fpsPos.y + (orbitPos.y - fpsPos.y) * blend;
+      const pz = fpsPos.z + (orbitPos.z - fpsPos.z) * blend;
+      const tx = fpsTarget.x + (orbitTarget.x - fpsTarget.x) * blend;
+      const ty = fpsTarget.y + (orbitTarget.y - fpsTarget.y) * blend;
+      const tz = fpsTarget.z + (orbitTarget.z - fpsTarget.z) * blend;
+
+      camera.position.set(px, py, pz);
+      camera.lookAt(tx, ty, tz);
 
       // once zoomed in close enough it reads as first-person - hide your own
       // body so it doesn't block the view (remote players still see you normally)
-      const firstPerson = dist < 1.6;
+      const firstPerson = blend < 0.35;
       if(character) character.visible = !firstPerson;
     }
 
@@ -5538,37 +5629,64 @@
       if(audioCtx.state === "suspended") audioCtx.resume();
       return audioCtx;
     }
+    // short filtered noise burst - used as the "thud" texture under both
+    // footsteps and landing so they sound like an actual contact, not a beep
+    function playNoiseThud(freq, gainAmt, dur, ctx){
+      const bufferSize = Math.floor(ctx.sampleRate * dur);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i = 0; i < bufferSize; i++) data[i] = (Math.random()*2 - 1);
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass"; filter.frequency.value = freq; filter.Q.value = 0.9;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(gainAmt, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      noise.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+      noise.start();
+    }
     function playFootstep(){
       const ctx = getAudioCtx(); if(!ctx) return;
+      // a soft low thump plus a bit of filtered noise "scuff" - two very
+      // short layers read as an actual footstep instead of a synth blip
       const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(120 + Math.random()*30, ctx.currentTime);
-      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(95 + Math.random()*18, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.07, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
       osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.1);
+      osc.start(); osc.stop(ctx.currentTime + 0.09);
+      playNoiseThud(900 + Math.random()*300, 0.02, 0.045, ctx);
     }
     function playJumpSound(){
       const ctx = getAudioCtx(); if(!ctx) return;
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(220, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.09, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.16);
+      // a quick upward "hup" - two oscillators a fifth apart for a bit of
+      // body, plus a short breathy noise swoosh under it
+      [1, 1.5].forEach((mult, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.type = i === 0 ? "sine" : "triangle";
+        osc.frequency.setValueAtTime(210 * mult, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(430 * mult, ctx.currentTime + 0.11);
+        gain.gain.setValueAtTime(i === 0 ? 0.08 : 0.035, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.17);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.17);
+      });
+      playNoiseThud(1400, 0.015, 0.09, ctx);
     }
     function playLandSound(){
       const ctx = getAudioCtx(); if(!ctx) return;
       const osc = ctx.createOscillator(), gain = ctx.createGain();
       osc.type = "sine";
-      osc.frequency.setValueAtTime(180, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(70, ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+      osc.frequency.setValueAtTime(170, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + 0.13);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
       osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.14);
+      osc.start(); osc.stop(ctx.currentTime + 0.15);
+      playNoiseThud(500, 0.035, 0.1, ctx);
     }
     // soft filtered noise loop for ambient outdoor "air"/wind - starts once and just fades in/out with gain
     function startAmbientAir(){
