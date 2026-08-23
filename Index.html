@@ -4098,6 +4098,7 @@
     let walkT = 0;
     let idleT = 0;
     let landSquashT = 0;       // 0..1, drives the landing squash/stretch pop
+    let lastWalkPhase = 0;     // tracks the walk-cycle phase so footstep sounds fire once per stride
     let baseScaleX = 1, baseScaleY = 1, baseScaleZ = 1; // set once the character rig exists, see buildCharacter()
     let velX = 0, velZ = 0;    // smoothed movement velocity
     let mouseSensitivity = 1;
@@ -4123,6 +4124,23 @@
     const JUMP_VELOCITY = 0.46;
     const MOVE_SPEED = 0.11;
 
+    // a simple vertical-gradient sky (deep blue up top fading to a pale
+    // horizon) instead of one flat color - reads as open air/atmosphere
+    function makeSkyGradientTexture(){
+      const canvas = document.createElement("canvas");
+      canvas.width = 2; canvas.height = 256;
+      const ctx = canvas.getContext("2d");
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, "#5a9bdc");
+      grad.addColorStop(0.55, "#8fd0f0");
+      grad.addColorStop(1, "#dff3ff");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 2, 256);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace || tex.colorSpace;
+      return tex;
+    }
+
     function initScene(){
       const canvas = document.getElementById("gameCanvas");
       renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
@@ -4131,7 +4149,7 @@
       renderer.shadowMap.enabled = true;
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x8fd0f0);
+      scene.background = makeSkyGradientTexture();
       scene.fog = new THREE.Fog(0x8fd0f0, 40, 160);
 
       camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 500);
@@ -4723,6 +4741,7 @@
       "fuck","fuk","fck","shit","bitch","bytch","cunt","dick","pussy","pussi",
       "ass","asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
       "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
+      "sex","porn","nude","nudes","rape",
       // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
       "كس","كسم","خرا","زبي","شرموطة","شرموط","قحبة","منيك","كلب ابن","ابن كلب","عرص","متناك",
       // Spanish
@@ -5324,6 +5343,12 @@
 
         walkT += dt * 5.5;
         applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head }, walkT, true);
+        if(onGround){
+          const phase = walkT % (Math.PI*2);
+          const justCrossedStep = phase < lastWalkPhase; // wrapped around - one stride cycle completed
+          if(justCrossedStep) playFootstep();
+          lastWalkPhase = phase;
+        }
       } else {
         walkT = 0;
         idleT += dt * 1.6;
@@ -5341,7 +5366,7 @@
       const wasOnGround = onGround;
       if(character.position.y <= GROUND_Y){
         character.position.y = GROUND_Y;
-        if(!wasOnGround){ landSquashT = 1; } // just touched down - kick off the squash
+        if(!wasOnGround){ landSquashT = 1; playLandSound(); } // just touched down - kick off the squash
         vy = 0;
         onGround = true;
       } else {
@@ -5396,10 +5421,73 @@
       }
     }
 
+    // ---- lightweight synthesized sound effects (no audio files needed) ----
+    let audioCtx = null, windGain = null, windNode = null;
+    function getAudioCtx(){
+      if(!audioCtx){
+        try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; }
+      }
+      if(audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
+    }
+    function playFootstep(){
+      const ctx = getAudioCtx(); if(!ctx) return;
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(120 + Math.random()*30, ctx.currentTime);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.1);
+    }
+    function playJumpSound(){
+      const ctx = getAudioCtx(); if(!ctx) return;
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.09, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.16);
+    }
+    function playLandSound(){
+      const ctx = getAudioCtx(); if(!ctx) return;
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(180, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(70, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.14);
+    }
+    // soft filtered noise loop for ambient outdoor "air"/wind - starts once and just fades in/out with gain
+    function startAmbientAir(){
+      const ctx = getAudioCtx(); if(!ctx || windNode) return;
+      const bufferSize = 2 * ctx.sampleRate;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i = 0; i < bufferSize; i++) data[i] = (Math.random()*2 - 1) * 0.6;
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer; noise.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass"; filter.frequency.value = 380;
+      windGain = ctx.createGain();
+      windGain.gain.value = 0.02;
+      noise.connect(filter); filter.connect(windGain); windGain.connect(ctx.destination);
+      noise.start();
+      windNode = noise;
+    }
+    function stopAmbientAir(){
+      if(windNode){ try{ windNode.stop(); }catch(e){} windNode = null; }
+    }
+
     function doJump(){
       if(onGround){
         if(myEmote) stopDance(); // jumping always cancels an emote
         vy = JUMP_VELOCITY; onGround = false;
+        playJumpSound();
       }
     }
 
@@ -5509,12 +5597,15 @@
     function toggleShiftlock(){
       shiftLocked = !shiftLocked;
       const reticle = document.getElementById("gameReticle");
+      const canvas = document.getElementById("gameCanvas");
       if(shiftLocked){
         dragging = true;
         reticle.classList.remove("hidden");
+        if(canvas.requestPointerLock) canvas.requestPointerLock(); // hides the OS cursor and switches mouse input to relative movement
       } else {
         dragging = false;
         reticle.classList.add("hidden");
+        if(document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
       }
     }
     function wireShiftlockSetting(){
@@ -5583,10 +5674,20 @@
       window.addEventListener("mousemove", (e) => {
         if(!dragging || menuOpen) return;
         e.preventDefault();
-        const dx = e.clientX - lastX, dy = e.clientY - lastY;
-        lastX = e.clientX; lastY = e.clientY;
+        let dx, dy;
+        if(shiftLocked){
+          // pointer-locked: the OS cursor doesn't move, so read the relative delta instead of absolute position
+          dx = e.movementX || 0; dy = e.movementY || 0;
+        } else {
+          dx = e.clientX - lastX; dy = e.clientY - lastY;
+          lastX = e.clientX; lastY = e.clientY;
+        }
         camYaw -= dx * 0.006 * mouseSensitivity;
-        camPitch = Math.max(0.05, Math.min(0.9, camPitch + dy * 0.004 * mouseSensitivity));
+        camPitch = Math.max(-0.8, Math.min(1.4, camPitch + dy * 0.004 * mouseSensitivity));
+      });
+      document.addEventListener("pointerlockchange", () => {
+        // the browser can exit pointer lock on its own (Escape, alt-tab, etc.) - keep our state in sync either way
+        if(!document.pointerLockElement && shiftLocked) toggleShiftlock();
       });
       canvas.addEventListener("wheel", (e) => {
         if(menuOpen) return;
@@ -5620,7 +5721,7 @@
         const dx = t.clientX - lastX, dy = t.clientY - lastY;
         lastX = t.clientX; lastY = t.clientY;
         camYaw -= dx * 0.006 * mouseSensitivity;
-        camPitch = Math.max(0.05, Math.min(0.9, camPitch + dy * 0.004 * mouseSensitivity));
+        camPitch = Math.max(-0.8, Math.min(1.4, camPitch + dy * 0.004 * mouseSensitivity));
       }, { passive:true });
       canvas.addEventListener("touchend", (e) => {
         dragging = false;
@@ -6135,6 +6236,7 @@
       updateCamera();
       renderer.render(scene, camera);
       wireOrientationPrompt();
+      startAmbientAir();
 
       let pct = 0;
       const iv = setInterval(() => {
@@ -6161,6 +6263,8 @@
       closeMenu();
       closeCharacterPreview();
       disconnectMultiplayer();
+      stopAmbientAir();
+      if(shiftLocked) toggleShiftlock();
       const chatPanel = document.getElementById("gameChatPanel");
       if(chatPanel) chatPanel.classList.add("hidden");
 
@@ -6183,6 +6287,7 @@
             loading.classList.add("hidden");
             label.textContent = "Loading Baseplate...";
             bar.style.width = "0%";
+            showPage("home"); // always land back on a real dashboard tab, never wherever you happened to be before
           }, 180);
         }
       }, 90);
