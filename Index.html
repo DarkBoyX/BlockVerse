@@ -329,6 +329,36 @@
     .game-lb-btn{ width:32px; height:32px; top:12px; right:12px; }
     .game-lb-panel{ top:52px; right:12px; width:60vw; max-width:240px; }
   }
+
+  /* ---------- shiftlock reticle + toggle switch ---------- */
+  .game-reticle{
+    position:absolute; top:50%; left:50%; width:18px; height:18px; margin:-9px 0 0 -9px;
+    border:2px solid rgba(255,255,255,0.85); border-radius:50%; z-index:15; pointer-events:none;
+    box-shadow:0 0 0 2px rgba(0,0,0,0.35);
+  }
+  .game-reticle.hidden{ display:none; }
+  .game-toggle-row{ display:flex; flex-direction:column; align-items:flex-start; }
+  .g-switch{
+    width:42px; height:24px; border-radius:14px; background:rgba(255,255,255,0.14);
+    position:relative; cursor:pointer; transition:background .15s; flex-shrink:0;
+  }
+  .g-switch.on{ background:#4a6cf7; }
+  .g-switch-nub{
+    position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+    background:#fff; transition:left .15s;
+  }
+  .g-switch.on .g-switch-nub{ left:21px; }
+
+  /* ---------- mobile rotate-device prompt ---------- */
+  .game-rotate-prompt{
+    position:absolute; inset:0; z-index:50; background:rgba(8,8,10,0.94);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    color:#e4e4e6; text-align:center; padding:0 32px;
+  }
+  .game-rotate-prompt svg{ animation:rotateHint 1.6s ease-in-out infinite; }
+  .game-rotate-prompt p{ font-size:13.5px; color:#c4c4c9; margin:0; max-width:260px; }
+  @keyframes rotateHint{ 0%,100%{ transform:rotate(0deg); } 50%{ transform:rotate(90deg); } }
+  .game-rotate-prompt.hidden{ display:none; }
   .game-chat-btn svg{ width:17px; height:17px; }
   .game-chat-panel{
     position:absolute; top:64px; left:16px; z-index:25; width:430px; max-width:90vw;
@@ -1414,6 +1444,14 @@
     <span class="game-lb-count hidden" id="gameLbCount">0</span>
   </div>
   <div class="game-lb-panel hidden" id="gameLbPanel"></div>
+
+  <!-- shiftlock crosshair - only visible while shiftlock is active -->
+  <div class="game-reticle hidden" id="gameReticle"></div>
+  <!-- mobile: rotate-device prompt for portrait orientation -->
+  <div class="game-rotate-prompt hidden" id="gameRotatePrompt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="46" height="46"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+    <p>Rotate your device to landscape for the best experience</p>
+  </div>
   <div class="game-chat-panel hidden" id="gameChatPanel">
     <div class="game-chat-head">
       <span>Chat</span>
@@ -1537,6 +1575,11 @@
         <div class="game-settings-row">
           <label><span>Mouse sensitivity</span><span id="sensValue">1.0x</span></label>
           <input type="range" id="sensRange" min="0.2" max="3" step="0.1" value="1">
+        </div>
+        <div class="game-settings-row game-toggle-row">
+          <label><span>Shiftlock</span></label>
+          <p class="s-desc" style="margin:0 0 8px;">Press Shift to lock the camera to the crosshair and look around without holding the mouse. Press Shift again to release. Turn this off if you don't want Shift to do anything.</p>
+          <div class="g-switch" id="shiftlockToggle"><div class="g-switch-nub"></div></div>
         </div>
       </div>
     </div>
@@ -4059,6 +4102,12 @@
     let velX = 0, velZ = 0;    // smoothed movement velocity
     let mouseSensitivity = 1;
     let ragdoll = false;
+    let camDist = 6.5;         // target orbit distance - scroll/pinch zoom moves this toward 0 for first person
+    let smDist = 6.5;          // smoothed/applied distance
+    const CAM_DIST_MIN = 0.6, CAM_DIST_MAX = 9;
+    let shiftLocked = false;   // shiftlock: mouse moves the camera without holding a button
+    const SHIFTLOCK_KEY = "blockverse_shiftlock_enabled";
+    function shiftlockEnabled(){ return localStorage.getItem(SHIFTLOCK_KEY) === "1"; }
 
     // multiplayer state
     let playerId = null;
@@ -4111,8 +4160,66 @@
       grid.material.transparent = true;
       scene.add(grid);
 
+      spawnTrees();
+      spawnClouds();
+
       buildCharacter();
       clock = new THREE.Clock();
+    }
+
+    // ---- trees: simple trunk+leaves meshes scattered around, with a
+    // radius each so the movement code can push the player back out ----
+    const treeColliders = []; // {x, z, radius}
+    function spawnTrees(){
+      const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2e });
+      const leafMat = new THREE.MeshLambertMaterial({ color: 0x2f7d3a });
+      const positions = [];
+      // scatter trees in a rough ring/grid around spawn, leaving the
+      // center clear so it doesn't block where players land
+      for(let i = 0; i < 46; i++){
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 22 + Math.random() * 105;
+        positions.push({ x: Math.cos(angle) * radius, z: Math.sin(angle) * radius });
+      }
+      positions.forEach(p => {
+        const scale = 0.8 + Math.random() * 0.6;
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28*scale, 0.34*scale, 2.2*scale, 7), trunkMat);
+        trunk.position.set(p.x, 1.1*scale, p.z);
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        scene.add(trunk);
+        const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5*scale, 3.1*scale, 8), leafMat);
+        leaves.position.set(p.x, 3.4*scale, p.z);
+        leaves.castShadow = true;
+        scene.add(leaves);
+        treeColliders.push({ x: p.x, z: p.z, radius: 0.55*scale });
+      });
+    }
+
+    // ---- moving clouds: flat billboards drifting across the sky, looping
+    // back around once they drift far enough away ----
+    const clouds = [];
+    function spawnClouds(){
+      const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent:true, opacity:0.85, depthWrite:false });
+      for(let i = 0; i < 14; i++){
+        const grp = new THREE.Group();
+        const puffs = 3 + Math.floor(Math.random()*3);
+        for(let j = 0; j < puffs; j++){
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(3 + Math.random()*2, 8, 6), cloudMat);
+          puff.position.set(j*3.2 - puffs*1.6, Math.random()*1.2, (Math.random()-0.5)*2.5);
+          puff.scale.y = 0.55;
+          grp.add(puff);
+        }
+        grp.position.set((Math.random()-0.5)*260, 38 + Math.random()*14, (Math.random()-0.5)*260);
+        grp.userData.speed = 0.4 + Math.random()*0.6;
+        scene.add(grp);
+        clouds.push(grp);
+      }
+    }
+    function updateClouds(dt){
+      clouds.forEach(c => {
+        c.position.x += c.userData.speed * dt;
+        if(c.position.x > 160) c.position.x = -160;
+      });
     }
 
     function makeLimbMesh(mat, w,h,d, pivotY){
@@ -5145,11 +5252,12 @@
     }
 
     function updateCamera(){
-      // smoothly ease the applied camera angles toward the target angles
+      // smoothly ease the applied camera angles/distance toward the target values
       smYaw += (camYaw - smYaw) * 0.18;
       smPitch += (camPitch - smPitch) * 0.18;
+      smDist += (camDist - smDist) * 0.2;
 
-      const dist = 6.5;
+      const dist = smDist;
       const offX = Math.sin(smYaw) * Math.cos(smPitch) * dist;
       const offZ = Math.cos(smYaw) * Math.cos(smPitch) * dist;
       const offY = 2.2 + Math.sin(smPitch) * dist;
@@ -5163,25 +5271,37 @@
         character.position.y + 1.5,
         character.position.z
       );
+
+      // once zoomed in close enough it reads as first-person - hide your own
+      // body so it doesn't block the view (remote players still see you normally)
+      const firstPerson = dist < 1.6;
+      if(character) character.visible = !firstPerson;
     }
 
     function updateMovement(dt){
-      let mx = move.x, mz = move.z;
-      if(keys["w"]||keys["arrowup"]) mz -= 1;
-      if(keys["s"]||keys["arrowdown"]) mz += 1;
-      if(keys["a"]||keys["arrowleft"]) mx -= 1;
-      if(keys["d"]||keys["arrowright"]) mx += 1;
+      // input in "local" terms: +1 forward/right, -1 back/left - keeps the
+      // key-reading separate from the camera-relative math below so it's
+      // easy to see w=forward, s=back, a=left, d=right actually holds
+      let inputForward = 0, inputRight = 0;
+      if(keys["w"]||keys["arrowup"]) inputForward += 1;
+      if(keys["s"]||keys["arrowdown"]) inputForward -= 1;
+      if(keys["d"]||keys["arrowright"]) inputRight += 1;
+      if(keys["a"]||keys["arrowleft"]) inputRight -= 1;
+      inputForward += -move.z; // joystick: pushing up (negative z) = forward
+      inputRight += move.x;
 
-      const len = Math.hypot(mx, mz);
+      const len = Math.hypot(inputForward, inputRight);
       const moving = len > 0.05;
       if(moving && myEmote) stopDance(); // moving always cancels an emote
       let targetVelX = 0, targetVelZ = 0;
       if(moving){
-        mx /= len; mz /= len;
-        // move relative to camera yaw (forward = -Z rotated by yaw)
-        const sin = Math.sin(smYaw), cos = Math.cos(smYaw);
-        const worldX = mx*cos - mz*sin;
-        const worldZ = mx*sin + mz*cos;
+        const nf = inputForward/len, nr = inputRight/len;
+        // camera-facing forward/right vectors, so w always walks "into" the
+        // screen and d always strafes toward the right of the current view
+        const fx = -Math.sin(smYaw), fz = -Math.cos(smYaw);
+        const rx = Math.cos(smYaw), rz = -Math.sin(smYaw);
+        const worldX = nf*fx + nr*rx;
+        const worldZ = nf*fz + nr*rz;
         targetVelX = worldX * MOVE_SPEED;
         targetVelZ = worldZ * MOVE_SPEED;
       }
@@ -5194,6 +5314,7 @@
       if(Math.hypot(velX, velZ) > 0.002){
         character.position.x += velX;
         character.position.z += velZ;
+        resolveTreeCollisions();
 
         const targetRot = Math.atan2(velX, velZ);
         let diff = targetRot - character.rotation.y;
@@ -5257,6 +5378,21 @@
         character.scale.z = baseScaleZ * (1 + squash * 0.5);
       } else if(character.scale.y !== baseScaleY){
         character.scale.set(baseScaleX, baseScaleY, baseScaleZ);
+      }
+    }
+
+    const PLAYER_RADIUS = 0.5;
+    function resolveTreeCollisions(){
+      for(const t of treeColliders){
+        const dx = character.position.x - t.x, dz = character.position.z - t.z;
+        const minDist = t.radius + PLAYER_RADIUS;
+        const distSq = dx*dx + dz*dz;
+        if(distSq < minDist*minDist && distSq > 0.0001){
+          const d = Math.sqrt(distSq);
+          const push = (minDist - d);
+          character.position.x += (dx/d) * push;
+          character.position.z += (dz/d) * push;
+        }
       }
     }
 
@@ -5355,6 +5491,7 @@
       updateRemotePlayers(dt);
       pushOwnTransform(dt);
       updateCamera();
+      updateClouds(dt);
       renderer.render(scene, camera);
       animId = requestAnimationFrame(tick);
     }
@@ -5368,6 +5505,30 @@
 
     /* ---- input wiring ---- */
     let dragging = false, lastX = 0, lastY = 0, menuOpen = false;
+    let pinchStartDist = 0, pinchStartCamDist = 6.5;
+    function toggleShiftlock(){
+      shiftLocked = !shiftLocked;
+      const reticle = document.getElementById("gameReticle");
+      if(shiftLocked){
+        dragging = true;
+        reticle.classList.remove("hidden");
+      } else {
+        dragging = false;
+        reticle.classList.add("hidden");
+      }
+    }
+    function wireShiftlockSetting(){
+      const toggle = document.getElementById("shiftlockToggle");
+      if(!toggle) return;
+      const sync = () => toggle.classList.toggle("on", shiftlockEnabled());
+      sync();
+      toggle.addEventListener("click", () => {
+        const next = !shiftlockEnabled();
+        localStorage.setItem(SHIFTLOCK_KEY, next ? "1" : "0");
+        if(!next && shiftLocked) toggleShiftlock(); // turning the feature off also releases an active lock
+        sync();
+      });
+    }
     function wireInput(){
       window.addEventListener("keydown", (e) => {
         if(e.key === "Escape"){
@@ -5394,6 +5555,10 @@
           openChatAndFocus();
           return;
         }
+        if(!typingNow && e.key === "Shift" && shiftlockEnabled()){
+          toggleShiftlock();
+          return;
+        }
         keys[e.key.toLowerCase()] = true;
         if(e.key === " ") doJump();
       });
@@ -5410,11 +5575,11 @@
       canvas.addEventListener("contextmenu", (e) => e.preventDefault());
       canvas.addEventListener("selectstart", (e) => e.preventDefault());
       canvas.addEventListener("mousedown", (e) => {
-        if(menuOpen) return;
+        if(menuOpen || shiftLocked) return; // shiftlock already has the camera - a click shouldn't also start a drag
         e.preventDefault();
         dragging = true; lastX = e.clientX; lastY = e.clientY;
       });
-      window.addEventListener("mouseup", () => { dragging = false; });
+      window.addEventListener("mouseup", () => { if(!shiftLocked) dragging = false; });
       window.addEventListener("mousemove", (e) => {
         if(!dragging || menuOpen) return;
         e.preventDefault();
@@ -5423,22 +5588,44 @@
         camYaw -= dx * 0.006 * mouseSensitivity;
         camPitch = Math.max(0.05, Math.min(0.9, camPitch + dy * 0.004 * mouseSensitivity));
       });
+      canvas.addEventListener("wheel", (e) => {
+        if(menuOpen) return;
+        e.preventDefault();
+        // scroll toward the screen zooms in toward first person, the other way zooms back out
+        camDist = Math.max(CAM_DIST_MIN, Math.min(CAM_DIST_MAX, camDist + e.deltaY * 0.01));
+      }, { passive:false });
       canvas.addEventListener("touchstart", (e) => {
         if(menuOpen) return;
+        if(e.touches.length === 2){
+          dragging = false;
+          pinchStartDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          pinchStartCamDist = camDist;
+          return;
+        }
         const t = e.touches[0];
         if(t.clientX > window.innerWidth * 0.42){
           dragging = true; lastX = t.clientX; lastY = t.clientY;
         }
       }, { passive:true });
       canvas.addEventListener("touchmove", (e) => {
-        if(!dragging || menuOpen) return;
+        if(menuOpen) return;
+        if(e.touches.length === 2 && pinchStartDist){
+          // pinch to zoom: fingers spreading apart = zoom in, pinching together = zoom out
+          const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          camDist = Math.max(CAM_DIST_MIN, Math.min(CAM_DIST_MAX, pinchStartCamDist - (d - pinchStartDist) * 0.02));
+          return;
+        }
+        if(!dragging) return;
         const t = e.touches[0];
         const dx = t.clientX - lastX, dy = t.clientY - lastY;
         lastX = t.clientX; lastY = t.clientY;
         camYaw -= dx * 0.006 * mouseSensitivity;
         camPitch = Math.max(0.05, Math.min(0.9, camPitch + dy * 0.004 * mouseSensitivity));
       }, { passive:true });
-      canvas.addEventListener("touchend", () => { dragging = false; });
+      canvas.addEventListener("touchend", (e) => {
+        dragging = false;
+        if(e.touches.length < 2) pinchStartDist = 0;
+      });
 
       // mobile joystick
       const joy = document.getElementById("gameJoystick");
@@ -5534,6 +5721,7 @@
       character.rotation.set(0,0,0);
       vy = 0; onGround = true; velX = 0; velZ = 0;
       camYaw = Math.PI; camPitch = 0.28; smYaw = Math.PI; smPitch = 0.28;
+      camDist = 6.5; smDist = 6.5;
       ragdoll = false;
     }
 
@@ -5549,6 +5737,7 @@
     function openMenu(){
       menuOpen = true;
       dragging = false;
+      if(shiftLocked) toggleShiftlock(); // free the cursor while the menu is open
       for(const k in keys) keys[k] = false;
       showTab("tabMain");
       document.getElementById("gameMenuOverlay").classList.remove("hidden");
@@ -5904,6 +6093,28 @@
     }
 
     let wired = false;
+    let orientationWired = false;
+    function wireOrientationPrompt(){
+      const prompt = document.getElementById("gameRotatePrompt");
+      if(!prompt) return;
+      const isMobileScreen = () => /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && window.innerWidth <= 900;
+      const check = () => {
+        const portrait = window.innerHeight > window.innerWidth;
+        prompt.classList.toggle("hidden", !(isMobileScreen() && portrait));
+      };
+      check();
+      if(!orientationWired){
+        orientationWired = true;
+        window.addEventListener("resize", check);
+        window.addEventListener("orientationchange", check);
+        // best-effort - only works in some browsers and typically needs fullscreen first, so
+        // the visual prompt above is the real fallback when this silently does nothing
+        if(screen.orientation && screen.orientation.lock){
+          screen.orientation.lock("landscape").catch(() => {});
+        }
+      }
+    }
+
     function start(){
       const screen = document.getElementById("gameScreen");
       const loading = document.getElementById("gameLoading");
@@ -5917,11 +6128,13 @@
       wireMenu();
       wireChat();
       wireLeaderboard();
+      wireShiftlockSetting();
 
       character.position.set(0,0,0);
       vy = 0; onGround = true; camYaw = Math.PI; camPitch = 0.28;
       updateCamera();
       renderer.render(scene, camera);
+      wireOrientationPrompt();
 
       let pct = 0;
       const iv = setInterval(() => {
