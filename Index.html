@@ -2648,28 +2648,48 @@
     else if(/Linux/.test(ua)) os = "Linux";
     return { type: isMobile ? "mobile" : "desktop", label: [os, browser].filter(Boolean).join(" - ") || "This device" };
   }
-  function renderDevices(username){
+  function renderDevices(){
     const list = document.getElementById("deviceList");
     if(!list) return;
-    // BlockVerse runs fully client-side with no server/auth backend, so it has no
-    // way to see other real devices or sessions signed in to an account.
-    // The only session we can honestly report is this current browser.
-    const info = detectDeviceLabel();
-    const sessions = [
-      { device: info.label, type: info.type, country: t("online"), time: "", current:true }
-    ];
-    list.innerHTML = "";
-    sessions.forEach(s => {
-      const row = document.createElement("div");
-      row.className = "device-row";
-      row.innerHTML =
-        '<div class="device-icon">' + deviceIconSvg(s.type) + '</div>' +
-        '<div class="device-info">' +
-          '<div class="d-name">' + s.device + '</div>' +
-          '<div class="d-meta">' + s.country + (s.time ? ' &middot; ' + s.time : '') + '</div>' +
-        '</div>' +
-        (s.current ? '<span class="device-current" data-i18n="thisDevice">' + t("thisDevice") + '</span>' : '');
-      list.appendChild(row);
+    const key = getSession();
+    if(!key) return;
+    list.innerHTML = '<div class="empty-state" style="padding:16px;">...</div>';
+    fbDb.ref("blockverse_sessions/" + key).once("value").then(snap => {
+      const data = snap.val() || {};
+      const rows = Object.keys(data).map(sid => ({ sessionId: sid, ...data[sid] }))
+        .sort((a,b) => (a.sessionId === mySessionId ? -1 : b.sessionId === mySessionId ? 1 : (b.ts||0) - (a.ts||0)));
+      list.innerHTML = "";
+      if(rows.length === 0){
+        // covers the moment right after login before the write finishes, or an older
+        // account that never registered a session before this feature existed
+        const info = detectDeviceLabel();
+        rows.push({ sessionId: mySessionId, device: info.label, type: info.type, ts: Date.now() });
+      }
+      rows.forEach(s => {
+        const isMe = s.sessionId === mySessionId;
+        const row = document.createElement("div");
+        row.className = "device-row";
+        row.innerHTML =
+          '<div class="device-icon">' + deviceIconSvg(s.type) + '</div>' +
+          '<div class="device-info">' +
+            '<div class="d-name">' + escapeHtml(s.device || "Unknown device") + '</div>' +
+            '<div class="d-meta">' + (s.ts ? new Date(s.ts).toLocaleString() : "") + '</div>' +
+          '</div>' +
+          (isMe
+            ? '<span class="device-current" data-i18n="thisDevice">' + t("thisDevice") + '</span>'
+            : '<button class="friend-btn" data-logout-session="' + s.sessionId + '">' + t("logout") + '</button>');
+        list.appendChild(row);
+      });
+      list.querySelectorAll("[data-logout-session]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          btn.disabled = true;
+          fbDb.ref("blockverse_sessions/" + key + "/" + btn.getAttribute("data-logout-session")).remove()
+            .then(() => renderDevices())
+            .catch(() => { btn.disabled = false; });
+        });
+      });
+    }).catch(() => {
+      list.innerHTML = '<div class="empty-state" style="padding:16px;">Couldn\'t load sessions.</div>';
     });
   }
 
@@ -2681,6 +2701,73 @@
   function setSession(u){ localStorage.setItem(SESSION_KEY, u); }
   function getSession(){ return localStorage.getItem(SESSION_KEY); }
   function clearSession(){ localStorage.removeItem(SESSION_KEY); }
+
+  /* ============ multi-device sessions (real cross-device tracking) ============ */
+  // one random id per browser tab/session - never persisted, so a refresh
+  // creates a "new" session entry and the old one just times out via onDisconnect
+  const mySessionId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  let sessionListenerRef = null;
+  let claimListenerRef = null;
+  let forcedLogoutHandled = false;
+
+  function registerSession(key){
+    if(!key || typeof fbDb === "undefined" || !fbDb) return;
+    try{
+      const info = detectDeviceLabel();
+      const ref = fbDb.ref("blockverse_sessions/" + key + "/" + mySessionId);
+      ref.set({ device: info.label, type: info.type, ts: firebase.database.ServerValue.TIMESTAMP }).catch(()=>{});
+      ref.onDisconnect().remove();
+
+      // watch our OWN session entry - if it disappears while we still think
+      // we're logged in, another device hit "log out" on us remotely
+      sessionListenerRef = ref;
+      forcedLogoutHandled = false;
+      ref.on("value", snap => {
+        if(!snap.exists() && getSession() === key && !forcedLogoutHandled){
+          forcedLogoutHandled = true;
+          handleRemoteLogout();
+        }
+      });
+    }catch(e){}
+  }
+
+  function stopSessionTracking(){
+    if(sessionListenerRef){ sessionListenerRef.off(); sessionListenerRef.set(null).catch(()=>{}); sessionListenerRef = null; }
+    if(claimListenerRef){ claimListenerRef.off(); claimListenerRef = null; }
+  }
+
+  // another device removed our session row (they clicked "Log out" on us in
+  // Privacy & Safety) - if we're mid-game, that needs a visible disconnect,
+  // not just a silent redirect
+  function handleRemoteLogout(){
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+      BaseplateGame.forceDisconnect("You've been logged out from another device.", true);
+    } else {
+      doLogout();
+    }
+  }
+
+  // called when joining the baseplate game - claims "this session is the
+  // one actively playing" for the account. If another session later steals
+  // the claim (by joining too), we get bumped instead of both existing at once.
+  function claimActiveGame(key){
+    if(!key || typeof fbDb === "undefined" || !fbDb) return;
+    try{
+      const ref = fbDb.ref("blockverse_active_claim/" + key);
+      ref.set({ sessionId: mySessionId, ts: firebase.database.ServerValue.TIMESTAMP }).catch(()=>{});
+      claimListenerRef = ref;
+      ref.on("value", snap => {
+        const v = snap.val();
+        if(v && v.sessionId && v.sessionId !== mySessionId && typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+          BaseplateGame.forceDisconnect("You joined Baseplate on another device, so this session was disconnected.");
+        }
+      });
+    }catch(e){}
+  }
+  function releaseActiveGameClaim(){
+    if(claimListenerRef){ claimListenerRef.off(); claimListenerRef = null; }
+  }
+
 
   // password hashing (SHA-256) so we can keep a server-side backup of
   // accounts in Firebase without ever storing/reading a readable password.
@@ -3159,6 +3246,21 @@
     stack.appendChild(el);
     el.querySelector("[data-invite-accept]").addEventListener("click", () => acceptGameInvite(inviteId, fromKey));
     el.querySelector("[data-invite-ignore]").addEventListener("click", () => ignoreGameInvite(inviteId));
+  }
+
+  // shown on the dashboard after a forced disconnect (kicked by another
+  // device) - lives on the same toast stack invites use, since that one is
+  // always present on the dashboard/home screen the player lands back on
+  function showDisconnectedNotice(message){
+    const stack = inviteToastStack();
+    if(!stack) return;
+    const el = document.createElement("div");
+    el.className = "ingame-toast";
+    el.innerHTML =
+      '<div class="friend-avatar" style="background:linear-gradient(135deg,#e5484d,#2a2a2e);">!</div>' +
+      '<div class="it-body"><div class="it-text"><b>Disconnected</b><br>' + escapeHtml(message || "You were disconnected.") + '</div></div>';
+    stack.appendChild(el);
+    setTimeout(() => dismissToastEl(el), 9000);
   }
 
   // kind: "request" (accept/ignore a friend request) or "info" (auto-dismissing confirmation)
@@ -4054,6 +4156,7 @@
     showPage("home");
     updateFriendBadge();
     startFriendNoticePolling();
+    registerSession(key);
 
     // pull any previously-saved customization for this account down from
     // Firebase (covers logging in on a new device/browser)
@@ -4066,6 +4169,7 @@
   }
 
   function doLogout(){
+    stopSessionTracking();
     clearSession();
     closeNotifPanel();
     stopFriendNoticePolling();
@@ -4651,6 +4755,9 @@
 
       onlineRef.onDisconnect().remove();
 
+      const myAccKey = currentAccountKey && currentAccountKey();
+      if(myAccKey) claimActiveGame(myAccKey);
+
       const myCustom = getMyCustom();
       onlineRef.set({
         name: currentUsername(),
@@ -4722,6 +4829,7 @@
       livePlayers = {};
       disconnectChat();
       mpErrorShown = false;
+      releaseActiveGameClaim();
     }
 
     /* ---- chat profanity filter ----
@@ -6293,7 +6401,32 @@
       }, 90);
     }
 
-    return { start, stop, isRunning: () => running, buildCharacterRig, normalizeCustom, disposeObject3D };
+    // like stop(), but skips the "leaving" animation and shows a disconnect
+    // reason instead - used when another device kicks this session out.
+    // alsoLogout=true means the whole account session ends too (remote
+    // "log out"), vs false which just exits the game (lost the active-game
+    // claim to another device, but you're still logged in here)
+    function forceDisconnect(message, alsoLogout){
+      if(!running){ if(alsoLogout) doLogout(); return; }
+      const screen = document.getElementById("gameScreen");
+      closeMenu();
+      closeCharacterPreview();
+      disconnectMultiplayer();
+      stopAmbientAir();
+      if(shiftLocked) toggleShiftlock();
+      running = false;
+      if(animId) cancelAnimationFrame(animId);
+      screen.classList.add("hidden");
+      document.getElementById("gameLoading").classList.add("hidden");
+      if(alsoLogout) doLogout(); else showPage("home");
+      if(alsoLogout){
+        setTimeout(() => { if(typeof loginMsg !== "undefined") showMsg(loginMsg, message || "You were logged out.", "error"); }, 50);
+      } else {
+        showDisconnectedNotice(message);
+      }
+    }
+
+    return { start, stop, forceDisconnect, isRunning: () => running, buildCharacterRig, normalizeCustom, disposeObject3D };
   })();
 
   document.getElementById("playBaseplateBtn").addEventListener("click", () => BaseplateGame.start());
