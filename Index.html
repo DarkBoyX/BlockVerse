@@ -973,6 +973,10 @@
     display:flex; align-items:center; justify-content:center; padding:20px;
     animation:fadeIn .18s ease both;
   }
+  .modal-box{
+    width:100%; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:16px;
+    padding:22px 22px; box-shadow:0 24px 70px rgba(0,0,0,0.6); animation:modalIn .22s cubic-bezier(.2,.9,.3,1.1) both;
+  }
   .lang-modal{
     width:100%; max-width:380px; max-height:78vh; display:flex; flex-direction:column;
     background:var(--bg-2); border:1px solid var(--border-soft); border-radius:16px;
@@ -1299,6 +1303,23 @@
       <div class="settings-block">
         <h3 data-i18n="blockedUsersTitle">Blocked users</h3>
         <div id="blockedUsersList"></div>
+      </div>
+      <div class="settings-block" style="border-color:#5c2426;">
+        <h3 style="color:#ff9d9f;">Terminate your account</h3>
+        <p class="s-desc">This permanently deletes your account and logs you out everywhere.</p>
+        <button class="friend-btn" id="terminateAccountBtn" style="background:#3a1c1d;border-color:#5c2426;color:#ff9d9f;">Terminate account</button>
+      </div>
+    </div>
+
+    <!-- TERMINATE CONFIRM MODAL -->
+    <div class="modal-overlay hidden" id="terminateModalOverlay">
+      <div class="modal-box" style="max-width:380px;">
+        <h3 style="color:#ff9d9f;margin-top:0;">Terminate this account?</h3>
+        <p style="font-size:13.5px;color:var(--text-1);line-height:1.5;">This will result in the termination of this account and will remove it from all devices that had logged in. This cannot be undone.</p>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+          <button class="friend-btn" id="terminateNevermindBtn" style="flex:1;">Nevermind</button>
+          <button class="friend-btn" id="terminateContinueBtn" style="flex:1;background:#3a1c1d;border-color:#5c2426;color:#ff9d9f;">Continue</button>
+        </div>
       </div>
     </div>
 
@@ -2929,6 +2950,18 @@
   async function attemptFinishLogin(key, account){
     if(loginBusy) return;
     loginBusy = true;
+
+    let banRec = null;
+    try{
+      const banSnap = await fbDb.ref("blockverse_account_bans/" + key).once("value");
+      banRec = banSnap.val();
+    }catch(e){}
+    if(banRec){
+      showMsg(loginMsg, "This account has been banned" + (banRec.reason ? ": " + banRec.reason : "") + ".", "error");
+      loginBusy = false;
+      return;
+    }
+
     let email = null;
     try{
       const snap = await fbDb.ref("blockverse_security/" + key + "/email").once("value");
@@ -3060,7 +3093,128 @@
     if(sessionListenerRef){ sessionListenerRef.off(); sessionListenerRef.set(null).catch(()=>{}); sessionListenerRef = null; }
     if(claimListenerRef){ claimListenerRef.off(); claimListenerRef = null; }
     if(connectedInfoRef){ connectedInfoRef.off(); connectedInfoRef = null; }
+    stopModerationListeners();
   }
+
+  /* ============ live moderation: ban / kick / warn ============ */
+  let banListenerRef = null, kickListenerRef = null, warnListenerRef = null;
+  let lastKickTs = 0, lastWarnTs = 0;
+
+  function startModerationListeners(key){
+    if(!key) return;
+    banListenerRef = fbDb.ref("blockverse_account_bans/" + key);
+    banListenerRef.on("value", snap => {
+      const ban = snap.val();
+      if(ban && getSession() === key){
+        const reason = "You've been banned" + (ban.reason ? ": " + ban.reason : "") + ".";
+        if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+          BaseplateGame.forceDisconnect(reason, true);
+        } else {
+          doLogout();
+          setTimeout(() => { if(typeof loginMsg !== "undefined") showMsg(loginMsg, reason, "error"); }, 50);
+        }
+      }
+    });
+
+    kickListenerRef = fbDb.ref("blockverse_kicks/" + key);
+    kickListenerRef.on("value", snap => {
+      const rec = snap.val();
+      if(rec && rec.ts && rec.ts > lastKickTs){
+        lastKickTs = rec.ts;
+        if(lastKickTs === rec.ts && typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+          BaseplateGame.forceDisconnect("You were kicked from Baseplate by an admin.", false);
+        }
+      }
+    });
+
+    warnListenerRef = fbDb.ref("blockverse_warnings/" + key);
+    warnListenerRef.on("value", snap => {
+      const rec = snap.val();
+      if(rec && rec.ts && rec.ts > lastWarnTs){
+        lastWarnTs = rec.ts;
+        showAdminWarningToast(rec.message || "You've received a warning.");
+      }
+    });
+  }
+  function stopModerationListeners(){
+    if(banListenerRef){ banListenerRef.off(); banListenerRef = null; }
+    if(kickListenerRef){ kickListenerRef.off(); kickListenerRef = null; }
+    if(warnListenerRef){ warnListenerRef.off(); warnListenerRef = null; }
+    lastKickTs = 0; lastWarnTs = 0;
+  }
+  // a centered "danger" banner - visible over the dashboard or in-game -
+  // that fades out on its own after 3 seconds
+  function showAdminWarningToast(message){
+    const existing = document.getElementById("adminWarningToast");
+    if(existing) existing.remove();
+    const el = document.createElement("div");
+    el.id = "adminWarningToast";
+    el.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:10000;background:#3a1c1d;border:1px solid #e5484d;color:#ffdcdc;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:fadeUp .25s ease both;max-width:90vw;text-align:center;";
+    el.innerHTML = '<span style="font-size:18px;">&#9888;</span><span>' + escapeHtml(message) + '</span>';
+    document.body.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = "opacity .4s ease";
+      el.style.opacity = "0";
+      setTimeout(() => el.remove(), 400);
+    }, 3000);
+  }
+
+  // deletes an account entirely: credentials, reserved username, all
+  // per-account data, and cleans up the reverse-friend edge on everyone who
+  // had them as a friend (friend lists are stored on both sides, see
+  // acceptFriendRequest/removeFriend above, so this is symmetric).
+  // Deleting blockverse_sessions/$key also force-logs-out any device that
+  // has them logged in right now, for free, via the existing session listener.
+  async function terminateAccount(key){
+    try{
+      const friendsSnap = await fbDb.ref("blockverse_users/" + key + "/friends").once("value");
+      const friends = friendsSnap.val() || {};
+      await Promise.all(Object.keys(friends).map(fKey =>
+        fbDb.ref("blockverse_users/" + fKey + "/friends/" + key).remove().catch(()=>{})
+      ));
+    }catch(e){}
+    const paths = [
+      "blockverse_credentials/" + key,
+      "blockverse_usernames/" + key,
+      "blockverse_users/" + key,
+      "blockverse_security/" + key,
+      "blockverse_active_claim/" + key,
+      "blockverse_login_codes/" + key,
+      "blockverse_account_bans/" + key,
+      "blockverse_kicks/" + key,
+      "blockverse_warnings/" + key,
+      "blockverse_sessions/" + key
+    ];
+    await Promise.all(paths.map(p => fbDb.ref(p).remove().catch(()=>{})));
+  }
+
+  document.getElementById("terminateAccountBtn").addEventListener("click", () => {
+    document.getElementById("terminateModalOverlay").classList.remove("hidden");
+  });
+  document.getElementById("terminateNevermindBtn").addEventListener("click", () => {
+    document.getElementById("terminateModalOverlay").classList.add("hidden");
+  });
+  document.getElementById("terminateContinueBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("terminateContinueBtn");
+    const key = getSession();
+    if(!key) return;
+    btn.disabled = true; btn.textContent = "Terminating...";
+    stopSessionTracking(); // detach our own listeners first so this reads as an intentional exit, not a "kicked" event
+    await terminateAccount(key);
+    const accounts = getAccounts();
+    delete accounts[key];
+    localStorage.setItem(STORE_KEY, JSON.stringify(accounts));
+    clearSession();
+    document.getElementById("terminateModalOverlay").classList.add("hidden");
+    btn.disabled = false; btn.textContent = "Continue";
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+      BaseplateGame.forceDisconnect("Your account has been terminated.", true);
+    } else {
+      document.getElementById("dashScreen").classList.add("hidden");
+      document.getElementById("authScreenWrap").classList.remove("hidden");
+      setTimeout(() => { if(typeof loginMsg !== "undefined") showMsg(loginMsg, "Your account has been terminated.", "error"); }, 50);
+    }
+  });
 
   // another device removed our session row (they clicked "Log out" on us in
   // Privacy & Safety) - if we're mid-game, that needs a visible disconnect,
@@ -4503,6 +4657,7 @@
     updateFriendBadge();
     startFriendNoticePolling();
     registerSession(key);
+    startModerationListeners(key);
 
     // pull any previously-saved customization for this account down from
     // Firebase (covers logging in on a new device/browser)
@@ -4639,6 +4794,7 @@
       grid.material.transparent = true;
       scene.add(grid);
 
+      spawnMountains();
       spawnTrees();
       spawnClouds();
       spawnRocks();
@@ -4666,31 +4822,79 @@
     }
 
     // a handful of low rocks scattered around for ground-level variety
+    // ---- rocks: scattered boulders with real collision, same push-out
+    // approach as trees ----
+    const rockColliders = []; // {x, z, radius}
     function spawnRocks(){
       const rockMat = new THREE.MeshLambertMaterial({ color: 0x8a8a86 });
-      for(let i = 0; i < 24; i++){
+      for(let i = 0; i < 40; i++){
         const angle = Math.random() * Math.PI * 2;
-        const radius = 15 + Math.random() * 110;
-        const s = 0.4 + Math.random()*0.5;
+        const radius = 10 + Math.random() * 115;
+        const s = 0.4 + Math.random()*0.7;
         const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockMat);
-        rock.position.set(Math.cos(angle)*radius, s*0.4, Math.sin(angle)*radius);
+        const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius;
+        rock.position.set(x, s*0.4, z);
         rock.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
         rock.castShadow = true; rock.receiveShadow = true;
         scene.add(rock);
+        rockColliders.push({ x, z, radius: s*0.75 });
       }
     }
 
-    // distant low-poly hills at the horizon so the world doesn't just stop
-    // at a flat edge - purely a backdrop, well outside the playable/fog range
+    // ---- mountains: a few large climbable cones. Not just backdrop - the
+    // ground-height check in updateMovement queries these, so walking up
+    // the slope actually raises you instead of colliding with a wall ----
+    const mountainColliders = []; // {x, z, baseRadius, peakHeight}
+    function spawnMountains(){
+      const mountainMat = new THREE.MeshLambertMaterial({ color: 0x6b7568 });
+      const snowMat = new THREE.MeshLambertMaterial({ color: 0xf0f4f7 });
+      const spots = [
+        { x: 95, z: 95, baseRadius: 34, peakHeight: 26 },
+        { x: -100, z: 80, baseRadius: 30, peakHeight: 22 },
+        { x: 85, z: -105, baseRadius: 38, peakHeight: 30 },
+        { x: -90, z: -90, baseRadius: 26, peakHeight: 18 }
+      ];
+      spots.forEach(m => {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(m.baseRadius, m.peakHeight, 9), mountainMat);
+        cone.position.set(m.x, m.peakHeight/2, m.z);
+        cone.castShadow = true; cone.receiveShadow = true;
+        scene.add(cone);
+        // a small snow cap near the peak for visual variety
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(m.baseRadius*0.3, m.peakHeight*0.32, 9), snowMat);
+        cap.position.set(m.x, m.peakHeight*0.86, m.z);
+        cap.castShadow = true;
+        scene.add(cap);
+        mountainColliders.push(m);
+      });
+    }
+
+    // ---- distant low-poly hills at the horizon so the world doesn't just
+    // stop at a flat edge - purely a backdrop, well outside the playable/fog range
     function spawnHills(){
       const hillMat = new THREE.MeshLambertMaterial({ color: 0x3f7a4a });
       for(let i = 0; i < 10; i++){
         const angle = (i / 10) * Math.PI * 2 + Math.random()*0.3;
-        const radius = 170 + Math.random()*30;
+        const radius = 190 + Math.random()*30;
         const hill = new THREE.Mesh(new THREE.SphereGeometry(28 + Math.random()*18, 10, 8, 0, Math.PI*2, 0, Math.PI/2), hillMat);
         hill.position.set(Math.cos(angle)*radius, -6, Math.sin(angle)*radius);
         scene.add(hill);
       }
+    }
+
+    // returns the ground height at a given XZ, taking any mountain slopes
+    // into account - flat GROUND_Y everywhere except inside a mountain's base
+    // radius, where it rises linearly toward the peak (a cone's actual slope)
+    function terrainHeightAt(x, z){
+      let height = GROUND_Y;
+      for(const m of mountainColliders){
+        const d = Math.hypot(x - m.x, z - m.z);
+        if(d < m.baseRadius){
+          const t = 1 - (d / m.baseRadius); // 0 at the base edge, 1 at the very center/peak
+          const h = t * m.peakHeight;
+          if(h > height) height = h;
+        }
+      }
+      return height;
     }
 
     // ---- trees: simple trunk+leaves meshes scattered around, with a
@@ -4700,13 +4904,23 @@
       const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2e });
       const leafShades = [0x2f7d3a, 0x389146, 0x256b32, 0x3d9b4e];
       const positions = [];
-      // scatter trees in a rough ring/grid around spawn, leaving the
-      // center clear so it doesn't block where players land
-      for(let i = 0; i < 46; i++){
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 22 + Math.random() * 105;
-        positions.push({ x: Math.cos(angle) * radius, z: Math.sin(angle) * radius });
-      }
+      // dense ring-by-ring scatter so there are no bare gaps between spawn
+      // and the tree line, instead of one sparse random pass
+      const rings = [
+        { count: 26, rMin: 14, rMax: 34 },
+        { count: 34, rMin: 34, rMax: 62 },
+        { count: 40, rMin: 62, rMax: 95 },
+        { count: 30, rMin: 95, rMax: 130 }
+      ];
+      rings.forEach(ring => {
+        for(let i = 0; i < ring.count; i++){
+          const angle = Math.random() * Math.PI * 2;
+          const radius = ring.rMin + Math.random() * (ring.rMax - ring.rMin);
+          const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
+          if(terrainHeightAt(x, z) > 1) continue; // skip spots already on a mountain slope
+          positions.push({ x, z });
+        }
+      });
       positions.forEach(p => {
         const scale = 0.8 + Math.random() * 0.6;
         const leafMat = new THREE.MeshLambertMaterial({ color: leafShades[Math.floor(Math.random()*leafShades.length)] });
@@ -4825,7 +5039,11 @@
       // BoxGeometry face order is [+X,-X,+Y,-Y,+Z,-Z] - put the smiley on
       // both Z faces so it reads correctly regardless of which way "front"
       // ends up facing after the model's own base rotation
-      const headMats = [skin, skin, skin, skin, faceMat, faceMat];
+      // BoxGeometry face order is [+X,-X,+Y,-Y,+Z,-Z]. The rig's local +Z is
+      // the front (rotation.y=PI maps it to -world-Z, which is the forward
+      // movement direction - see updateMovement), so only that face gets the
+      // smiley; -Z (the back of the head) stays plain skin.
+      const headMats = [skin, skin, skin, skin, faceMat, skin];
       const torsoMat = new THREE.MeshLambertMaterial({ color: c.torso });
       const lArmMat = new THREE.MeshLambertMaterial({ color: c.leftArm });
       const rArmMat = new THREE.MeshLambertMaterial({ color: c.rightArm });
@@ -5937,13 +6155,21 @@
       vy += GRAVITY;
       character.position.y += vy;
       const wasOnGround = onGround;
-      if(character.position.y <= GROUND_Y){
-        character.position.y = GROUND_Y;
+      const groundHere = terrainHeightAt(character.position.x, character.position.z);
+      if(character.position.y <= groundHere){
+        character.position.y = groundHere;
         if(!wasOnGround){ landSquashT = 1; playLandSound(); } // just touched down - kick off the squash
         vy = 0;
         onGround = true;
       } else {
         onGround = false;
+      }
+
+      // fell off the world (off the edge of a mountain, out past the
+      // playable area, etc) - send them back to spawn instead of falling forever
+      if(character.position.y < -25){
+        character.position.set(0, terrainHeightAt(0, 0), 0);
+        vy = 0; onGround = true;
       }
 
       // distinct jump pose: rising = arms/legs pull up and in, falling = legs
@@ -5981,7 +6207,8 @@
 
     const PLAYER_RADIUS = 0.5;
     function resolveTreeCollisions(){
-      for(const t of treeColliders){
+      const colliders = treeColliders.concat(rockColliders);
+      for(const t of colliders){
         const dx = character.position.x - t.x, dz = character.position.z - t.z;
         const minDist = t.radius + PLAYER_RADIUS;
         const distSq = dx*dx + dz*dz;
