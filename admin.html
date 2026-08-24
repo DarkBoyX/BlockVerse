@@ -23,7 +23,7 @@
     color:var(--text-0); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   .card{
-    width:100%; max-width:420px; background:var(--bg-2); border:1px solid var(--border-soft);
+    width:100%; max-width:720px; background:var(--bg-2); border:1px solid var(--border-soft);
     border-radius:16px; padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
     animation:fadeUp .4s ease both;
   }
@@ -70,6 +70,33 @@
 
   .hidden{ display:none !important; }
   .note{ font-size:11px; color:var(--text-3); margin-top:16px; line-height:1.5; text-align:center; }
+
+  /* ---------- Accounts panel ---------- */
+  .section-title{ font-size:15px; font-weight:700; margin:26px 0 12px; padding-top:18px; border-top:1px solid var(--border-soft); }
+  .acct-search{ margin-bottom:10px; }
+  .acct-list{ max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .acct-row{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:10px;
+    padding:11px 13px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .acct-name{ font-size:13.5px; font-weight:600; }
+  .acct-key{ font-size:11px; color:var(--text-3); }
+  .acct-badges{ display:flex; gap:5px; }
+  .acct-badge{ font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:6px; text-transform:uppercase; letter-spacing:0.3px; }
+  .acct-badge.banned{ background:#3a1c1d; color:#ff9d9f; }
+  .acct-actions{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+  .mini-btn{
+    padding:7px 11px; background:var(--grey-2); border:1px solid var(--border); border-radius:7px;
+    color:var(--text-0); font-size:11.5px; font-weight:600; cursor:pointer; transition:background .15s;
+  }
+  .mini-btn:hover{ background:var(--grey-3); }
+  .mini-btn.warn{ background:#3a3320; border-color:#5c4f26; color:#ffd98a; }
+  .mini-btn.warn:hover{ background:#4a4128; }
+  .mini-btn.ban{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  .mini-btn.ban:hover{ background:#4a2224; }
+  .mini-btn.terminate{ background:#e5484d; border-color:#e5484d; color:#fff; }
+  .mini-btn.terminate:hover{ background:#c93c41; }
+  .mini-btn:disabled{ opacity:0.5; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -106,6 +133,15 @@
       Publishing bumps the live version. Anyone currently in the game gets pulled
       out immediately with a "please refresh" message; anyone just browsing the
       site gets the same notice next time they interact with it.
+    </p>
+
+    <div class="section-title">Accounts</div>
+    <input type="text" id="acctSearch" class="acct-search" placeholder="Search by username...">
+    <div class="acct-list" id="acctList"></div>
+    <p class="note">
+      Kick pulls someone out of Baseplate only. Ban blocks login and logs them
+      out everywhere immediately. Terminate permanently deletes the account and
+      unfriends it from everyone. None of this is undoable except Ban (you can unban).
     </p>
   </div>
 </div>
@@ -149,6 +185,7 @@
       gateScreen.classList.add("hidden");
       publishScreen.classList.remove("hidden");
       loadStatus();
+      loadAccounts();
     } else {
       showMsg(gateMsg, "Wrong passphrase.", "error");
     }
@@ -181,6 +218,114 @@
     }
     publishBtn.disabled = false;
   });
+
+  /* ============ Accounts ============ */
+  const acctList = document.getElementById("acctList");
+  const acctSearch = document.getElementById("acctSearch");
+  let allAccounts = []; // [{key, username}]
+  let banStatus = {};   // key -> ban record or null
+
+  async function loadAccounts(){
+    acctList.innerHTML = '<p class="note">Loading...</p>';
+    if(!auth.currentUser) await auth.signInAnonymously().catch(()=>{});
+    try{
+      const [namesSnap, bansSnap] = await Promise.all([
+        db.ref("blockverse_usernames").once("value"),
+        db.ref("blockverse_account_bans").once("value")
+      ]);
+      const names = namesSnap.val() || {};
+      banStatus = bansSnap.val() || {};
+      allAccounts = Object.keys(names).map(key => ({ key, username: (names[key] && names[key].username) || key }))
+        .sort((a,b) => a.username.localeCompare(b.username));
+      renderAccounts();
+    }catch(e){
+      acctList.innerHTML = '<p class="note">Couldn\'t load accounts.</p>';
+    }
+  }
+
+  function renderAccounts(){
+    const q = (acctSearch.value || "").trim().toLowerCase();
+    const rows = allAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
+    if(rows.length === 0){ acctList.innerHTML = '<p class="note">No accounts found.</p>'; return; }
+    acctList.innerHTML = rows.map(a => {
+      const banned = !!banStatus[a.key];
+      return '<div class="acct-row" data-key="' + a.key + '">' +
+        '<div><div class="acct-name">' + escapeHtml(a.username) + '</div><div class="acct-key">' + escapeHtml(a.key) + '</div></div>' +
+        '<div class="acct-badges">' + (banned ? '<span class="acct-badge banned">Banned</span>' : '') + '</div>' +
+        '<div class="acct-actions">' +
+          '<button class="mini-btn kick-btn">Kick</button>' +
+          '<button class="mini-btn warn warn-btn">Warn</button>' +
+          '<button class="mini-btn ban ban-btn">' + (banned ? 'Unban' : 'Ban') + '</button>' +
+          '<button class="mini-btn terminate terminate-btn">Terminate</button>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    acctList.querySelectorAll(".acct-row").forEach(row => {
+      const key = row.getAttribute("data-key");
+      const username = row.querySelector(".acct-name").textContent;
+
+      row.querySelector(".kick-btn").addEventListener("click", () => {
+        db.ref("blockverse_kicks/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP, by: "admin" });
+      });
+
+      row.querySelector(".warn-btn").addEventListener("click", () => {
+        const message = prompt("Warning message for " + username + ":");
+        if(!message) return;
+        db.ref("blockverse_warnings/" + key).set({ message, ts: firebase.database.ServerValue.TIMESTAMP });
+      });
+
+      row.querySelector(".ban-btn").addEventListener("click", () => {
+        const banned = !!banStatus[key];
+        if(banned){
+          db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
+        } else {
+          const reason = prompt("Ban reason for " + username + " (shown to them):") || "";
+          db.ref("blockverse_account_bans/" + key).set({ reason, by: "admin", ts: firebase.database.ServerValue.TIMESTAMP }).then(loadAccounts);
+        }
+      });
+
+      row.querySelector(".terminate-btn").addEventListener("click", async () => {
+        if(!confirm("Permanently terminate " + username + "'s account? This deletes it and unfriends it from everyone. This cannot be undone.")) return;
+        const btn = row.querySelector(".terminate-btn");
+        btn.disabled = true; btn.textContent = "...";
+        await terminateAccount(key);
+        loadAccounts();
+      });
+    });
+  }
+  acctSearch.addEventListener("input", renderAccounts);
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  // same logic as the self-service version in Index.html - deletes every
+  // per-account node and removes the reverse-friend edge on anyone who had
+  // this account as a friend. Deleting blockverse_sessions also force-logs
+  // them out immediately if they're online right now.
+  async function terminateAccount(key){
+    try{
+      const friendsSnap = await db.ref("blockverse_users/" + key + "/friends").once("value");
+      const friends = friendsSnap.val() || {};
+      await Promise.all(Object.keys(friends).map(fKey =>
+        db.ref("blockverse_users/" + fKey + "/friends/" + key).remove().catch(()=>{})
+      ));
+    }catch(e){}
+    const paths = [
+      "blockverse_credentials/" + key,
+      "blockverse_usernames/" + key,
+      "blockverse_users/" + key,
+      "blockverse_security/" + key,
+      "blockverse_active_claim/" + key,
+      "blockverse_login_codes/" + key,
+      "blockverse_account_bans/" + key,
+      "blockverse_kicks/" + key,
+      "blockverse_warnings/" + key,
+      "blockverse_sessions/" + key
+    ];
+    await Promise.all(paths.map(p => db.ref(p).remove().catch(()=>{})));
+  }
 </script>
 </body>
 </html>
