@@ -3096,16 +3096,34 @@
     stopModerationListeners();
   }
 
-  /* ============ live moderation: ban / kick / warn ============ */
-  let banListenerRef = null, kickListenerRef = null, warnListenerRef = null;
-  let lastKickTs = 0, lastWarnTs = 0;
+  /* ============ live moderation: ban / kick / warn / terminate ============ */
+  let banListenerRef = null, kickListenerRef = null, warnListenerRef = null, terminatedListenerRef = null;
+  let lastKickTs = 0, lastWarnTs = 0, terminationHandled = false;
 
   function startModerationListeners(key){
     if(!key) return;
+    terminationHandled = false;
+
+    // checked first/separately from ban, since termination is a distinct,
+    // permanent, unmistakable message - not "banned", not "logged out elsewhere"
+    terminatedListenerRef = fbDb.ref("blockverse_terminated/" + key);
+    terminatedListenerRef.on("value", snap => {
+      if(snap.exists() && getSession() === key && !terminationHandled){
+        terminationHandled = true;
+        const reason = "This account has been terminated.";
+        if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+          BaseplateGame.forceDisconnect(reason, true);
+        } else {
+          doLogout();
+          setTimeout(() => { if(typeof loginMsg !== "undefined") showMsg(loginMsg, reason, "error"); }, 50);
+        }
+      }
+    });
+
     banListenerRef = fbDb.ref("blockverse_account_bans/" + key);
     banListenerRef.on("value", snap => {
       const ban = snap.val();
-      if(ban && getSession() === key){
+      if(ban && getSession() === key && !terminationHandled){
         const reason = "You've been banned" + (ban.reason ? ": " + ban.reason : "") + ".";
         if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
           BaseplateGame.forceDisconnect(reason, true);
@@ -3140,7 +3158,8 @@
     if(banListenerRef){ banListenerRef.off(); banListenerRef = null; }
     if(kickListenerRef){ kickListenerRef.off(); kickListenerRef = null; }
     if(warnListenerRef){ warnListenerRef.off(); warnListenerRef = null; }
-    lastKickTs = 0; lastWarnTs = 0;
+    if(terminatedListenerRef){ terminatedListenerRef.off(); terminatedListenerRef = null; }
+    lastKickTs = 0; lastWarnTs = 0; terminationHandled = false;
   }
   // a centered "danger" banner - visible over the dashboard or in-game -
   // that fades out on its own after 3 seconds
@@ -3173,6 +3192,11 @@
         fbDb.ref("blockverse_users/" + fKey + "/friends/" + key).remove().catch(()=>{})
       ));
     }catch(e){}
+    // set the tombstone FIRST - if they're online right now, the moderation
+    // listener below picks this up immediately and shows the real
+    // "terminated" message before the session-deletion's generic
+    // remote-logout listener would otherwise fire with a less clear one
+    await fbDb.ref("blockverse_terminated/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP }).catch(()=>{});
     const paths = [
       "blockverse_credentials/" + key,
       "blockverse_usernames/" + key,
@@ -3413,6 +3437,15 @@
       return;
     }
     const key = username.toLowerCase();
+
+    try{
+      const termSnap = await fbDb.ref("blockverse_terminated/" + key).once("value");
+      if(termSnap.exists()){
+        showMsg(loginMsg, "This account has been terminated.", "error");
+        return;
+      }
+    }catch(e){}
+
     const accounts = getAccounts();
     let account = accounts[key];
 
@@ -4691,6 +4724,8 @@
     let character, leftArm, rightArm, leftLeg, rightLeg, head;
     let running = false;
     let animId = null;
+    let sunLight = null, hemiLight = null, fillLight = null, moonLight = null, moonMesh = null, starField = null;
+    const DAY_NIGHT_CYCLE_MS = 30 * 60 * 1000; // full day->night->day loop; reaches full night at the 15-min mark
 
     const keys = {};
     const move = { x:0, z:0 }; // joystick / wasd vector
@@ -4731,19 +4766,58 @@
 
     // a simple vertical-gradient sky (deep blue up top fading to a pale
     // horizon) instead of one flat color - reads as open air/atmosphere
-    function makeSkyGradientTexture(){
+    // t=0 is full daylight, t=1 is full night - lerps between a day gradient
+    // and a dark starry-night gradient. Called on init and re-called
+    // periodically (not every frame - it's cheap but no need to redraw 60x/sec)
+    function lerpHex(a, b, t){
+      const ar=(a>>16)&255, ag=(a>>8)&255, ab=a&255;
+      const br=(b>>16)&255, bg=(b>>8)&255, bb=b&255;
+      const r = Math.round(ar+(br-ar)*t), g = Math.round(ag+(bg-ag)*t), bl = Math.round(ab+(bb-ab)*t);
+      return "rgb(" + r + "," + g + "," + bl + ")";
+    }
+    function makeSkyGradientTexture(t){
+      t = t || 0;
       const canvas = document.createElement("canvas");
       canvas.width = 2; canvas.height = 256;
       const ctx = canvas.getContext("2d");
       const grad = ctx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, "#5a9bdc");
-      grad.addColorStop(0.55, "#8fd0f0");
-      grad.addColorStop(1, "#dff3ff");
+      grad.addColorStop(0, lerpHex(0x5a9bdc, 0x05060f, t));
+      grad.addColorStop(0.55, lerpHex(0x8fd0f0, 0x11142a, t));
+      grad.addColorStop(1, lerpHex(0xdff3ff, 0x232a4a, t));
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 2, 256);
       const tex = new THREE.CanvasTexture(canvas);
       tex.encoding = THREE.sRGBEncoding; // r128 API - colorSpace doesn't exist on this version
       return tex;
+    }
+
+    // triangle wave: 0 at the top of each 30-min wall-clock window (full day),
+    // 1 at the 15-minute mark (full night), back to 0 at 30 (day again).
+    // Using absolute Date.now() (not a per-session timer) means every player
+    // sees the same time of day automatically, with zero syncing needed.
+    function nightAmount(){
+      const phase = (Date.now() % DAY_NIGHT_CYCLE_MS) / DAY_NIGHT_CYCLE_MS;
+      return phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+    }
+    let lastSkyRedrawAt = 0;
+    function updateDayNightCycle(){
+      const t = nightAmount();
+      if(hemiLight) hemiLight.intensity = 1.0 - t*0.75;
+      if(sunLight){ sunLight.intensity = Math.max(0, 1.05 - t*1.15); }
+      if(fillLight) fillLight.intensity = 0.25 - t*0.15;
+      if(moonLight) moonLight.intensity = t * 0.4;
+      if(moonMesh && moonMesh.material) moonMesh.material.opacity = t;
+      if(starField && starField.material) starField.material.opacity = t;
+      if(scene && scene.fog){
+        scene.fog.color.set(lerpHex(0xaee0f5, 0x0c0e1c, t));
+      }
+      // redrawing the canvas gradient every frame is unnecessary for a
+      // 30-minute cycle - once every couple seconds is plenty smooth
+      const now = Date.now();
+      if(now - lastSkyRedrawAt > 2000){
+        lastSkyRedrawAt = now;
+        if(scene) scene.background = makeSkyGradientTexture(t);
+      }
     }
 
     function initScene(){
@@ -4758,13 +4832,14 @@
       renderer.toneMappingExposure = 1.05;
 
       scene = new THREE.Scene();
-      scene.background = makeSkyGradientTexture();
+      scene.background = makeSkyGradientTexture(nightAmount());
       scene.fog = new THREE.Fog(0xaee0f5, 55, 190);
 
       camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 500);
 
       const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x3a5f2b, 1.0);
       scene.add(hemi);
+      hemiLight = hemi;
       const sun = new THREE.DirectionalLight(0xfff4dd, 1.05);
       sun.position.set(30, 45, 20);
       sun.castShadow = true;
@@ -4773,9 +4848,41 @@
       sun.shadow.camera.top = 50; sun.shadow.camera.bottom = -50;
       sun.shadow.bias = -0.0015;
       scene.add(sun);
+      sunLight = sun;
       const fill = new THREE.DirectionalLight(0xbcd8ff, 0.25); // soft cool fill from the opposite side so shadows aren't pitch black
       fill.position.set(-25, 20, -15);
       scene.add(fill);
+      fillLight = fill;
+
+      // moon: dim light plus a small visible sphere, opposite the sun -
+      // both start at zero and fade in as the day/night cycle approaches night
+      const moon = new THREE.DirectionalLight(0xaebfff, 0);
+      moon.position.set(-30, 40, -20);
+      scene.add(moon);
+      moonLight = moon;
+      moonMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(4, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xe8ecff, transparent:true, opacity:0 })
+      );
+      moonMesh.position.set(-140, 90, -100);
+      scene.add(moonMesh);
+
+      // stars: a shell of small points, invisible by day, fades in at night
+      const starGeo = new THREE.BufferGeometry();
+      const starCount = 700;
+      const starPositions = new Float32Array(starCount * 3);
+      for(let i = 0; i < starCount; i++){
+        const r = 280 + Math.random()*40;
+        const theta = Math.random()*Math.PI*2;
+        const phi = Math.random()*Math.PI*0.5; // upper hemisphere only
+        starPositions[i*3] = r*Math.sin(phi)*Math.cos(theta);
+        starPositions[i*3+1] = r*Math.cos(phi) + 20;
+        starPositions[i*3+2] = r*Math.sin(phi)*Math.sin(theta);
+      }
+      starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+      const starMat = new THREE.PointsMaterial({ color:0xffffff, size:1.6, transparent:true, opacity:0, depthWrite:false });
+      starField = new THREE.Points(starGeo, starMat);
+      scene.add(starField);
 
       // baseplate - a tileable procedural grass texture instead of one flat color
       const groundGeo = new THREE.PlaneGeometry(300, 300);
@@ -6407,6 +6514,7 @@
       pushOwnTransform(dt);
       updateCamera();
       updateClouds(dt);
+      updateDayNightCycle();
       renderer.render(scene, camera);
       animId = requestAnimationFrame(tick);
     }
