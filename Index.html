@@ -2847,6 +2847,9 @@
     if(!/^[A-Za-z0-9_]+$/.test(newName)){
       showMsg(msg, "Letters, numbers, and underscores only.", "error"); return;
     }
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.looksLikeProfanity(newName)){
+      showMsg(msg, "That username isn't allowed - it violates the rules.", "error"); return;
+    }
     btn.disabled = true; btn.classList.add("loading");
     try{
       const lastSnap = await fbDb.ref("blockverse_credentials/" + key + "/lastUsernameChange").once("value");
@@ -2875,6 +2878,7 @@
       if(hubEl) hubEl.textContent = newName;
       const welcomeEl = document.getElementById("welcomeName");
       if(welcomeEl) welcomeEl.textContent = ", " + newName;
+      if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()) BaseplateGame.refreshOwnNameTag();
 
       showMsg(msg, "Username changed! This is what everyone will see now.", "success");
       renderUsernameChangeUI();
@@ -3363,6 +3367,11 @@
       return;
     }
     if(username.length < 3){ showMsg(signupMsg, "Username needs at least 3 characters.", "error"); shakeField(usernameEl); return; }
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.looksLikeProfanity(username)){
+      showMsg(signupMsg, "That username isn't allowed - it violates the rules.", "error");
+      shakeField(usernameEl);
+      return;
+    }
     if(!selectedGender){ showMsg(signupMsg, "Pick male or female.", "error"); return; }
     if(password !== confirm){ showMsg(signupMsg, "Passwords don't match.", "error"); shakeField(confirmEl); return; }
     if(password.length < 8){ showMsg(signupMsg, "Password needs to be at least 8 characters.", "error"); shakeField(passwordEl); return; }
@@ -4724,7 +4733,7 @@
     let character, leftArm, rightArm, leftLeg, rightLeg, head;
     let running = false;
     let animId = null;
-    let sunLight = null, hemiLight = null, fillLight = null, moonLight = null, moonMesh = null, starField = null;
+    let sunLight = null, hemiLight = null, fillLight = null, moonLight = null, moonMesh = null, sunMesh = null, starField = null;
     const DAY_NIGHT_CYCLE_MS = 30 * 60 * 1000; // full day->night->day loop; reaches full night at the 15-min mark
 
     const keys = {};
@@ -4801,16 +4810,31 @@
     }
     let lastSkyRedrawAt = 0;
     function updateDayNightCycle(){
-      const t = nightAmount();
-      if(hemiLight) hemiLight.intensity = 1.0 - t*0.75;
-      if(sunLight){ sunLight.intensity = Math.max(0, 1.05 - t*1.15); }
-      if(fillLight) fillLight.intensity = 0.25 - t*0.15;
-      if(moonLight) moonLight.intensity = t * 0.4;
-      if(moonMesh && moonMesh.material) moonMesh.material.opacity = t;
-      if(starField && starField.material) starField.material.opacity = t;
-      if(scene && scene.fog){
-        scene.fog.color.set(lerpHex(0xaee0f5, 0x0c0e1c, t));
+      const t = nightAmount(); // 0 = full day, 1 = full night
+      // deeper night: ambient/fill nearly gone, sun light fully off, only
+      // moonlight (dim, cool-toned) remains once it's dark
+      if(hemiLight) hemiLight.intensity = 1.0 - t*0.88;
+      if(sunLight) sunLight.intensity = Math.max(0, 1.05 - t*1.2);
+      if(fillLight) fillLight.intensity = 0.25 - t*0.22;
+      if(moonLight) moonLight.intensity = t * 0.35;
+      if(scene && scene.fog) scene.fog.color.set(lerpHex(0xaee0f5, 0x05060c, t));
+      if(renderer) renderer.toneMappingExposure = 1.05 - t*0.35; // scene reads noticeably darker/moodier at night, not just recolored
+
+      // sun/moon visually rise and set together, following the same phase
+      // that drives the lighting - sunHeight 1 at day-peak, -1 at night-peak
+      const sunHeight = 1 - 2*t;
+      const orbitY = sunHeight * 130;
+      const orbitR = 220;
+      if(sunMesh){
+        sunMesh.position.set(orbitR*0.55, Math.max(orbitY, -40), orbitR*0.35);
+        sunMesh.material.opacity = Math.max(0, Math.min(1, sunHeight*1.6));
       }
+      if(moonMesh){
+        moonMesh.position.set(-orbitR*0.55, Math.max(-orbitY, -40), -orbitR*0.35);
+        moonMesh.material.opacity = Math.max(0, Math.min(1, -sunHeight*1.6));
+      }
+      if(starField && starField.material) starField.material.opacity = t;
+
       // redrawing the canvas gradient every frame is unnecessary for a
       // 30-minute cycle - once every couple seconds is plenty smooth
       const now = Date.now();
@@ -4818,6 +4842,22 @@
         lastSkyRedrawAt = now;
         if(scene) scene.background = makeSkyGradientTexture(t);
       }
+    }
+
+    // soft glowing disc texture: a bright core fading out through a mid
+    // color to a faint outer glow - used for both the sun and moon sprites
+    function makeGlowCircleTexture(colors){
+      const canvas = document.createElement("canvas");
+      canvas.width = 128; canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+      const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(0.45, colors[1]);
+      grad.addColorStop(0.75, colors[2]);
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(canvas);
     }
 
     function initScene(){
@@ -4854,18 +4894,26 @@
       scene.add(fill);
       fillLight = fill;
 
-      // moon: dim light plus a small visible sphere, opposite the sun -
-      // both start at zero and fade in as the day/night cycle approaches night
+      // moon: dim light plus a visible glowing disc, opposite the sun
       const moon = new THREE.DirectionalLight(0xaebfff, 0);
       moon.position.set(-30, 40, -20);
       scene.add(moon);
       moonLight = moon;
-      moonMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(4, 16, 16),
-        new THREE.MeshBasicMaterial({ color: 0xe8ecff, transparent:true, opacity:0 })
-      );
-      moonMesh.position.set(-140, 90, -100);
+      moonMesh = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: makeGlowCircleTexture(["#ffffff", "#dfe6ff", "#aab6e6"]),
+        transparent: true, opacity: 0, depthWrite: false, fog: false
+      }));
+      moonMesh.scale.set(26, 26, 1);
       scene.add(moonMesh);
+
+      // sun: a visible disc too - yellow ring with a brighter core, moves
+      // up/down with the day/night cycle instead of just a hidden light
+      sunMesh = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: makeGlowCircleTexture(["#fff6c8", "#ffe066", "#ffb703"]),
+        transparent: true, opacity: 1, depthWrite: false, fog: false
+      }));
+      sunMesh.scale.set(34, 34, 1);
+      scene.add(sunMesh);
 
       // stars: a shell of small points, invisible by day, fades in at night
       const starGeo = new THREE.BufferGeometry();
@@ -4880,15 +4928,18 @@
         starPositions[i*3+2] = r*Math.sin(phi)*Math.sin(theta);
       }
       starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
-      const starMat = new THREE.PointsMaterial({ color:0xffffff, size:1.6, transparent:true, opacity:0, depthWrite:false });
+      const starMat = new THREE.PointsMaterial({ color:0xffffff, size:2, transparent:true, opacity:0, depthWrite:false, fog:false });
       starField = new THREE.Points(starGeo, starMat);
       scene.add(starField);
 
-      // baseplate - a tileable procedural grass texture instead of one flat color
-      const groundGeo = new THREE.PlaneGeometry(300, 300);
+      // baseplate - a tileable procedural grass texture instead of one flat color.
+      // sized well past the furthest mountain edge (~172 units out) so there's
+      // no gap between the ground and any decoration - that gap was the "flying
+      // over a void" bug: trees/mountains stood past the old 300x300 ground's edge.
+      const groundGeo = new THREE.PlaneGeometry(500, 500);
       const groundTex = makeGrassTexture();
       groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
-      groundTex.repeat.set(60, 60);
+      groundTex.repeat.set(100, 100);
       const groundMat = new THREE.MeshLambertMaterial({ map: groundTex });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI/2;
@@ -4896,7 +4947,7 @@
       scene.add(ground);
 
       // faint grid for scale reference
-      const grid = new THREE.GridHelper(300, 60, 0x1f7a34, 0x1f7a34);
+      const grid = new THREE.GridHelper(500, 100, 0x1f7a34, 0x1f7a34);
       grid.material.opacity = 0.1;
       grid.material.transparent = true;
       scene.add(grid);
@@ -5608,7 +5659,7 @@
     const PROFANITY_LIST = [
       // English
       "fuck","fuk","fck","shit","bitch","bytch","cunt","dick","pussy","pussi",
-      "ass","asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
+      "ass","asshole","asswhole","ass hole","nigger","nigga","nig","faggot","fag","retard",
       "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
       "sex","porn","nude","nudes","rape",
       // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
@@ -5697,17 +5748,24 @@
       return new RegExp(profanityPatternSrc, "iu").test(normalizeForFilter(text));
     }
 
-    // if the message is flagged at all, the ENTIRE message is masked
-    // (not just the matched word) - every non-space character becomes a
-    // "*", so the shape/length stays visible but nothing readable leaks
+    // each matched bad word gets replaced with hashtags matching its length
+    // (e.g. "shit" -> "####") - the rest of the message stays readable.
+    // looksLikeProfanity() catches obfuscated/leetspeak spellings via
+    // normalization, but replacement runs on the raw text to keep original
+    // formatting; if normalization caught something but no raw substring
+    // lines up (a heavily obfuscated spelling), hash the whole message as a
+    // safe fallback rather than let it through unmarked.
     function censorText(text){
       if(!text) return text;
       if(!looksLikeProfanity(text)) return text;
-      return text.replace(/\S/g, "*");
+      const replaced = text.replace(new RegExp(profanityPatternSrc, "giu"), m => "#".repeat(m.length));
+      if(replaced !== text) return replaced;
+      return text.replace(/\S/g, "#");
     }
 
     /* ---- in-game chat ---- */
     let chatRef = null;
+    let recentOwnMessages = []; // {text, ts} - short rolling window for the split-message bypass check
     let chatReady = false; // becomes true once initial backlog has streamed in, so we don't bubble-pop old history
     let chatSeenKeys = new Set(); // tracks which Firebase message keys are already rendered, so a
                                    // leave->rejoin (or an overlapping detach/reattach) never dupes a line
@@ -5878,6 +5936,20 @@
         if(!body){ appendSystemChatLine("Usage: /whisper username message"); return; }
         whisperKey = foundKey; whisperName = targetName;
       }
+
+      // catches a message split across multiple sends to dodge the filter
+      // (e.g. sending "ni" then "gga" - neither flags alone, but "ni"+"gga"
+      // does). Checks the new message against a short rolling window of the
+      // sender's own recent raw messages, not just this one in isolation.
+      const now = Date.now();
+      recentOwnMessages = recentOwnMessages.filter(m => now - m.ts < 15000);
+      const combinedTail = recentOwnMessages.map(m => m.text).join("") + body;
+      if(!looksLikeProfanity(body) && looksLikeProfanity(combinedTail)){
+        appendSystemChatLine("That message looks like it's spelling out something against the rules across multiple messages - it wasn't sent.");
+        return;
+      }
+      recentOwnMessages.push({ text: body, ts: now });
+      if(recentOwnMessages.length > 6) recentOwnMessages.shift();
 
       body = censorText(body.slice(0, 140));
       if(!body) return;
@@ -6582,6 +6654,7 @@
           return;
         }
         if(!typingNow && e.key === "Shift" && shiftlockEnabled()){
+          if(e.repeat) return; // holding the key fires repeated keydown events - only toggle on the initial press
           toggleShiftlock();
           return;
         }
@@ -7258,7 +7331,20 @@
       }
     }
 
-    return { start, stop, forceDisconnect, isRunning: () => running, buildCharacterRig, normalizeCustom, disposeObject3D };
+    // rebuilds the local player's floating nametag with the current
+    // username - called after a username change so the change shows up
+    // in-game without needing to rejoin
+    function refreshOwnNameTag(){
+      if(!character || !ownNameSprite) return;
+      character.remove(ownNameSprite);
+      if(ownNameSprite.material && ownNameSprite.material.map) ownNameSprite.material.map.dispose();
+      if(ownNameSprite.material) ownNameSprite.material.dispose();
+      ownNameSprite = makeNameSprite(currentUsername ? currentUsername() : "Player");
+      ownNameSprite.position.set(0, 2.9, 0);
+      character.add(ownNameSprite);
+    }
+
+    return { start, stop, forceDisconnect, isRunning: () => running, refreshOwnNameTag, looksLikeProfanity, buildCharacterRig, normalizeCustom, disposeObject3D };
   })();
 
   document.getElementById("playBaseplateBtn").addEventListener("click", () => BaseplateGame.start());
