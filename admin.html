@@ -75,6 +75,13 @@
   .hidden{ display:none !important; }
   .note{ font-size:11px; color:var(--text-3); margin-top:16px; line-height:1.5; text-align:center; }
 
+  .role-badge{
+    text-align:center; font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase;
+    padding:6px 0; margin-bottom:16px; color:var(--text-2); background:var(--grey-1);
+    border:1px solid var(--border-soft); border-radius:8px;
+  }
+  body.role-admin .owner-only{ display:none !important; }
+
   /* ---------- Accounts panel ---------- */
   .section-title{ font-size:14px; font-weight:700; margin:26px 0 12px; padding-top:18px; border-top:1px solid var(--border-soft); display:flex; align-items:center; gap:7px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-1); }
   .section-title .count-pill{ background:var(--grey-2); color:var(--text-2); font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; text-transform:none; letter-spacing:0; }
@@ -130,13 +137,14 @@
 
   <!-- publish screen -->
   <div id="publishScreen" class="hidden">
-    <div class="status-block">
+    <div class="role-badge" id="roleBadge"></div>
+    <div class="status-block owner-only">
       <div class="status-row"><span>Current version</span><span id="curVersion">-</span></div>
       <div class="status-row"><span>Last published</span><span id="curTs">-</span></div>
     </div>
-    <button class="btn danger" id="publishBtn">Publish update &amp; disconnect players</button>
-    <div class="msg" id="publishMsg"></div>
-    <p class="note">
+    <button class="btn danger owner-only" id="publishBtn">Publish update &amp; disconnect players</button>
+    <div class="msg owner-only" id="publishMsg"></div>
+    <p class="note owner-only">
       Publishing bumps the live version. Anyone currently in the game gets pulled
       out immediately with a "please refresh" message; anyone just browsing the
       site gets the same notice next time they interact with it.
@@ -171,9 +179,16 @@
   const db = firebase.database();
   const auth = firebase.auth();
 
-  // CHANGE THIS before you rely on the gate for anything - it's just a
-  // deterrent (see the note in the UI), not real security
-  const ADMIN_PASSPHRASE = "BloxyVerse201682@#Q~";
+  // CHANGE THESE before you rely on the gate for anything - it's just a
+  // deterrent (see the note in the UI), not real security.
+  const OWNER_PASSPHRASE = "OwnerBlockVerse2026"; // full access: publish, kick, warn, ban, terminate
+  const ADMIN_PASSPHRASE = "AdminBlockVerse2026"; // limited access: kick + warn only
+  // the account key (lowercase username) that's protected from admin-role
+  // moderation - an admin trying to kick/warn this account gets blocked and
+  // you get notified in-game instead. CHANGE THIS to your own username.
+  const OWNER_ACCOUNT_KEY = "yourownerusername";
+
+  let currentRole = null; // "owner" | "admin"
 
   const gateScreen = document.getElementById("gateScreen");
   const publishScreen = document.getElementById("publishScreen");
@@ -188,14 +203,16 @@
   function showMsg(el, text, kind){ el.textContent = text; el.className = "msg " + kind; }
 
   gateBtn.addEventListener("click", () => {
-    if(gateInput.value === ADMIN_PASSPHRASE){
-      gateScreen.classList.add("hidden");
-      publishScreen.classList.remove("hidden");
-      loadStatus();
-      loadAccounts();
-    } else {
-      showMsg(gateMsg, "Wrong passphrase.", "error");
-    }
+    if(gateInput.value === OWNER_PASSPHRASE) currentRole = "owner";
+    else if(gateInput.value === ADMIN_PASSPHRASE) currentRole = "admin";
+    else { showMsg(gateMsg, "Wrong passphrase.", "error"); return; }
+
+    gateScreen.classList.add("hidden");
+    publishScreen.classList.remove("hidden");
+    document.body.classList.toggle("role-admin", currentRole === "admin");
+    document.getElementById("roleBadge").textContent = currentRole === "owner" ? "Owner access" : "Admin access (kick/warn only)";
+    loadStatus();
+    loadAccounts();
   });
   gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
 
@@ -255,6 +272,7 @@
     const rows = allAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
     document.getElementById("acctCountPill").textContent = rows.length + " / " + allAccounts.length;
     if(rows.length === 0){ acctList.innerHTML = '<p class="note">No accounts found.</p>'; return; }
+    const isAdminRole = currentRole === "admin";
     acctList.innerHTML = rows.map(a => {
       const banned = !!banStatus[a.key];
       return '<div class="acct-row" data-key="' + a.key + '">' +
@@ -263,40 +281,55 @@
         '<div class="acct-actions">' +
           '<button class="mini-btn kick-btn">Kick</button>' +
           '<button class="mini-btn warn warn-btn">Warn</button>' +
-          '<button class="mini-btn ban ban-btn">' + (banned ? 'Unban' : 'Ban') + '</button>' +
-          '<button class="mini-btn terminate terminate-btn">Terminate</button>' +
+          (isAdminRole ? '' :
+            '<button class="mini-btn ban ban-btn">' + (banned ? 'Unban' : 'Ban') + '</button>' +
+            '<button class="mini-btn terminate terminate-btn">Terminate</button>') +
         '</div>' +
       '</div>';
     }).join("");
 
+    // notifies the protected owner account in-game (reuses the existing
+    // warning-toast channel) that an admin-role login just tried to use a
+    // moderation command on them, instead of letting the action go through
+    function alertOwnerOfAttempt(action){
+      db.ref("blockverse_warnings/" + OWNER_ACCOUNT_KEY).set({
+        message: "An admin login just tried to " + action + " your account. It was blocked.",
+        ts: firebase.database.ServerValue.TIMESTAMP
+      }).catch(()=>{});
+    }
+
     acctList.querySelectorAll(".acct-row").forEach(row => {
       const key = row.getAttribute("data-key");
       const username = row.querySelector(".acct-name").textContent;
+      const isOwnerTarget = key === OWNER_ACCOUNT_KEY;
 
       row.querySelector(".kick-btn").addEventListener("click", () => {
-        db.ref("blockverse_kicks/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP, by: "admin" });
+        if(isAdminRole && isOwnerTarget){ alertOwnerOfAttempt("kick"); alert("This account is protected - the owner has been notified."); return; }
+        db.ref("blockverse_kicks/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP, by: currentRole });
       });
 
       row.querySelector(".warn-btn").addEventListener("click", () => {
+        if(isAdminRole && isOwnerTarget){ alertOwnerOfAttempt("warn"); alert("This account is protected - the owner has been notified."); return; }
         const message = prompt("Warning message for " + username + ":");
         if(!message) return;
         db.ref("blockverse_warnings/" + key).set({ message, ts: firebase.database.ServerValue.TIMESTAMP });
       });
 
-      row.querySelector(".ban-btn").addEventListener("click", () => {
+      const banBtn = row.querySelector(".ban-btn");
+      if(banBtn) banBtn.addEventListener("click", () => {
         const banned = !!banStatus[key];
         if(banned){
           db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
         } else {
           const reason = prompt("Ban reason for " + username + " (shown to them):") || "";
-          db.ref("blockverse_account_bans/" + key).set({ reason, by: "admin", ts: firebase.database.ServerValue.TIMESTAMP }).then(loadAccounts);
+          db.ref("blockverse_account_bans/" + key).set({ reason, by: currentRole, ts: firebase.database.ServerValue.TIMESTAMP }).then(loadAccounts);
         }
       });
 
-      row.querySelector(".terminate-btn").addEventListener("click", async () => {
+      const termBtn = row.querySelector(".terminate-btn");
+      if(termBtn) termBtn.addEventListener("click", async () => {
         if(!confirm("Permanently terminate " + username + "'s account? This deletes it and unfriends it from everyone. This cannot be undone.")) return;
-        const btn = row.querySelector(".terminate-btn");
-        btn.disabled = true; btn.textContent = "...";
+        termBtn.disabled = true; termBtn.textContent = "...";
         await terminateAccount(key);
         loadAccounts();
       });
