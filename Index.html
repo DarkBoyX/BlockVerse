@@ -54,6 +54,8 @@
   .hidden{ display:none !important; }
 
   @keyframes fadeUp{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes adminWarnIn{ from{ opacity:0; transform:translate(-50%,-14px) scale(0.96); } to{ opacity:1; transform:translate(-50%,0) scale(1); } }
+  @keyframes adminWarnOut{ from{ opacity:1; transform:translate(-50%,0) scale(1); } to{ opacity:0; transform:translate(-50%,-10px) scale(0.97); } }
   @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
   @keyframes popIn{ 0%{opacity:0; transform:scale(0.94);} 100%{opacity:1; transform:scale(1);} }
   @keyframes floatCube{ 0%,100%{transform:rotate(45deg) translateY(0);} 50%{transform:rotate(45deg) translateY(-6px);} }
@@ -3172,13 +3174,12 @@
     if(existing) existing.remove();
     const el = document.createElement("div");
     el.id = "adminWarningToast";
-    el.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:10000;background:#3a1c1d;border:1px solid #e5484d;color:#ffdcdc;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:fadeUp .25s ease both;max-width:90vw;text-align:center;";
-    el.innerHTML = '<span style="font-size:18px;">&#9888;</span><span>' + escapeHtml(message) + '</span>';
+    el.style.cssText = "position:fixed;top:24px;left:50%;z-index:10000;background:linear-gradient(180deg,#1b1b1e,#141416);border:1px solid #3a3a40;color:#f2f2f3;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;box-shadow:0 14px 34px rgba(0,0,0,0.55);max-width:90vw;text-align:center;animation:adminWarnIn .28s cubic-bezier(.2,.9,.3,1.1) both;";
+    el.innerHTML = '<span style="font-size:18px;color:#ffb84d;">&#9888;</span><span>' + escapeHtml(message) + '</span>';
     document.body.appendChild(el);
     setTimeout(() => {
-      el.style.transition = "opacity .4s ease";
-      el.style.opacity = "0";
-      setTimeout(() => el.remove(), 400);
+      el.style.animation = "adminWarnOut .3s ease both";
+      setTimeout(() => el.remove(), 300);
     }, 3000);
   }
 
@@ -4957,6 +4958,7 @@
       spawnClouds();
       spawnRocks();
       spawnHills();
+      spawnBoundaryFence();
 
       buildCharacter();
       clock = new THREE.Clock();
@@ -6304,6 +6306,7 @@
         character.position.x += velX;
         character.position.z += velZ;
         resolveTreeCollisions();
+        resolveMapBoundary();
 
         const targetRot = Math.atan2(velX, velZ);
         let diff = targetRot - character.rotation.y;
@@ -6330,18 +6333,36 @@
         }
       }
 
-      // jump / gravity
-      vy += GRAVITY;
-      character.position.y += vy;
+      // jump / gravity, with slope-following: on flat ground OR walking
+      // down a mountain slope, snap straight to the ground height instead
+      // of letting gravity re-integrate from scratch every frame - that
+      // per-frame gravity approach couldn't keep up with a descending slope
+      // (the ground drops away faster than one frame of gravity pulls you
+      // down), so it kept flip-flopping onGround/falling every frame -
+      // the rapid jump/land "shaking" bug. Only actually falls (real
+      // gravity) after a jump, or when the ground drops more than a step
+      // can reasonably cover (an actual ledge/cliff, not a walkable slope).
       const wasOnGround = onGround;
       const groundHere = terrainHeightAt(character.position.x, character.position.z);
-      if(character.position.y <= groundHere){
-        character.position.y = groundHere;
-        if(!wasOnGround){ landSquashT = 1; playLandSound(); } // just touched down - kick off the squash
-        vy = 0;
-        onGround = true;
-      } else {
-        onGround = false;
+      const STEP_MAX = 1.2;
+      if(onGround && vy <= 0){
+        const drop = character.position.y - groundHere;
+        if(drop <= STEP_MAX){
+          character.position.y = groundHere;
+          vy = 0;
+        } else {
+          onGround = false; // stepped off an actual ledge - let real gravity take over below
+        }
+      }
+      if(!onGround){
+        vy += GRAVITY;
+        character.position.y += vy;
+        if(character.position.y <= groundHere){
+          character.position.y = groundHere;
+          if(!wasOnGround){ landSquashT = 1; playLandSound(); } // just touched down - kick off the squash
+          vy = 0;
+          onGround = true;
+        }
       }
 
       // fell off the world (off the edge of a mountain, out past the
@@ -6397,6 +6418,44 @@
           character.position.x += (dx/d) * push;
           character.position.z += (dz/d) * push;
         }
+      }
+    }
+
+    const MAP_BOUNDARY_RADIUS = 235; // just inside the 500x500 ground plane's edge, with the fence sitting right on this ring
+    function resolveMapBoundary(){
+      const d = Math.hypot(character.position.x, character.position.z);
+      if(d > MAP_BOUNDARY_RADIUS){
+        const scale = MAP_BOUNDARY_RADIUS / d;
+        character.position.x *= scale;
+        character.position.z *= scale;
+      }
+    }
+    // a visible low fence ring around the playable area, so the boundary
+    // reads as an intentional edge instead of an invisible wall
+    function spawnBoundaryFence(){
+      const postMat = new THREE.MeshLambertMaterial({ color: 0x5a4632 });
+      const railMat = new THREE.MeshLambertMaterial({ color: 0x6b5640 });
+      const postCount = 72;
+      for(let i = 0; i < postCount; i++){
+        const angle = (i / postCount) * Math.PI * 2;
+        const x = Math.cos(angle) * MAP_BOUNDARY_RADIUS, z = Math.sin(angle) * MAP_BOUNDARY_RADIUS;
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.2, 6), postMat);
+        post.position.set(x, 1.1, z);
+        post.castShadow = true;
+        scene.add(post);
+      }
+      // horizontal rail ring, built as short segments between consecutive posts
+      for(let i = 0; i < postCount; i++){
+        const a1 = (i / postCount) * Math.PI * 2, a2 = ((i+1) / postCount) * Math.PI * 2;
+        const x1 = Math.cos(a1)*MAP_BOUNDARY_RADIUS, z1 = Math.sin(a1)*MAP_BOUNDARY_RADIUS;
+        const x2 = Math.cos(a2)*MAP_BOUNDARY_RADIUS, z2 = Math.sin(a2)*MAP_BOUNDARY_RADIUS;
+        const midX = (x1+x2)/2, midZ = (z1+z2)/2;
+        const segLen = Math.hypot(x2-x1, z2-z1);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.12, 0.12), railMat);
+        rail.position.set(midX, 1.6, midZ);
+        rail.rotation.y = Math.atan2(x2-x1, z2-z1);
+        rail.castShadow = true;
+        scene.add(rail);
       }
     }
 
