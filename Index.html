@@ -237,6 +237,64 @@
   }
   .notif-row .friend-actions{ flex-shrink:0; }
   .notif-panel-empty{ text-align:center; color:var(--text-3); font-size:12.5px; padding:40px 14px; }
+
+  /* ---------- Game info / join panel (opens when tapping a game card) ---------- */
+  .gp-panel{
+    position:fixed; top:0; right:0; height:100vh; width:380px; max-width:92vw;
+    background:var(--bg-2); border-left:1px solid var(--border-soft); z-index:901;
+    display:flex; flex-direction:column; box-shadow:-14px 0 40px rgba(0,0,0,0.5);
+    animation:panelSlideIn .22s ease both; overflow-y:auto;
+  }
+  .gp-banner{ position:relative; width:100%; aspect-ratio:16/9; background-size:cover; background-position:center; flex-shrink:0; }
+  .gp-banner::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 40%, var(--bg-2) 100%); }
+  .gp-close-btn{
+    position:absolute; top:14px; right:14px; z-index:2; width:32px; height:32px; border-radius:50%;
+    background:rgba(10,10,11,0.55); border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center; color:#fff; cursor:pointer;
+  }
+  .gp-close-btn svg{ width:15px; height:15px; }
+  .gp-profile{
+    width:64px; height:64px; border-radius:16px; flex-shrink:0; background:var(--bg-1);
+    border:3px solid var(--bg-2); box-shadow:0 4px 14px rgba(0,0,0,0.4);
+    position:absolute; left:18px; bottom:-14px; z-index:2; background-size:cover; background-position:center;
+  }
+  .gp-head{ position:relative; padding:26px 20px 4px; }
+  .gp-title{ font-size:19px; font-weight:800; color:var(--text-0); }
+  .gp-creator{ font-size:12.5px; color:var(--text-2); margin-top:3px; }
+  .gp-creator b{ color:var(--text-1); font-weight:600; }
+  .gp-stats{ display:flex; gap:8px; padding:16px 20px 0; }
+  .gp-stat{
+    flex:1; background:var(--bg-1); border:1px solid var(--border-soft); border-radius:10px;
+    padding:10px 8px; text-align:center; cursor:default; transition:border-color .15s, background .15s;
+  }
+  .gp-stat.gp-reactable{ cursor:pointer; }
+  .gp-stat.gp-reactable:hover{ border-color:var(--grey-3); }
+  .gp-stat.gp-active{ border-color:#4a6cf7; background:rgba(74,108,247,0.12); }
+  .gp-stat-num{ font-size:15px; font-weight:800; color:var(--text-0); }
+  .gp-stat-label{ font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.4px; margin-top:2px; }
+  .gp-meta{ padding:14px 20px 0; font-size:12px; color:var(--text-2); }
+  .gp-desc{ padding:10px 20px 0; font-size:12.5px; color:var(--text-1); line-height:1.5; }
+  .gp-play-btn{
+    margin:20px 20px 22px; padding:13px; background:#4a6cf7; border:none; border-radius:10px;
+    color:#fff; font-size:14.5px; font-weight:700; cursor:pointer; transition:background .15s, transform .1s;
+  }
+  .gp-play-btn:hover{ background:#3d5ce0; }
+  .gp-play-btn:active{ transform:scale(0.98); }
+
+  /* ---------- Loading screen: game background + profile + creator ---------- */
+  .game-loading{ background-size:cover; background-position:center; }
+  .game-loading::before{
+    content:""; position:absolute; inset:0; background:rgba(8,8,10,0.72); backdrop-filter:blur(2px); z-index:0;
+  }
+  .game-loading > *{ position:relative; z-index:1; }
+  .gl-profile{
+    width:64px; height:64px; border-radius:16px; background:var(--bg-1); background-size:cover; background-position:center;
+    border:2px solid rgba(255,255,255,0.15); box-shadow:0 6px 18px rgba(0,0,0,0.5); display:none;
+  }
+  .gl-profile.show{ display:block; }
+  .gl-creator{ color:#8a8a90; font-size:11.5px; margin-top:-8px; display:none; }
+  .gl-creator.show{ display:block; }
+  .gl-cube.hide{ display:none; }
   .sb-user{
     display:flex; align-items:center; gap:10px; padding:10px; border-radius:10px;
     border:1px solid var(--border-soft); background:var(--bg-2); margin-bottom:8px;
@@ -334,7 +392,7 @@
   .game-lb-panel{
     position:absolute; top:64px; right:16px; z-index:20; width:230px; max-height:60vh; overflow-y:auto;
     background:rgba(20,20,22,0.88); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(12px);
-    border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:3px;
+    border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:5px;
     box-shadow:0 12px 30px rgba(0,0,0,0.4); animation:lbPanelIn .16s ease both;
   }
   @keyframes lbPanelIn{ from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);} }
@@ -342,20 +400,17 @@
   .game-lb-head{
     display:flex; align-items:center; justify-content:space-between; padding:4px 6px 8px;
     font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; color:#8a8a90;
-    border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:4px;
+    border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:2px;
   }
   .game-lb-head .lb-hint{ font-size:9.5px; text-transform:none; letter-spacing:0; color:#5c5c62; font-weight:500; }
+  /* plain bordered box per player, just rank + name - no avatar circle, no colored status dot */
   .game-lb-row{
-    display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:9px; cursor:pointer;
-    transition:background .12s; color:#e4e4e6; font-size:12.5px;
+    display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+    transition:background .12s, border-color .12s; color:#e4e4e6; font-size:13px;
   }
-  .game-lb-row:hover{ background:rgba(255,255,255,0.08); }
+  .game-lb-row:hover{ background:rgba(255,255,255,0.09); border-color:rgba(255,255,255,0.16); }
   .game-lb-row .game-lb-rank{ width:16px; flex-shrink:0; font-size:11px; color:#6a6a70; font-weight:700; text-align:center; }
-  .game-lb-row .game-lb-avatar{
-    width:24px; height:24px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
-    font-size:10px; font-weight:700; color:#fff; background:linear-gradient(135deg,#5a6cd6,#3a4aa8);
-  }
-  .game-lb-row .status-dot{ width:8px; height:8px; border-radius:50%; background:#3ecf6e; flex-shrink:0; box-shadow:0 0 5px rgba(62,207,110,0.6); }
   .game-lb-row .lb-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .game-lb-row .lb-you{ color:#8a8a90; font-size:10.5px; margin-left:auto; flex-shrink:0; }
   @media (max-width:720px){
@@ -1255,7 +1310,7 @@
         <p data-i18n="homeSub">Here's what's happening in your BlockVerse.</p>
       </div>
       <div class="game-grid">
-        <div class="game-card" id="playBaseplateBtn">
+        <div class="game-card" id="playBaseplateBtn" data-game-id="baseplate">
           <div class="game-card-thumb">
             <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
               <rect x="0" y="0" width="100" height="60" fill="#173b1f"/>
@@ -1271,6 +1326,8 @@
         </div>
       </div>
     </div>
+
+    <div id="gamePanelRoot"></div>
 
     <!-- SETTINGS HUB (3 buttons) -->
     <div id="pageSettingsHub" class="hidden">
@@ -1508,8 +1565,10 @@
   <canvas id="gameCanvas"></canvas>
 
   <div class="game-loading" id="gameLoading">
-    <div class="gl-cube"></div>
+    <div class="gl-profile" id="gameLoadingProfile"></div>
+    <div class="gl-cube" id="gameLoadingCube"></div>
     <p id="gameLoadingText" data-i18n="loadingGame">Loading Baseplate...</p>
+    <p class="gl-creator" id="gameLoadingCreator"></p>
     <div class="gl-bar"><div class="gl-bar-fill" id="gameLoadBar"></div></div>
   </div>
 
@@ -4694,6 +4753,142 @@
     el.addEventListener("click", () => showPage(el.getAttribute("data-back")));
   });
 
+  /* ============ game catalog (generic - add more entries here as new games ship) ============ */
+  // background/profile are just CSS values (gradient or url(...)) so no extra
+  // image assets are required, but a real image URL drops in the same way.
+  const GAMES_CATALOG = {
+    baseplate: {
+      id: "baseplate",
+      title: "Baseplate",
+      sub: "Run, jump and look around.",
+      creator: "Nyx",
+      createdAt: Date.UTC(2026, 0, 15), // fixed launch date - not a live timestamp, so it never changes on refresh
+      background: "linear-gradient(160deg,#173b1f 0%,#1f6e33 55%,#e8e0c8 100%)",
+      profile: "linear-gradient(135deg,#5a6cd6,#3a4aa8)",
+      start: () => BaseplateGame.start()
+    }
+  };
+
+  function fmtCreatedDate(ms){
+    const d = new Date(ms);
+    return d.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"numeric" });
+  }
+
+  /* ============ per-account visit / like / dislike tracking ============
+     A "visit" is a unique-visitor count, not a play count: the current
+     account's own first join adds 1, but leaving and rejoining never adds
+     again - it only goes up when a *different* account joins for the first
+     time. Likes/dislikes are one reaction per account, togglable, stored the
+     same way. Needs this added to the Firebase rules under rooms/<gameId>:
+       "visitors": { "$uid": { ".write": "auth != null && auth.uid === $uid", ".validate": "newData.isBoolean() && newData.val() === true" } },
+       "reactions": { ".read": "auth != null", "$uid": { ".write": "auth != null && auth.uid === $uid", ".validate": "newData.isString() && (newData.val() === 'like' || newData.val() === 'dislike')" } }
+  */
+  async function registerVisitOnce(gameId){
+    const key = currentAccountKey();
+    if(!key) return;
+    try{
+      if(!firebase.auth().currentUser) await firebase.auth().signInAnonymously().catch(()=>{});
+      const ref = fbDb.ref("rooms/" + gameId + "/visitors/" + key);
+      const snap = await ref.once("value");
+      if(!snap.exists()) await ref.set(true); // first-ever join for this account - counts once, forever
+    }catch(e){}
+  }
+  async function getGameStats(gameId){
+    try{
+      const [visitorsSnap, reactionsSnap] = await Promise.all([
+        fbDb.ref("rooms/" + gameId + "/visitors").once("value"),
+        fbDb.ref("rooms/" + gameId + "/reactions").once("value")
+      ]);
+      const visitors = visitorsSnap.val() || {};
+      const reactions = reactionsSnap.val() || {};
+      let likes = 0, dislikes = 0;
+      Object.keys(reactions).forEach(k => { if(reactions[k] === "like") likes++; else if(reactions[k] === "dislike") dislikes++; });
+      const myKey = currentAccountKey();
+      return { visits: Object.keys(visitors).length, likes, dislikes, myReaction: myKey ? (reactions[myKey] || null) : null };
+    }catch(e){
+      return { visits: 0, likes: 0, dislikes: 0, myReaction: null };
+    }
+  }
+  async function setMyReaction(gameId, reaction){ // reaction: "like" | "dislike" | null (null clears it)
+    const key = currentAccountKey();
+    if(!key) return;
+    try{
+      if(!firebase.auth().currentUser) await firebase.auth().signInAnonymously().catch(()=>{});
+      const ref = fbDb.ref("rooms/" + gameId + "/reactions/" + key);
+      if(reaction) await ref.set(reaction); else await ref.remove();
+    }catch(e){}
+  }
+
+  /* ============ game info / join panel ============ */
+  let gpCurrentGameId = null;
+  async function openGamePanel(gameId){
+    const game = GAMES_CATALOG[gameId];
+    if(!game) return;
+    gpCurrentGameId = gameId;
+    const root = document.getElementById("gamePanelRoot");
+    root.innerHTML =
+      '<div class="notif-panel-overlay" id="gpOverlay"></div>' +
+      '<div class="gp-panel">' +
+        '<div class="gp-banner" style="background:' + game.background + '">' +
+          '<div class="gp-close-btn" id="gpCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>' +
+          '<div class="gp-profile" style="background:' + game.profile + '"></div>' +
+        '</div>' +
+        '<div class="gp-head">' +
+          '<div class="gp-title">' + escapeHtml(game.title) + '</div>' +
+          '<div class="gp-creator">By <b>' + escapeHtml(game.creator) + '</b></div>' +
+        '</div>' +
+        '<div class="gp-stats">' +
+          '<div class="gp-stat"><div class="gp-stat-num" id="gpVisits">-</div><div class="gp-stat-label">Visits</div></div>' +
+          '<div class="gp-stat gp-reactable" id="gpLikeStat"><div class="gp-stat-num" id="gpLikes">-</div><div class="gp-stat-label">Likes</div></div>' +
+          '<div class="gp-stat gp-reactable" id="gpDislikeStat"><div class="gp-stat-num" id="gpDislikes">-</div><div class="gp-stat-label">Dislikes</div></div>' +
+        '</div>' +
+        '<div class="gp-meta">Created ' + fmtCreatedDate(game.createdAt) + '</div>' +
+        '<div class="gp-desc">' + escapeHtml(game.sub) + '</div>' +
+        '<button class="gp-play-btn" id="gpPlayBtn">Play</button>' +
+      '</div>';
+
+    document.getElementById("gpOverlay").addEventListener("click", closeGamePanel);
+    document.getElementById("gpCloseBtn").addEventListener("click", closeGamePanel);
+    document.getElementById("gpPlayBtn").addEventListener("click", () => {
+      closeGamePanel();
+      game.start();
+    });
+
+    const likeStat = document.getElementById("gpLikeStat");
+    const dislikeStat = document.getElementById("gpDislikeStat");
+    likeStat.addEventListener("click", async () => {
+      const stats = await getGameStats(gameId);
+      await setMyReaction(gameId, stats.myReaction === "like" ? null : "like");
+      refreshGamePanelStats(gameId);
+    });
+    dislikeStat.addEventListener("click", async () => {
+      const stats = await getGameStats(gameId);
+      await setMyReaction(gameId, stats.myReaction === "dislike" ? null : "dislike");
+      refreshGamePanelStats(gameId);
+    });
+
+    refreshGamePanelStats(gameId);
+  }
+  async function refreshGamePanelStats(gameId){
+    const stats = await getGameStats(gameId);
+    if(gpCurrentGameId !== gameId) return; // panel was closed/changed while this was in flight
+    const visitsEl = document.getElementById("gpVisits");
+    if(!visitsEl) return;
+    visitsEl.textContent = stats.visits;
+    document.getElementById("gpLikes").textContent = stats.likes;
+    document.getElementById("gpDislikes").textContent = stats.dislikes;
+    document.getElementById("gpLikeStat").classList.toggle("gp-active", stats.myReaction === "like");
+    document.getElementById("gpDislikeStat").classList.toggle("gp-active", stats.myReaction === "dislike");
+  }
+  function closeGamePanel(){
+    gpCurrentGameId = null;
+    document.getElementById("gamePanelRoot").innerHTML = "";
+  }
+
+  document.querySelectorAll(".game-card[data-game-id]").forEach(card => {
+    card.addEventListener("click", () => openGamePanel(card.getAttribute("data-game-id")));
+  });
+
   document.getElementById("hubUserRow").addEventListener("click", () => showPage("customize"));
   document.getElementById("openSecurity").addEventListener("click", () => showPage("security"));
   document.getElementById("openAccount").addEventListener("click", () => showPage("account"));
@@ -4841,7 +5036,7 @@
       // sun/moon visually rise and set together, following the same phase
       // that drives the lighting - sunHeight 1 at day-peak, -1 at night-peak
       const sunHeight = 1 - 2*t;
-      const orbitY = sunHeight * 130;
+      const orbitY = sunHeight * 260; // pushed much higher overhead than before so it reads as "way up there" instead of near the treeline
       const orbitR = 220;
       if(sunMesh){
         sunMesh.position.set(orbitR*0.55, Math.max(orbitY, -40), orbitR*0.35);
@@ -6512,41 +6707,67 @@
       }
     }
 
-    const MAP_BOUNDARY_RADIUS = 235; // just inside the 500x500 ground plane's edge, with the fence sitting right on this ring
+    const MAP_BOUNDARY_RADIUS = 235; // just inside the 500x500 ground plane's edge, with the wall sitting right on this ring
+    // small inward pad so the collision ring sits just inside the visible wall face -
+    // stops the character's capsule from ever visually poking through the mesh
+    const MAP_BOUNDARY_COLLIDE_RADIUS = MAP_BOUNDARY_RADIUS - PLAYER_RADIUS;
     function resolveMapBoundary(){
       const d = Math.hypot(character.position.x, character.position.z);
-      if(d > MAP_BOUNDARY_RADIUS){
-        const scale = MAP_BOUNDARY_RADIUS / d;
+      if(d > MAP_BOUNDARY_COLLIDE_RADIUS){
+        const scale = MAP_BOUNDARY_COLLIDE_RADIUS / d;
         character.position.x *= scale;
         character.position.z *= scale;
       }
     }
-    // a visible low fence ring around the playable area, so the boundary
-    // reads as an intentional edge instead of an invisible wall
+    // a solid low wall ring around the playable area (not just thin rails),
+    // so the edge reads as a real, deliberate barrier and the invisible
+    // collision clamp lines up with something you can actually see and feel
     function spawnBoundaryFence(){
-      const postMat = new THREE.MeshLambertMaterial({ color: 0x5a4632 });
-      const railMat = new THREE.MeshLambertMaterial({ color: 0x6b5640 });
-      const postCount = 72;
-      for(let i = 0; i < postCount; i++){
-        const angle = (i / postCount) * Math.PI * 2;
-        const x = Math.cos(angle) * MAP_BOUNDARY_RADIUS, z = Math.sin(angle) * MAP_BOUNDARY_RADIUS;
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.2, 6), postMat);
-        post.position.set(x, 1.1, z);
-        post.castShadow = true;
-        scene.add(post);
-      }
-      // horizontal rail ring, built as short segments between consecutive posts
-      for(let i = 0; i < postCount; i++){
-        const a1 = (i / postCount) * Math.PI * 2, a2 = ((i+1) / postCount) * Math.PI * 2;
+      const wallMat = new THREE.MeshLambertMaterial({ color: 0x5a4632 });
+      const capMat = new THREE.MeshLambertMaterial({ color: 0x6b5640 });
+      const stripeMat = new THREE.MeshLambertMaterial({ color: 0xd8b34a, emissive: 0x3a2c0a, emissiveIntensity: 0.4 });
+      const postMat = new THREE.MeshLambertMaterial({ color: 0x4a3a28 });
+      const segCount = 96;
+      const wallHeight = 3.4, wallThickness = 0.6;
+
+      // continuous solid wall, built from angled box segments so it forms a closed ring
+      for(let i = 0; i < segCount; i++){
+        const a1 = (i / segCount) * Math.PI * 2, a2 = ((i+1) / segCount) * Math.PI * 2;
         const x1 = Math.cos(a1)*MAP_BOUNDARY_RADIUS, z1 = Math.sin(a1)*MAP_BOUNDARY_RADIUS;
         const x2 = Math.cos(a2)*MAP_BOUNDARY_RADIUS, z2 = Math.sin(a2)*MAP_BOUNDARY_RADIUS;
         const midX = (x1+x2)/2, midZ = (z1+z2)/2;
-        const segLen = Math.hypot(x2-x1, z2-z1);
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.12, 0.12), railMat);
-        rail.position.set(midX, 1.6, midZ);
-        rail.rotation.y = Math.atan2(x2-x1, z2-z1);
-        rail.castShadow = true;
-        scene.add(rail);
+        const segLen = Math.hypot(x2-x1, z2-z1) + 0.05; // tiny overlap so there's no visible seam between segments
+        const angle = Math.atan2(x2-x1, z2-z1);
+
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(segLen, wallHeight, wallThickness), wallMat);
+        wall.position.set(midX, wallHeight/2, midZ);
+        wall.rotation.y = angle;
+        wall.castShadow = true; wall.receiveShadow = true;
+        scene.add(wall);
+
+        // thin glowing warning stripe along the top edge, makes the boundary readable at a glance/at night
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.14, wallThickness + 0.04), stripeMat);
+        stripe.position.set(midX, wallHeight + 0.05, midZ);
+        stripe.rotation.y = angle;
+        scene.add(stripe);
+
+        // squared-off cap along the top so the wall doesn't read as a flat slab from above
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.2, wallThickness + 0.3), capMat);
+        cap.position.set(midX, wallHeight + 0.2, midZ);
+        cap.rotation.y = angle;
+        cap.castShadow = true;
+        scene.add(cap);
+      }
+
+      // chunky corner posts every few segments, breaks up the ring visually and hides seams
+      const postCount = 48;
+      for(let i = 0; i < postCount; i++){
+        const angle = (i / postCount) * Math.PI * 2;
+        const x = Math.cos(angle) * MAP_BOUNDARY_RADIUS, z = Math.sin(angle) * MAP_BOUNDARY_RADIUS;
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, wallHeight + 0.6, 6), postMat);
+        post.position.set(x, (wallHeight + 0.6)/2, z);
+        post.castShadow = true;
+        scene.add(post);
       }
     }
 
@@ -7036,15 +7257,11 @@
       let html = '<div class="game-lb-head"><span>Online - ' + total + '</span><span class="lb-hint">Tab to close</span></div>';
 
       html += '<div class="game-lb-row"><span class="game-lb-rank">1</span>' +
-        '<span class="game-lb-avatar">' + initials(me) + '</span>' +
-        '<span class="status-dot"></span>' +
         '<span class="lb-name">' + escapeHtml(me) + '</span><span class="lb-you">You</span></div>';
 
       others.forEach((p, i) => {
         html += '<div class="game-lb-row" data-lb-name="' + escapeHtml(p.name) + '">' +
           '<span class="game-lb-rank">' + (i + 2) + '</span>' +
-          '<span class="game-lb-avatar">' + initials(p.name) + '</span>' +
-          '<span class="status-dot"></span>' +
           '<span class="lb-name">' + escapeHtml(p.name) + '</span></div>';
       });
       panel.innerHTML = html;
@@ -7402,6 +7619,20 @@
       loading.classList.remove("hidden");
       bar.style.width = "0%";
 
+      // loading screen shows the game's own background + profile + creator,
+      // matching whatever's in the catalog for this game
+      const game = (typeof GAMES_CATALOG !== "undefined") ? GAMES_CATALOG.baseplate : null;
+      if(game){
+        loading.style.background = game.background;
+        const profileEl = document.getElementById("gameLoadingProfile");
+        const creatorEl = document.getElementById("gameLoadingCreator");
+        const cubeEl = document.getElementById("gameLoadingCube");
+        if(profileEl){ profileEl.style.background = game.profile; profileEl.classList.add("show"); }
+        if(creatorEl){ creatorEl.textContent = "By " + game.creator; creatorEl.classList.add("show"); }
+        if(cubeEl) cubeEl.classList.add("hide");
+        registerVisitOnce(game.id);
+      }
+
       if(!renderer) initScene();
       if(!wired){ wireInput(); wired = true; }
       wireMenu();
@@ -7463,6 +7694,13 @@
             if(animId) cancelAnimationFrame(animId);
             screen.classList.add("hidden");
             loading.classList.add("hidden");
+            loading.style.background = "";
+            const profileEl = document.getElementById("gameLoadingProfile");
+            const creatorEl = document.getElementById("gameLoadingCreator");
+            const cubeEl = document.getElementById("gameLoadingCube");
+            if(profileEl) profileEl.classList.remove("show");
+            if(creatorEl) creatorEl.classList.remove("show");
+            if(cubeEl) cubeEl.classList.remove("hide");
             label.textContent = "Loading Baseplate...";
             bar.style.width = "0%";
             showPage("home"); // always land back on a real dashboard tab, never wherever you happened to be before
@@ -7512,7 +7750,8 @@
     return { start, stop, forceDisconnect, isRunning: () => running, refreshOwnNameTag, looksLikeProfanity, buildCharacterRig, normalizeCustom, disposeObject3D };
   })();
 
-  document.getElementById("playBaseplateBtn").addEventListener("click", () => BaseplateGame.start());
+  // playBaseplateBtn's click is now wired above via the generic
+  // .game-card[data-game-id] handler, which opens the game info panel first
 
   /* ============ init ============ */
   applyTheme();
