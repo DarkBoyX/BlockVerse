@@ -25,21 +25,35 @@
     color:var(--text-0); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   .card{
-    width:100%; max-width:720px; background:var(--bg-2); border:1px solid var(--border-soft);
-    border-radius:16px; padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
-    animation:fadeUp .4s ease both;
+    width:100%; max-width:760px; background:var(--bg-2); border:1px solid var(--border-soft);
+    border-radius:18px; padding:0; box-shadow:0 24px 70px rgba(0,0,0,0.65);
+    animation:fadeUp .4s ease both; overflow:hidden;
   }
   @keyframes fadeUp{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
-  .logo{ text-align:center; margin-bottom:22px; }
+  .card-inner{ padding:30px 28px 28px; }
+  .logo{
+    text-align:center; padding:26px 28px 22px; background:linear-gradient(180deg, rgba(74,108,247,0.08), transparent);
+    border-bottom:1px solid var(--border-soft);
+  }
   .logo .cube{
-    display:inline-block; width:36px; height:36px;
+    display:inline-block; width:38px; height:38px;
     background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
-    border:1px solid var(--border); border-radius:8px; margin-bottom:8px; transform:rotate(45deg);
+    border:1px solid var(--border); border-radius:9px; margin-bottom:10px; transform:rotate(45deg);
     box-shadow:0 0 0 rgba(74,108,247,0); animation:cubeGlow 4s ease-in-out infinite;
   }
-  @keyframes cubeGlow{ 0%,100%{ box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ box-shadow:0 0 18px rgba(255,255,255,0.28); } }
-  .logo h1{ margin:0; font-size:19px; letter-spacing:0.5px; }
-  .logo p{ margin:4px 0 0; font-size:11.5px; color:var(--text-2); }
+  @keyframes cubeGlow{ 0%,100%{ box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ box-shadow:0 0 22px rgba(120,145,255,0.35); } }
+  .logo h1{ margin:0; font-size:20px; letter-spacing:0.3px; font-weight:800; }
+  .logo p{ margin:5px 0 0; font-size:11.5px; color:var(--text-2); }
+
+  /* ---------- quick stats strip ---------- */
+  .stats-strip{ display:flex; gap:10px; margin:0 0 20px; }
+  .stat-box{
+    flex:1; background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px;
+    padding:13px 14px; text-align:center;
+  }
+  .stat-box .stat-num{ font-size:20px; font-weight:800; color:var(--text-0); line-height:1.1; }
+  .stat-box .stat-label{ font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; }
+  .stat-box.stat-danger .stat-num{ color:#ff9d9f; }
 
   label{ display:block; font-size:12px; color:var(--text-1); margin:14px 0 6px; }
   input[type="password"], input[type="text"]{
@@ -77,22 +91,25 @@
 
   .role-badge{
     text-align:center; font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase;
-    padding:6px 0; margin-bottom:16px; color:var(--text-2); background:var(--grey-1);
-    border:1px solid var(--border-soft); border-radius:8px;
+    padding:8px 0; margin-bottom:18px; color:var(--text-1); background:var(--grey-1);
+    border:1px solid var(--border-soft); border-radius:9px; display:flex; align-items:center; justify-content:center; gap:6px;
   }
+  .role-badge .role-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 6px rgba(62,207,110,0.7); }
   body.role-admin .owner-only{ display:none !important; }
 
   /* ---------- Accounts panel ---------- */
-  .section-title{ font-size:14px; font-weight:700; margin:26px 0 12px; padding-top:18px; border-top:1px solid var(--border-soft); display:flex; align-items:center; gap:7px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-1); }
+  .section-title{ font-size:13px; font-weight:700; margin:24px 0 12px; padding-top:20px; border-top:1px solid var(--border-soft); display:flex; align-items:center; gap:7px; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-1); }
   .section-title .count-pill{ background:var(--grey-2); color:var(--text-2); font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; text-transform:none; letter-spacing:0; }
-  .acct-search{ margin-bottom:10px; }
+  .acct-search-wrap{ position:relative; margin-bottom:12px; }
+  .acct-search-wrap svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+  .acct-search{ padding-left:34px !important; }
   .acct-list{ max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
   .acct-row{
-    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:10px;
-    padding:11px 13px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-    transition:border-color .15s, background .15s;
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:11px;
+    padding:12px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    transition:border-color .15s, background .15s, transform .1s;
   }
-  .acct-row:hover{ border-color:var(--grey-3); background:#17171a; }
+  .acct-row:hover{ border-color:var(--grey-3); background:#17171a; transform:translateX(1px); }
   .acct-name{ font-size:13.5px; font-weight:600; }
   .acct-key{ font-size:11px; color:var(--text-3); }
   .acct-badges{ display:flex; gap:5px; }
@@ -122,6 +139,8 @@
     <p>Publish updates &middot; disconnect live players</p>
   </div>
 
+  <div class="card-inner">
+
   <!-- gate screen -->
   <div id="gateScreen">
     <label for="gateInput">Admin passphrase</label>
@@ -137,7 +156,14 @@
 
   <!-- publish screen -->
   <div id="publishScreen" class="hidden">
-    <div class="role-badge" id="roleBadge"></div>
+    <div class="role-badge" id="roleBadge"><span class="role-dot"></span><span id="roleBadgeText"></span></div>
+
+    <div class="stats-strip">
+      <div class="stat-box"><div class="stat-num" id="statTotal">-</div><div class="stat-label">Accounts</div></div>
+      <div class="stat-box stat-danger"><div class="stat-num" id="statBanned">-</div><div class="stat-label">Banned</div></div>
+      <div class="stat-box owner-only"><div class="stat-num" id="statVersion">-</div><div class="stat-label">Live version</div></div>
+    </div>
+
     <div class="status-block owner-only">
       <div class="status-row"><span>Current version</span><span id="curVersion">-</span></div>
       <div class="status-row"><span>Last published</span><span id="curTs">-</span></div>
@@ -151,13 +177,18 @@
     </p>
 
     <div class="section-title">Accounts <span class="count-pill" id="acctCountPill">-</span></div>
-    <input type="text" id="acctSearch" class="acct-search" placeholder="Search by username...">
+    <div class="acct-search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" id="acctSearch" class="acct-search" placeholder="Search by username...">
+    </div>
     <div class="acct-list" id="acctList"></div>
     <p class="note">
       Kick pulls someone out of Baseplate only. Ban blocks login and logs them
       out everywhere immediately. Terminate permanently deletes the account and
       unfriends it from everyone. None of this is undoable except Ban (you can unban).
     </p>
+  </div>
+
   </div>
 </div>
 
@@ -210,7 +241,7 @@
     gateScreen.classList.add("hidden");
     publishScreen.classList.remove("hidden");
     document.body.classList.toggle("role-admin", currentRole === "admin");
-    document.getElementById("roleBadge").textContent = currentRole === "owner" ? "Owner access" : "Admin access (kick/warn only)";
+    document.getElementById("roleBadgeText").textContent = currentRole === "owner" ? "Owner access" : "Admin access (kick/warn only)";
     loadStatus();
     loadAccounts();
   });
@@ -219,8 +250,11 @@
   function loadStatus(){
     db.ref("blockverse_version").once("value").then(snap => {
       const v = snap.val();
-      curVersion.textContent = v && v.version != null ? v.version : "0";
+      const versionText = v && v.version != null ? String(v.version) : "0";
+      curVersion.textContent = versionText;
       curTs.textContent = v && v.ts ? new Date(v.ts).toLocaleString() : "Never";
+      const statVersion = document.getElementById("statVersion");
+      if(statVersion) statVersion.textContent = versionText;
     }).catch(() => {
       curVersion.textContent = "?"; curTs.textContent = "?";
     });
@@ -271,6 +305,11 @@
     const q = (acctSearch.value || "").trim().toLowerCase();
     const rows = allAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
     document.getElementById("acctCountPill").textContent = rows.length + " / " + allAccounts.length;
+
+    const statTotal = document.getElementById("statTotal");
+    const statBanned = document.getElementById("statBanned");
+    if(statTotal) statTotal.textContent = allAccounts.length;
+    if(statBanned) statBanned.textContent = Object.keys(banStatus).length;
     if(rows.length === 0){ acctList.innerHTML = '<p class="note">No accounts found.</p>'; return; }
     const isAdminRole = currentRole === "admin";
     acctList.innerHTML = rows.map(a => {
