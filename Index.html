@@ -5340,6 +5340,14 @@
     const move = { x:0, z:0 }; // joystick / wasd vector
     let camYaw = Math.PI;      // horizontal look angle (target)
     let camPitch = 0.28;       // vertical look angle (target)
+    // pitch is stored relative to the 0.28 "neutral" offset (see updateCamera's
+    // tilt calc), so these bounds keep tilt within just shy of straight up/down
+    // (+/- ~85deg) - full 90deg causes a gimbal pop as the look direction
+    // flips, so we stop just short of it
+    const PITCH_NEUTRAL = 0.28;
+    const CAM_PITCH_MIN = PITCH_NEUTRAL - 1.48; // near-vertical look up
+    const CAM_PITCH_MAX = PITCH_NEUTRAL + 1.48; // near-vertical look down
+    function clampPitch(p){ return Math.max(CAM_PITCH_MIN, Math.min(CAM_PITCH_MAX, p)); }
     let smYaw = Math.PI;       // smoothed/applied look angle
     let smPitch = 0.28;
     let vy = 0;                // vertical velocity for jump
@@ -5421,16 +5429,20 @@
       if(renderer) renderer.toneMappingExposure = 1.05 - t*0.35; // scene reads noticeably darker/moodier at night, not just recolored
 
       // sun/moon visually rise and set together, following the same phase
-      // that drives the lighting - sunHeight 1 at day-peak, -1 at night-peak
+      // that drives the lighting - sunHeight 1 at day-peak, -1 at night-peak.
+      // Pushed way out (not just "up") so they read as genuinely distant
+      // celestial objects instead of big nearby discs - they sit at a fixed
+      // point in world space (not attached to the camera in any way), so
+      // walking toward the edge of the map doesn't make them loom closer.
       const sunHeight = 1 - 2*t;
-      const orbitY = sunHeight * 260; // pushed much higher overhead than before so it reads as "way up there" instead of near the treeline
-      const orbitR = 220;
+      const orbitY = sunHeight * 900;
+      const orbitR = 950;
       if(sunMesh){
-        sunMesh.position.set(orbitR*0.55, Math.max(orbitY, -40), orbitR*0.35);
+        sunMesh.position.set(orbitR*0.55, Math.max(orbitY, -150), orbitR*0.35);
         sunMesh.material.opacity = Math.max(0, Math.min(1, sunHeight*1.6));
       }
       if(moonMesh){
-        moonMesh.position.set(-orbitR*0.55, Math.max(-orbitY, -40), -orbitR*0.35);
+        moonMesh.position.set(-orbitR*0.55, Math.max(-orbitY, -150), -orbitR*0.35);
         moonMesh.material.opacity = Math.max(0, Math.min(1, -sunHeight*1.6));
       }
       if(starField && starField.material) starField.material.opacity = t;
@@ -5505,7 +5517,7 @@
       scene.background = makeSkyGradientTexture(nightAmount());
       scene.fog = new THREE.Fog(0xaee0f5, 55, 190);
 
-      camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 500);
+      camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 2000);
 
       const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x3a5f2b, 1.0);
       scene.add(hemi);
@@ -5533,7 +5545,7 @@
         map: makeCrescentMoonTexture(),
         transparent: true, opacity: 0, depthWrite: false, fog: false
       }));
-      moonMesh.scale.set(26, 26, 1);
+      moonMesh.scale.set(70, 70, 1);
       scene.add(moonMesh);
 
       // sun: white core with a very soft warm-white glow, moves up/down
@@ -5542,7 +5554,7 @@
         map: makeGlowCircleTexture(["#ffffff", "#fdfdfb", "#eef3ff"]),
         transparent: true, opacity: 1, depthWrite: false, fog: false
       }));
-      sunMesh.scale.set(34, 34, 1);
+      sunMesh.scale.set(90, 90, 1);
       scene.add(sunMesh);
 
       // stars: a shell of small points, invisible by day, fades in at night
@@ -5550,7 +5562,7 @@
       const starCount = 700;
       const starPositions = new Float32Array(starCount * 3);
       for(let i = 0; i < starCount; i++){
-        const r = 280 + Math.random()*40;
+        const r = 1200 + Math.random()*200;
         const theta = Math.random()*Math.PI*2;
         const phi = Math.random()*Math.PI*0.5; // upper hemisphere only
         starPositions[i*3] = r*Math.sin(phi)*Math.cos(theta);
@@ -5558,7 +5570,7 @@
         starPositions[i*3+2] = r*Math.sin(phi)*Math.sin(theta);
       }
       starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
-      const starMat = new THREE.PointsMaterial({ color:0xffffff, size:2, transparent:true, opacity:0, depthWrite:false, fog:false });
+      const starMat = new THREE.PointsMaterial({ color:0xffffff, size:2, sizeAttenuation:false, transparent:true, opacity:0, depthWrite:false, fog:false });
       starField = new THREE.Points(starGeo, starMat);
       scene.add(starField);
 
@@ -6814,7 +6826,14 @@
         e.stopPropagation(); // don't let WASD movement keys fire while typing
         if(e.key === "Enter") doSend();
       });
-      input.addEventListener("keyup", (e) => e.stopPropagation());
+      // NOTE: keyup deliberately does NOT stop propagation (unlike keydown
+      // above) - it needs to reach the window-level handler so a WASD key
+      // that was held down right as chat opened still gets marked "released"
+      // when you let go, even though it's not actually being applied to
+      // movement while typing (see updateMovement's typingInField guard).
+      // Swallowing it here too used to leave keys[] stuck "true" forever,
+      // which is what caused the character to keep drifting after chatting.
+      input.addEventListener("focus", () => { for(const k in keys) keys[k] = false; });
       log.addEventListener("scroll", () => {
         if(isChatScrolledNearBottom()) pill.classList.add("hidden");
       });
@@ -7028,6 +7047,17 @@
       camera.position.set(px, py, pz);
       camera.lookAt(tx, ty, tz);
 
+      // keep the camera from dipping below the ground the character is
+      // standing on - without this, looking steeply down (especially
+      // zoomed out) can push the orbit camera's position under the
+      // baseplate/parts, which shows their backfaces (i.e. the void
+      // underneath) instead of the top surface
+      const groundFloor = character.position.y + 0.6;
+      if(camera.position.y < groundFloor){
+        camera.position.y = groundFloor;
+        camera.lookAt(tx, ty, tz);
+      }
+
       // once zoomed in close enough it reads as first-person - hide your own
       // body so it doesn't block the view (remote players still see you normally)
       const firstPerson = blend < 0.35;
@@ -7052,7 +7082,7 @@
       if(!menuOpen){
         if(rx || ry){
           camYaw -= rx * 0.045;
-          camPitch = Math.max(-0.8, Math.min(1.4, camPitch + ry * 0.03));
+          camPitch = clampPitch(camPitch + ry * 0.03);
         }
         if(justPressed(0)) doJump();           // A / Cross
         if(justPressed(2)) openChatAndFocus();  // X / Square
@@ -7074,10 +7104,18 @@
       // key-reading separate from the camera-relative math below so it's
       // easy to see w=forward, s=back, a=left, d=right actually holds
       let inputForward = 0, inputRight = 0;
-      if(keys["w"]||keys["arrowup"]) inputForward += 1;
-      if(keys["s"]||keys["arrowdown"]) inputForward -= 1;
-      if(keys["d"]||keys["arrowright"]) inputRight += 1;
-      if(keys["a"]||keys["arrowleft"]) inputRight -= 1;
+      // ignore WASD/arrow state entirely while focus is in a text field
+      // (chat, report box, etc.) - otherwise a key that was held down right
+      // as chat opened could get "stuck" (see input focus/blur handlers
+      // below for why keys[] can go stale) and keep moving the character
+      // even though nothing is actually being pressed anymore
+      const typingInField = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
+      if(!typingInField){
+        if(keys["w"]||keys["arrowup"]) inputForward += 1;
+        if(keys["s"]||keys["arrowdown"]) inputForward -= 1;
+        if(keys["d"]||keys["arrowright"]) inputRight += 1;
+        if(keys["a"]||keys["arrowleft"]) inputRight -= 1;
+      }
       inputForward += -move.z; // joystick: pushing up (negative z) = forward
       inputRight += move.x;
 
@@ -7119,22 +7157,31 @@
         while(diff < -Math.PI) diff += Math.PI*2;
         character.rotation.y += diff * 0.18;
 
-        walkT += dt * 5.5;
-        applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head }, walkT, true);
+        // only run the walk cycle while actually grounded - applying it
+        // in the air used to fight with the jump pose below (both setting
+        // leg/arm rotation the same frame), which is what made jumping
+        // while moving look like two animations layered on top of each
+        // other. Airborne movement still happens (you can strafe mid-air),
+        // it just doesn't drive the leg/arm swing while off the ground.
         if(onGround){
+          walkT += dt * 5.5;
+          applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head, group: character }, walkT, true);
           const phase = walkT % (Math.PI*2);
           const justCrossedStep = phase < lastWalkPhase; // wrapped around - one stride cycle completed
           if(justCrossedStep) playFootstep();
           lastWalkPhase = phase;
         }
-      } else {
+      } else if(onGround){
+        // same idea: idle/dance pose only while grounded, so a dance that
+        // gets cancelled mid-air (see doJump/stopDance) never gets its
+        // pose blended together with the jump pose in the same frame
         walkT = 0;
         idleT += dt * 1.6;
         if(myEmote === "dance"){
           myEmoteT += dt;
-          applyDancePose({ leftLeg, rightLeg, leftArm, rightArm, head }, myEmoteT);
+          applyDancePose({ leftLeg, rightLeg, leftArm, rightArm, head, group: character }, myEmoteT);
         } else {
-          applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head }, walkT, false, idleT);
+          applyWalkPose({ leftLeg, rightLeg, leftArm, rightArm, head, group: character }, walkT, false, idleT);
         }
       }
 
@@ -7581,7 +7628,7 @@
           lastX = e.clientX; lastY = e.clientY;
         }
         camYaw -= dx * 0.006 * mouseSensitivity;
-        camPitch = Math.max(-0.8, Math.min(1.4, camPitch + dy * 0.004 * mouseSensitivity));
+        camPitch = clampPitch(camPitch + dy * 0.004 * mouseSensitivity);
       });
       document.addEventListener("pointerlockchange", () => {
         // the browser can exit pointer lock on its own (Escape, alt-tab, etc.) - keep our state in sync either way
@@ -7619,7 +7666,7 @@
         const dx = t.clientX - lastX, dy = t.clientY - lastY;
         lastX = t.clientX; lastY = t.clientY;
         camYaw -= dx * 0.006 * mouseSensitivity;
-        camPitch = Math.max(-0.8, Math.min(1.4, camPitch + dy * 0.004 * mouseSensitivity));
+        camPitch = clampPitch(camPitch + dy * 0.004 * mouseSensitivity);
       }, { passive:true });
       canvas.addEventListener("touchend", (e) => {
         dragging = false;
