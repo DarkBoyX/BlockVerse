@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlockVerse Studio</title>
+<style>
+  :root{
+    --bg-0:#0a0a0b; --bg-1:#131315; --bg-2:#1a1a1d; --bg-3:#212124;
+    --grey-1:#2a2a2e; --grey-2:#38383d; --grey-3:#48484e;
+    --border:#333338; --border-soft:#242428;
+    --text-0:#f2f2f2; --text-1:#b4b4b9; --text-2:#7a7a80; --text-3:#55555a;
+    --accent:#4a6cf7; --danger:#e5484d;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; min-height:100vh; background:var(--bg-0); color:var(--text-0);
+    overflow:hidden;
+  }
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:var(--grey-2); border-radius:8px; }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--grey-3); }
+  button{ font-family:inherit; }
+  button:active{ transform:scale(.97); }
+
+  /* ================= LOGIN ================= */
+  #loginScreen{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(circle at 20% 0%, #19191c 0%, transparent 45%),
+      radial-gradient(circle at 80% 100%, #16161a 0%, transparent 45%),
+      var(--bg-0);
+    z-index:10;
+  }
+  .login-card{
+    width:360px; max-width:90vw; background:var(--bg-2); border:1px solid var(--border-soft);
+    border-radius:16px; padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    animation:fadeUp .4s ease both;
+  }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:translateY(0);} }
+  .login-brand{
+    display:flex; align-items:center; gap:10px; margin-bottom:22px; font-weight:800; font-size:17px;
+  }
+  .login-brand .lb-mark{
+    width:32px; height:32px; border-radius:9px; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#fff;
+  }
+  .login-field{ margin-bottom:14px; }
+  .login-field label{ display:block; font-size:12px; color:var(--text-2); margin-bottom:6px; }
+  .login-field input{
+    width:100%; background:var(--bg-1); border:1px solid var(--border); border-radius:9px;
+    color:var(--text-0); font-size:13.5px; padding:11px 12px; outline:none; font-family:inherit;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .login-field input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(74,108,247,0.15); }
+  .login-submit{
+    width:100%; margin-top:6px; background:var(--accent); border:none; border-radius:9px;
+    color:#fff; font-size:13.5px; font-weight:700; padding:12px 0; cursor:pointer;
+    transition:filter .15s; position:relative;
+  }
+  .login-submit:hover{ filter:brightness(1.08); }
+  .login-submit:disabled{ opacity:.6; cursor:default; }
+  .login-msg{
+    margin-top:14px; font-size:12.5px; padding:9px 11px; border-radius:9px; display:none; align-items:center; gap:8px;
+  }
+  .login-msg.show{ display:flex; animation:popIn .2s ease both; }
+  @keyframes popIn{ from{ opacity:0; transform:scale(.96);} to{ opacity:1; transform:scale(1);} }
+  .login-msg.error{ background:rgba(229,72,77,0.1); color:#ff9a9d; border:1px solid rgba(229,72,77,0.35); }
+  .login-msg.info{ background:rgba(74,108,247,0.1); color:#9db1ff; border:1px solid rgba(74,108,247,0.3); }
+  .login-sub{ font-size:12px; color:var(--text-3); margin-top:18px; text-align:center; }
+  .login-sub a{ color:var(--text-1); text-decoration:none; border-bottom:1px dashed var(--text-3); }
+  .spin{
+    width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.35);
+    border-top-color:#fff; display:inline-block; animation:spin .6s linear infinite; vertical-align:-2px; margin-right:6px;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ================= DASHBOARD ================= */
+  #dashScreen{ position:fixed; inset:0; display:none; }
+  #dashScreen.show{ display:flex; }
+  .studio-sidebar{
+    width:220px; flex-shrink:0; background:var(--bg-1); border-right:1px solid var(--border-soft);
+    padding:20px 16px; display:flex; flex-direction:column;
+  }
+  .studio-brand{ display:flex; align-items:center; gap:10px; padding:0 4px 22px; font-weight:800; font-size:15px; }
+  .studio-brand .lb-mark{ width:26px; height:26px; border-radius:7px; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff; }
+  .studio-user{
+    display:flex; align-items:center; gap:10px; padding:10px; border-radius:10px;
+    border:1px solid var(--border-soft); background:var(--bg-2); margin-bottom:18px;
+  }
+  .studio-user .su-avatar{
+    width:32px; height:32px; border-radius:8px; background:var(--grey-2); display:flex; align-items:center;
+    justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;
+  }
+  .studio-user .su-name{ font-size:13px; font-weight:600; }
+  .studio-user .su-tag{ font-size:11px; color:var(--text-3); }
+  .studio-spacer{ flex:1; }
+  .studio-logout{
+    width:100%; background:var(--bg-2); border:1px solid var(--border); color:var(--text-2);
+    padding:9px 0; border-radius:8px; font-size:12.5px; cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .studio-logout:hover{ color:var(--text-0); border-color:var(--grey-3); background:var(--grey-1); }
+
+  .dash-main{ flex:1; overflow-y:auto; padding:32px 40px; }
+  .dash-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+  .dash-header h1{ margin:0; font-size:21px; }
+  .dash-header p{ margin:4px 0 0; font-size:13px; color:var(--text-2); }
+  .new-game-btn{
+    display:flex; align-items:center; gap:8px; background:var(--accent); border:none; border-radius:10px;
+    color:#fff; font-size:13.5px; font-weight:700; padding:11px 18px; cursor:pointer; transition:filter .15s;
+  }
+  .new-game-btn:hover{ filter:brightness(1.08); }
+  .new-game-btn svg{ width:15px; height:15px; }
+
+  .game-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:16px; }
+  .game-card{
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:14px; overflow:hidden;
+    cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; animation:fadeUp .35s ease both;
+  }
+  .game-card:hover{ transform:translateY(-3px); border-color:var(--grey-3); box-shadow:0 10px 26px rgba(0,0,0,0.4); }
+  .game-card .gc-thumb{
+    width:100%; aspect-ratio:16/10; background:
+      linear-gradient(180deg, #4a6cf7 0%, #7aa2ff 55%, #3ecf6e 55%, #2fae59 100%);
+    position:relative;
+  }
+  .game-card .gc-thumb::after{
+    content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.35) 100%);
+  }
+  .game-card .gc-body{ padding:12px 13px 14px; }
+  .game-card .gc-name{ font-size:13.5px; font-weight:700; margin-bottom:3px; }
+  .game-card .gc-meta{ font-size:11.5px; color:var(--text-3); }
+
+  .new-game-card{
+    background:var(--bg-2); border:1px dashed var(--border); border-radius:14px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+    aspect-ratio:16/13.2; cursor:pointer; color:var(--text-2); transition:border-color .15s, color .15s, background .15s;
+  }
+  .new-game-card:hover{ border-color:var(--accent); color:var(--text-0); background:rgba(74,108,247,0.06); }
+  .new-game-card .ngc-plus{
+    width:44px; height:44px; border-radius:50%; background:var(--grey-1); display:flex; align-items:center; justify-content:center;
+  }
+  .new-game-card .ngc-plus svg{ width:20px; height:20px; }
+  .new-game-card span{ font-size:12.5px; font-weight:600; }
+
+  .empty-state{
+    border:1px dashed var(--border); border-radius:14px; padding:60px 20px; text-align:center;
+    color:var(--text-2); grid-column:1/-1;
+  }
+  .empty-state .e-title{ font-size:15px; color:var(--text-1); margin-bottom:4px; }
+  .empty-state .e-sub{ font-size:12.5px; color:var(--text-3); }
+
+  /* ================= EDITOR ================= */
+  #editorScreen{ position:fixed; inset:0; display:none; background:var(--bg-0); }
+  #editorScreen.show{ display:flex; flex-direction:column; }
+
+  .editor-topbar{
+    height:48px; flex-shrink:0; background:var(--bg-1); border-bottom:1px solid var(--border-soft);
+    display:flex; align-items:center; padding:0 14px; gap:14px;
+  }
+  .editor-back-btn{
+    width:32px; height:32px; border-radius:8px; background:var(--bg-2); border:1px solid var(--border-soft);
+    color:var(--text-1); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+    transition:background .15s, color .15s;
+  }
+  .editor-back-btn:hover{ background:var(--grey-1); color:var(--text-0); }
+  .editor-back-btn svg{ width:15px; height:15px; }
+  .editor-title-wrap{ display:flex; flex-direction:column; line-height:1.25; }
+  .editor-title{ font-size:13px; font-weight:700; }
+  .editor-subtitle{ font-size:10.5px; color:var(--text-3); }
+  .editor-topbar-spacer{ flex:1; }
+  .editor-tool-btn{
+    display:flex; align-items:center; gap:6px; background:var(--bg-2); border:1px solid var(--border-soft);
+    color:var(--text-1); font-size:12px; border-radius:8px; padding:7px 12px; cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .editor-tool-btn:hover{ background:var(--grey-1); color:var(--text-0); }
+  .editor-tool-btn.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .editor-tool-btn svg{ width:14px; height:14px; }
+  .editor-save-btn{
+    background:var(--accent); border:none; color:#fff; font-size:12.5px; font-weight:700;
+    border-radius:8px; padding:8px 14px; cursor:pointer; transition:filter .15s;
+  }
+  .editor-save-btn:hover{ filter:brightness(1.08); }
+  .editor-save-note{ font-size:11px; color:var(--text-3); margin-right:4px; transition:opacity .3s; }
+
+  .editor-body{ flex:1; display:flex; min-height:0; }
+
+  /* ---- Properties (left) ---- */
+  .props-panel{
+    width:250px; flex-shrink:0; background:var(--bg-1); border-right:1px solid var(--border-soft);
+    display:flex; flex-direction:column;
+  }
+  .panel-head{
+    padding:12px 14px; border-bottom:1px solid var(--border-soft); font-size:11.5px; font-weight:700;
+    letter-spacing:0.4px; text-transform:uppercase; color:var(--text-2); display:flex; align-items:center; gap:8px;
+  }
+  .panel-head svg{ width:14px; height:14px; }
+  .props-body{ flex:1; overflow-y:auto; padding:10px 12px; }
+  .props-empty{ color:var(--text-3); font-size:12px; text-align:center; padding:40px 10px; }
+  .prop-group-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin:14px 2px 6px; }
+  .prop-group-label:first-child{ margin-top:2px; }
+  .prop-row{ margin-bottom:9px; }
+  .prop-row label{ display:block; font-size:11px; color:var(--text-2); margin-bottom:4px; }
+  .prop-row input[type="text"], .prop-row input[type="number"]{
+    width:100%; background:var(--bg-2); border:1px solid var(--border); border-radius:7px;
+    color:var(--text-0); font-size:12.5px; padding:7px 9px; outline:none; font-family:inherit;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .prop-row input[type="text"]:focus, .prop-row input[type="number"]:focus{
+    border-color:var(--accent); box-shadow:0 0 0 3px rgba(74,108,247,0.15);
+  }
+  .prop-vec3{ display:flex; gap:6px; }
+  .prop-vec3 input{ text-align:center; }
+  .prop-vec3-axis{
+    display:flex; align-items:center; justify-content:center; width:16px; font-size:10.5px; font-weight:700; color:var(--text-3);
+    flex-shrink:0;
+  }
+  .prop-vec3 .pv-field{ flex:1; display:flex; align-items:center; gap:4px; }
+  .prop-row input[type="color"]{
+    width:100%; height:30px; border:1px solid var(--border); border-radius:7px; background:var(--bg-2);
+    padding:2px; cursor:pointer;
+  }
+  .prop-row.readonly input{ color:var(--text-3); cursor:default; }
+
+  /* ---- Viewport (center) ---- */
+  .viewport-wrap{ flex:1; position:relative; min-width:0; }
+  #studioCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; }
+  #studioCanvas:active{ cursor:grabbing; }
+  .viewport-hint{
+    position:absolute; left:14px; bottom:14px; font-size:11px; color:var(--text-3);
+    background:rgba(19,19,21,0.7); border:1px solid var(--border-soft); border-radius:8px; padding:7px 10px;
+    pointer-events:none; backdrop-filter:blur(4px);
+  }
+
+  /* ---- Explorer (right) ---- */
+  .explorer-panel{
+    width:230px; flex-shrink:0; background:var(--bg-1); border-left:1px solid var(--border-soft);
+    display:flex; flex-direction:column;
+  }
+  .explorer-body{ flex:1; overflow-y:auto; padding:8px 8px; }
+  .exp-node{ user-select:none; }
+  .exp-row{
+    display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:7px; cursor:pointer;
+    font-size:12.5px; color:var(--text-1); transition:background .12s, color .12s;
+  }
+  .exp-row:hover{ background:var(--grey-1); color:var(--text-0); }
+  .exp-row.selected{ background:var(--accent); color:#fff; }
+  .exp-row .exp-icon{ width:14px; height:14px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .exp-row .exp-icon svg{ width:13px; height:13px; }
+  .exp-children{ margin-left:16px; border-left:1px solid var(--border-soft); padding-left:4px; }
+
+  .toast-wrap{ position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:50; display:flex; flex-direction:column; gap:8px; }
+  .toast{
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:10px; padding:10px 16px;
+    font-size:12.5px; color:var(--text-0); box-shadow:0 10px 26px rgba(0,0,0,0.4); animation:popIn .2s ease both;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand"><span class="lb-mark">BV</span> BlockVerse Studio</div>
+    <form id="loginForm">
+      <div class="login-field">
+        <label>Username</label>
+        <input type="text" id="stUsername" autocomplete="username" placeholder="Your BlockVerse username">
+      </div>
+      <div class="login-field">
+        <label>Password</label>
+        <input type="password" id="stPassword" autocomplete="current-password" placeholder="Your password">
+      </div>
+      <button type="submit" class="login-submit" id="stLoginBtn">Log In</button>
+      <div class="login-msg" id="stLoginMsg"></div>
+    </form>
+    <div class="login-sub">Use the same account you play BlockVerse with.</div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dashScreen">
+  <div class="studio-sidebar">
+    <div class="studio-brand"><span class="lb-mark">BV</span> Studio</div>
+    <div class="studio-user">
+      <div class="su-avatar" id="dashAvatarInitial">?</div>
+      <div>
+        <div class="su-name" id="dashUsername">-</div>
+        <div class="su-tag">Creator</div>
+      </div>
+    </div>
+    <div class="studio-spacer"></div>
+    <button class="studio-logout" id="studioLogoutBtn">Log out</button>
+  </div>
+  <div class="dash-main">
+    <div class="dash-header">
+      <div>
+        <h1>My Games</h1>
+        <p>Create and edit places for BlockVerse.</p>
+      </div>
+    </div>
+    <div class="game-grid" id="gameGrid">
+      <div class="new-game-card" id="newGameCard">
+        <div class="ngc-plus">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </div>
+        <span>New Game</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= EDITOR ================= -->
+<div id="editorScreen">
+  <div class="editor-topbar">
+    <button class="editor-back-btn" id="editorBackBtn" title="Back to dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="editor-title-wrap">
+      <div class="editor-title" id="editorTitle">Untitled Game</div>
+      <div class="editor-subtitle">BlockVerse Studio</div>
+    </div>
+    <div class="editor-topbar-spacer"></div>
+    <span class="editor-save-note" id="editorSaveNote"></span>
+    <button class="editor-tool-btn" id="addPartBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Part
+    </button>
+    <button class="editor-save-btn" id="editorSaveBtn">Save</button>
+  </div>
+  <div class="editor-body">
+    <div class="props-panel">
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Properties
+      </div>
+      <div class="props-body" id="propsBody">
+        <div class="props-empty">Select something in the Explorer to see its properties.</div>
+      </div>
+    </div>
+
+    <div class="viewport-wrap">
+      <canvas id="studioCanvas"></canvas>
+      <div class="viewport-hint">Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan</div>
+    </div>
+
+    <div class="explorer-panel">
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        Explorer
+      </div>
+      <div class="explorer-body" id="explorerBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- Firebase (same platform/project as the main game) ---------------- */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
+    authDomain: "blockverse-3526c.firebaseapp.com",
+    databaseURL: "https://blockverse-3526c-default-rtdb.firebaseio.com",
+    projectId: "blockverse-3526c",
+    storageBucket: "blockverse-3526c.firebasestorage.app",
+    messagingSenderId: "782192628812",
+    appId: "1:782192628812:web:79d50d2c34cd8ac969d0e9"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const fbDb = firebase.database();
+  const fbAuth = firebase.auth();
+
+  let fbReadyResolve;
+  const fbReady = new Promise(res => { fbReadyResolve = res; });
+  fbAuth.onAuthStateChanged((user) => { if(user) fbReadyResolve(user.uid); });
+  fbAuth.signInAnonymously().catch((err) => console.error("Studio: anon sign-in failed:", err));
+  setTimeout(() => fbReadyResolve(null), 6000);
+
+  async function hashPassword(pw){
+    const enc = new TextEncoder().encode(pw);
+    const buf = await crypto.subtle.digest("SHA-256", enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+
+  function showToast(text){
+    const wrap = document.getElementById("toastWrap");
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = text;
+    wrap.appendChild(t);
+    setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .3s"; setTimeout(() => t.remove(), 300); }, 2200);
+  }
+
+  /* ---------------- Session state ---------------- */
+  let currentUserKey = null;
+  let currentUsername = null;
+
+  const loginForm = document.getElementById("loginForm");
+  const loginMsg = document.getElementById("stLoginMsg");
+  const loginBtn = document.getElementById("stLoginBtn");
+
+  function showLoginMsg(text, kind){
+    loginMsg.textContent = text;
+    loginMsg.className = "login-msg show " + kind;
+  }
+  function clearLoginMsg(){
+    loginMsg.className = "login-msg";
+  }
+
+  loginForm.addEventListener("submit", async function(e){
+    e.preventDefault();
+    clearLoginMsg();
+    const username = document.getElementById("stUsername").value.trim();
+    const password = document.getElementById("stPassword").value;
+    if(!username || !password){
+      showLoginMsg("Enter your username and password.", "error");
+      return;
+    }
+    const key = username.toLowerCase();
+
+    loginBtn.disabled = true;
+    loginBtn.innerHTML = '<span class="spin"></span>Checking...';
+    try{
+      await fbReady;
+      const hash = await hashPassword(password);
+      const [credSnap, dirSnap, termSnap] = await Promise.all([
+        fbDb.ref("blockverse_credentials/" + key).once("value"),
+        fbDb.ref("blockverse_usernames/" + key).once("value"),
+        fbDb.ref("blockverse_terminated/" + key).once("value")
+      ]);
+
+      if(termSnap.exists()){
+        showLoginMsg("This account has been terminated.", "error");
+        return;
+      }
+
+      const cred = credSnap.val();
+      const dir = dirSnap.val();
+
+      if(!cred){
+        // no such account exists on the platform at all
+        showLoginMsg("This account is not found on the platform.", "error");
+        return;
+      }
+
+      if(cred.passwordHash !== hash){
+        showLoginMsg("Wrong password for that account.", "error");
+        return;
+      }
+
+      currentUserKey = key;
+      currentUsername = (dir && dir.username) || username;
+      enterDashboard();
+    }catch(err){
+      console.error("Studio login failed:", err);
+      showLoginMsg("Couldn't reach the platform. Check your connection and try again.", "error");
+    }finally{
+      loginBtn.disabled = false;
+      loginBtn.textContent = "Log In";
+    }
+  });
+
+  document.getElementById("studioLogoutBtn").addEventListener("click", () => {
+    currentUserKey = null; currentUsername = null;
+    document.getElementById("dashScreen").classList.remove("show");
+    document.getElementById("editorScreen").classList.remove("show");
+    document.getElementById("loginScreen").style.display = "flex";
+    document.getElementById("stPassword").value = "";
+  });
+
+  /* ---------------- Dashboard: games list ---------------- */
+  function gamesStorageKey(){ return "bv_studio_games_" + currentUserKey; }
+
+  function loadGames(){
+    try{ return JSON.parse(localStorage.getItem(gamesStorageKey()) || "[]"); }catch(e){ return []; }
+  }
+  function saveGames(list){
+    try{ localStorage.setItem(gamesStorageKey(), JSON.stringify(list)); }catch(e){}
+    // best-effort cloud backup of the games list (names/ids only - not the scene) so
+    // "My Games" isn't wiped by clearing browser storage
+    fbDb.ref("studio_games/" + currentUserKey).set(list).catch(() => {});
+  }
+
+  function enterDashboard(){
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("dashScreen").classList.add("show");
+    document.getElementById("dashUsername").textContent = currentUsername;
+    document.getElementById("dashAvatarInitial").textContent = currentUsername.slice(0,1).toUpperCase();
+
+    fbDb.ref("studio_games/" + currentUserKey).once("value").then(snap => {
+      const cloud = snap.val();
+      if(Array.isArray(cloud) && cloud.length && loadGames().length === 0){
+        try{ localStorage.setItem(gamesStorageKey(), JSON.stringify(cloud)); }catch(e){}
+      }
+      renderGameGrid();
+    }).catch(() => renderGameGrid());
+  }
+
+  function renderGameGrid(){
+    const grid = document.getElementById("gameGrid");
+    const games = loadGames();
+    const newCard = document.getElementById("newGameCard");
+    grid.innerHTML = "";
+    grid.appendChild(newCard);
+    games.slice().reverse().forEach(g => {
+      const card = document.createElement("div");
+      card.className = "game-card";
+      card.innerHTML =
+        '<div class="gc-thumb"></div>' +
+        '<div class="gc-body">' +
+          '<div class="gc-name"></div>' +
+          '<div class="gc-meta">' + new Date(g.created).toLocaleDateString() + '</div>' +
+        '</div>';
+      card.querySelector(".gc-name").textContent = g.name;
+      card.addEventListener("click", () => openEditor(g));
+      grid.appendChild(card);
+    });
+  }
+
+  document.getElementById("newGameCard").addEventListener("click", () => {
+    const name = "Untitled Game " + (loadGames().length + 1);
+    const game = { id: "g_" + Date.now().toString(36) + Math.random().toString(36).slice(2,7), name, created: Date.now() };
+    const games = loadGames();
+    games.push(game);
+    saveGames(games);
+    renderGameGrid();
+    openEditor(game);
+  });
+
+  /* ---------------- Editor: three.js scene + explorer + properties ---------------- */
+  let scene, camera, renderer, raycaster, mouse;
+  let sceneObjects = []; // { id, name, className, mesh, props }
+  let selectedId = null;
+  let editorInited = false;
+  let currentGame = null;
+
+  function openEditor(game){
+    currentGame = game;
+    document.getElementById("dashScreen").classList.remove("show");
+    document.getElementById("editorScreen").classList.add("show");
+    document.getElementById("editorTitle").textContent = game.name;
+
+    if(!editorInited){
+      initThree();
+      editorInited = true;
+    }
+    buildDefaultScene();
+    renderExplorer();
+    selectObject(null);
+    onResize();
+  }
+
+  document.getElementById("editorBackBtn").addEventListener("click", () => {
+    document.getElementById("editorScreen").classList.remove("show");
+    document.getElementById("dashScreen").classList.add("show");
+  });
+
+  document.getElementById("editorSaveBtn").addEventListener("click", () => {
+    if(!currentGame) return;
+    const games = loadGames();
+    const idx = games.findIndex(g => g.id === currentGame.id);
+    if(idx !== -1){ games[idx].name = currentGame.name; games[idx].lastSaved = Date.now(); saveGames(games); }
+    const note = document.getElementById("editorSaveNote");
+    note.textContent = "Saved";
+    note.style.opacity = "1";
+    setTimeout(() => { note.style.opacity = "0"; }, 1400);
+    showToast("Saved " + currentGame.name);
+  });
+
+  function initThree(){
+    const canvas = document.getElementById("studioCanvas");
+    renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+
+    // orbit target/state
+    const orbit = { target:new THREE.Vector3(0,3,0), radius:38, theta:Math.PI*0.28, phi:Math.PI*0.32 };
+    function updateCamera(){
+      const x = orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+      const y = orbit.target.y + orbit.radius * Math.cos(orbit.phi);
+      const z = orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+      camera.position.set(x,y,z);
+      camera.lookAt(orbit.target);
+    }
+    updateCamera();
+
+    let dragging = false, panning = false, lastX=0, lastY=0;
+    canvas.addEventListener("mousedown", (e) => {
+      if(e.button === 2){ panning = true; } else { dragging = true; }
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener("mouseup", () => { dragging=false; panning=false; });
+    window.addEventListener("mousemove", (e) => {
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      if(dragging){
+        orbit.theta -= dx * 0.006;
+        orbit.phi = Math.max(0.15, Math.min(Math.PI-0.15, orbit.phi - dy * 0.006));
+        updateCamera();
+      }else if(panning){
+        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+        const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+        orbit.target.addScaledVector(right, -dx * 0.04);
+        orbit.target.addScaledVector(up, dy * 0.04);
+        updateCamera();
+      }
+    });
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      orbit.radius = Math.max(6, Math.min(140, orbit.radius + e.deltaY * 0.03));
+      updateCamera();
+    }, { passive:false });
+
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+    canvas.addEventListener("click", (e) => {
+      if(Math.abs(e.movementX) + Math.abs(e.movementY) > 6) return; // ignore drag-releases
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const meshes = sceneObjects.map(o => o.mesh);
+      const hits = raycaster.intersectObjects(meshes);
+      if(hits.length){
+        const hit = sceneObjects.find(o => o.mesh === hits[0].object);
+        if(hit) selectObject(hit.id);
+      }else{
+        selectObject(null);
+      }
+    });
+
+    window.addEventListener("resize", onResize);
+
+    function animate(){
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+  }
+
+  function onResize(){
+    if(!renderer) return;
+    const wrap = document.querySelector(".viewport-wrap");
+    if(!wrap) return;
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if(w === 0 || h === 0) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+
+  function clearScene(){
+    sceneObjects.forEach(o => scene.remove(o.mesh));
+    sceneObjects = [];
+    scene.children.slice().forEach(c => scene.remove(c));
+  }
+
+  function addSceneObject(opts){
+    const id = "obj_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    const geo = new THREE.BoxGeometry(opts.size[0], opts.size[1], opts.size[2]);
+    const mat = new THREE.MeshLambertMaterial({ color: opts.color, transparent: opts.transparency > 0, opacity: 1 - opts.transparency });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(opts.pos[0], opts.pos[1], opts.pos[2]);
+    scene.add(mesh);
+    const obj = {
+      id, name: opts.name, className: opts.className,
+      mesh,
+      props: { position:[...opts.pos], size:[...opts.size], color: opts.color, transparency: opts.transparency, anchored: opts.anchored !== false }
+    };
+    sceneObjects.push(obj);
+    return obj;
+  }
+
+  function buildDefaultScene(){
+    clearScene();
+
+    // sky
+    scene.background = new THREE.Color(0x87b6ff);
+    scene.fog = new THREE.Fog(0x87b6ff, 60, 180);
+
+    const hemi = new THREE.HemisphereLight(0xbfd9ff, 0x2f3a2b, 0.9);
+    scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    sun.position.set(30, 50, 20);
+    scene.add(sun);
+
+    // Baseplate
+    addSceneObject({
+      name:"Baseplate", className:"Part",
+      pos:[0, -0.5, 0], size:[100, 1, 100],
+      color: 0x3ecf6e, transparency:0
+    });
+
+    // SpawnLocation
+    addSceneObject({
+      name:"SpawnLocation", className:"SpawnLocation",
+      pos:[0, 0.15, 0], size:[6, 0.3, 6],
+      color: 0xc23b3b, transparency:0
+    });
+  }
+
+  document.getElementById("addPartBtn").addEventListener("click", () => {
+    const n = sceneObjects.filter(o => o.className === "Part").length + 1;
+    const obj = addSceneObject({
+      name:"Part" + n, className:"Part",
+      pos:[0, 3, 0], size:[4,4,4],
+      color: 0x9aa0a6, transparency:0
+    });
+    renderExplorer();
+    selectObject(obj.id);
+    showToast("Added " + obj.name);
+  });
+
+  /* ---- Explorer ---- */
+  function iconSvg(className){
+    if(className === "SpawnLocation"){
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
+  }
+
+  function renderExplorer(){
+    const body = document.getElementById("explorerBody");
+    body.innerHTML = "";
+
+    const workspaceRow = document.createElement("div");
+    workspaceRow.className = "exp-row";
+    workspaceRow.innerHTML =
+      '<span class="exp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg></span>Workspace';
+    body.appendChild(workspaceRow);
+
+    const children = document.createElement("div");
+    children.className = "exp-children";
+    sceneObjects.forEach(o => {
+      const row = document.createElement("div");
+      row.className = "exp-row" + (o.id === selectedId ? " selected" : "");
+      row.innerHTML = '<span class="exp-icon">' + iconSvg(o.className) + '</span><span></span>';
+      row.querySelector("span:last-child").textContent = o.name;
+      row.addEventListener("click", () => selectObject(o.id));
+      children.appendChild(row);
+    });
+    body.appendChild(children);
+  }
+
+  /* ---- Properties ---- */
+  function selectObject(id){
+    selectedId = id;
+    renderExplorer();
+    renderProperties();
+    sceneObjects.forEach(o => {
+      o.mesh.material.emissive = o.mesh.material.emissive || new THREE.Color(0,0,0);
+      if(o.id === id) o.mesh.material.emissive.setHex(0x24407a);
+      else o.mesh.material.emissive.setHex(0x000000);
+    });
+  }
+
+  function renderProperties(){
+    const body = document.getElementById("propsBody");
+    const obj = sceneObjects.find(o => o.id === selectedId);
+    if(!obj){
+      body.innerHTML = '<div class="props-empty">Select something in the Explorer to see its properties.</div>';
+      return;
+    }
+    body.innerHTML = "";
+
+    function groupLabel(text){
+      const el = document.createElement("div");
+      el.className = "prop-group-label";
+      el.textContent = text;
+      body.appendChild(el);
+    }
+    function textRow(labelText, value, onChange, readonly){
+      const row = document.createElement("div");
+      row.className = "prop-row" + (readonly ? " readonly" : "");
+      const label = document.createElement("label");
+      label.textContent = labelText;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = value;
+      if(readonly) input.disabled = true;
+      else input.addEventListener("change", () => onChange(input.value));
+      row.appendChild(label); row.appendChild(input);
+      body.appendChild(row);
+    }
+    function vec3Row(labelText, vec, onChange){
+      const row = document.createElement("div");
+      row.className = "prop-row";
+      const label = document.createElement("label");
+      label.textContent = labelText;
+      const wrap = document.createElement("div");
+      wrap.className = "prop-vec3";
+      ["X","Y","Z"].forEach((axis, i) => {
+        const field = document.createElement("div");
+        field.className = "pv-field";
+        const ax = document.createElement("span");
+        ax.className = "prop-vec3-axis";
+        ax.textContent = axis;
+        const input = document.createElement("input");
+        input.type = "number";
+        input.step = "0.1";
+        input.value = Math.round(vec[i]*100)/100;
+        input.addEventListener("change", () => {
+          const nv = [...vec];
+          nv[i] = parseFloat(input.value) || 0;
+          onChange(nv);
+        });
+        field.appendChild(ax); field.appendChild(input);
+        wrap.appendChild(field);
+      });
+      row.appendChild(label); row.appendChild(wrap);
+      body.appendChild(row);
+    }
+    function colorRow(labelText, hexInt, onChange){
+      const row = document.createElement("div");
+      row.className = "prop-row";
+      const label = document.createElement("label");
+      label.textContent = labelText;
+      const input = document.createElement("input");
+      input.type = "color";
+      input.value = "#" + hexInt.toString(16).padStart(6,"0");
+      input.addEventListener("input", () => onChange(parseInt(input.value.slice(1), 16)));
+      row.appendChild(label); row.appendChild(input);
+      body.appendChild(row);
+    }
+
+    groupLabel("Identity");
+    textRow("Name", obj.name, (v) => {
+      obj.name = v || obj.name;
+      if(currentGame && obj.className !== "Baseplate") { /* name only affects explorer/label */ }
+      renderExplorer();
+    });
+    textRow("ClassName", obj.className, null, true);
+
+    groupLabel("Transform");
+    vec3Row("Position", obj.props.position, (nv) => {
+      obj.props.position = nv;
+      obj.mesh.position.set(nv[0], nv[1], nv[2]);
+    });
+    vec3Row("Size", obj.props.size, (nv) => {
+      obj.props.size = nv;
+      obj.mesh.geometry.dispose();
+      obj.mesh.geometry = new THREE.BoxGeometry(nv[0], nv[1], nv[2]);
+    });
+
+    groupLabel("Appearance");
+    colorRow("Color", obj.props.color, (hex) => {
+      obj.props.color = hex;
+      obj.mesh.material.color.setHex(hex);
+    });
+  }
+
+  /* ---------------- Boot ---------------- */
+  window.addEventListener("load", () => { document.getElementById("stUsername").focus(); });
+})();
+</script>
+</body>
+</html>
