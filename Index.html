@@ -59,6 +59,7 @@
   @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
   @keyframes popIn{ 0%{opacity:0; transform:scale(0.94);} 100%{opacity:1; transform:scale(1);} }
   @keyframes floatCube{ 0%,100%{transform:rotate(45deg) translateY(0);} 50%{transform:rotate(45deg) translateY(-6px);} }
+  @keyframes floatLogo{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
   @keyframes shake{ 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
   @keyframes shimmer{ 0%{background-position:-200px 0;} 100%{background-position:200px 0;} }
   @keyframes pulseDot{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
@@ -74,10 +75,9 @@
   }
   .logo{ text-align:center; margin-bottom:24px; }
   .logo .cube{
-    display:inline-block; width:40px; height:40px;
-    background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
-    border:1px solid var(--border); border-radius:9px; margin-bottom:10px;
-    transform:rotate(45deg); animation:floatCube 3.2s ease-in-out infinite, cubeGlow 4s ease-in-out infinite;
+    display:inline-block; width:52px; height:52px;
+    margin-bottom:10px; object-fit:contain;
+    animation:floatLogo 3.2s ease-in-out infinite, cubeGlow 4s ease-in-out infinite;
   }
   @keyframes cubeGlow{ 0%,100%{ box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ box-shadow:0 0 20px rgba(255,255,255,0.3); } }
   .logo h1{ margin:0; font-size:23px; letter-spacing:1px; color:var(--text-0); }
@@ -173,8 +173,7 @@
   }
   .sidebar-close-btn svg{ width:15px; height:15px; }
   .sb-cube{
-    width:20px; height:20px; background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
-    border:1px solid var(--border); border-radius:5px; transform:rotate(45deg);
+    width:20px; height:20px; object-fit:contain; display:inline-block;
   }
   .sb-section-label{ font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-3); margin:14px 8px 8px; }
   .sb-item{
@@ -560,6 +559,11 @@
     box-shadow:0 8px 20px rgba(0,0,0,0.4); animation:fadeIn .15s ease both;
   }
   .game-chat-newmsg svg{ width:12px; height:12px; }
+  .chat-typing-indicator{
+    padding:0 12px; font-size:11px; font-style:italic; color:var(--text-2,#7a7a80);
+    height:16px; line-height:16px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  }
+  .chat-typing-indicator.hidden{ display:none; }
   .game-chat-input-row{ display:flex; gap:6px; padding:10px; border-top:1px solid rgba(255,255,255,0.07); }
   .game-chat-input-row input{
     flex:1; background:#1c1c1f; border:1px solid #2c2c30; border-radius:8px; color:#f2f2f2;
@@ -1317,7 +1321,7 @@
 <div class="auth-box-grid"></div>
 <div class="auth-wrap" id="authScreen">
   <div class="logo">
-    <div class="cube"></div>
+    <img class="cube" src="logo.png" alt="BlockVerse logo">
     <h1>BlockVerse</h1>
     <p data-i18n="tagline">build. play. imagine.</p>
   </div>
@@ -1380,12 +1384,12 @@
     <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
     </button>
-    <div class="mt-brand"><div class="sb-cube" style="width:16px;height:16px;"></div><span>BlockVerse</span></div>
+    <div class="mt-brand"><img class="sb-cube" style="width:16px;height:16px;" src="logo.png" alt="BlockVerse logo"><span>BlockVerse</span></div>
   </div>
   <div class="sidebar-drawer-overlay" id="sidebarDrawerOverlay"></div>
   <div class="sidebar">
     <div class="sb-brand">
-      <div class="sb-cube"></div><span>BlockVerse</span>
+      <img class="sb-cube" src="logo.png" alt="BlockVerse logo"><span>BlockVerse</span>
       <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
       </button>
@@ -1766,6 +1770,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
       </button>
     </div>
+    <div class="chat-typing-indicator hidden" id="chatTypingIndicator"></div>
     <div class="game-chat-input-row">
       <input type="text" id="gameChatInput" maxlength="140" placeholder="Message...">
       <button id="gameChatSendBtn">Send</button>
@@ -6305,6 +6310,17 @@
       "блять","сука","хуй","пизда","бля"
     ];
 
+    // separate word list from PROFANITY_LIST: not swear words, but terms
+    // this in-game chat doesn't want spelled out plainly - other platform/
+    // app names (which chat rules disallow mentioning, e.g. to steer kids
+    // off-platform) and a couple of safety-flag words. Matched and hashed
+    // the same way as PROFANITY_LIST (see buildProfanityPattern below).
+    const SENSITIVE_TERMS_LIST = [
+      "predator","predators","groomer","groomers",
+      "discord","youtube","yt","tiktok","tik tok","twitter","x.com","instagram","insta",
+      "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game"
+    ];
+
     // strips accents/diacritics (Latin AND Arabic), Arabic tatweel, and
     // normalizes alef variants - so a word typed with decorations still
     // matches its plain form
@@ -6357,6 +6373,24 @@
     // share across calls
     const profanityRegex = new RegExp(profanityPatternSrc, "giu");
 
+    // short/ambiguous sensitive terms get word boundaries so they don't
+    // false-positive as substrings of unrelated words (e.g. "yt" inside
+    // "party", "snap" inside "snapshot", "insta" inside "instant")
+    const SENSITIVE_BOUNDARY_PROTECTED = new Set(["yt","snap","insta","kik","x.com"]);
+    function buildSensitivePattern(){
+      const parts = SENSITIVE_TERMS_LIST.map(w => {
+        const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+        return SENSITIVE_BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
+    }
+    const sensitivePatternSrc = buildSensitivePattern();
+
+    function looksLikeSensitiveTerm(text){
+      if(!text) return false;
+      return new RegExp(sensitivePatternSrc, "iu").test(normalizeForFilter(text));
+    }
+
     // true if ANY normalized substring of the text matches the filter -
     // this is the "is this message bad" check used both to decide whether
     // to censor a message and, in the report flow, as the automated check
@@ -6386,10 +6420,16 @@
     // safe fallback rather than let it through unmarked.
     function censorText(text){
       if(!text) return text;
-      if(!looksLikeProfanity(text)) return text;
-      const replaced = text.replace(new RegExp(profanityPatternSrc, "giu"), m => "#".repeat(m.length));
-      if(replaced !== text) return replaced;
-      return text.replace(/\S/g, "#");
+      let out = text;
+      if(looksLikeProfanity(out)){
+        const replaced = out.replace(new RegExp(profanityPatternSrc, "giu"), m => "#".repeat(m.length));
+        out = (replaced !== out) ? replaced : out.replace(/\S/g, "#");
+      }
+      if(looksLikeSensitiveTerm(out)){
+        const replaced = out.replace(new RegExp(sensitivePatternSrc, "giu"), m => "#".repeat(m.length));
+        if(replaced !== out) out = replaced;
+      }
+      return out;
     }
 
     /* ---- in-game chat ---- */
@@ -6447,10 +6487,92 @@
       }
     }
 
+    /* ---- "X is typing" indicator ---- */
+    let typingRef = null; // rooms/baseplate/typing/{playerId} = { name, ts }
+    let typingState = {}; // playerId -> { name, ts }
+    let typingStaleTimer = null;
+    const TYPING_STALE_MS = 5000; // an entry older than this is treated as "stopped typing" even without an explicit clear
+
+    function typingIndicatorEl(){ return document.getElementById("chatTypingIndicator"); }
+
+    function renderTypingIndicator(){
+      const el = typingIndicatorEl();
+      if(!el) return;
+      const now = Date.now();
+      const names = Object.keys(typingState)
+        .filter(id => id !== playerId && (now - (typingState[id].ts || 0)) < TYPING_STALE_MS)
+        .map(id => typingState[id].name || "Someone");
+
+      if(names.length === 0){
+        el.classList.add("hidden");
+        el.textContent = "";
+        return;
+      }
+      let text;
+      if(names.length === 1) text = names[0] + " is typing…";
+      else if(names.length <= 3) text = names.join(", ") + " are typing…";
+      else text = "Several people are typing…";
+      el.textContent = text;
+      el.classList.remove("hidden");
+    }
+
+    function connectChatTyping(){
+      typingState = {};
+      typingRef = fbDb.ref("rooms/baseplate/typing");
+      typingRef.on("value", (snap) => {
+        typingState = snap.val() || {};
+        renderTypingIndicator();
+      });
+      if(typingStaleTimer) clearInterval(typingStaleTimer);
+      // ticks the indicator's own clock so an entry silently ages out of
+      // view even if nobody writes another Firebase update after it
+      typingStaleTimer = setInterval(renderTypingIndicator, 1500);
+    }
+
+    function disconnectChatTyping(){
+      if(typingRef){ typingRef.off(); }
+      const myKey = playerId;
+      if(typingRef && myKey) typingRef.child(myKey).remove().catch(() => {});
+      typingRef = null;
+      typingState = {};
+      if(typingStaleTimer){ clearInterval(typingStaleTimer); typingStaleTimer = null; }
+      renderTypingIndicator();
+    }
+
+    let typingClearTimeout = null;
+    function broadcastTyping(){
+      if(!typingRef || !playerId) return;
+      const myRef = typingRef.child(playerId);
+      myRef.set({ name: currentUsername ? currentUsername() : "Player", ts: firebase.database.ServerValue.TIMESTAMP }).catch(() => {});
+      myRef.onDisconnect().remove();
+      clearTimeout(typingClearTimeout);
+      // auto-clear our own "typing" entry a couple seconds after the last
+      // keystroke, rather than waiting on the stale-timeout on every peer
+      typingClearTimeout = setTimeout(clearOwnTyping, 3000);
+    }
+    function clearOwnTyping(){
+      clearTimeout(typingClearTimeout);
+      if(typingRef && playerId) typingRef.child(playerId).remove().catch(() => {});
+    }
+
+    let typingIndicatorWired = false;
+    function wireChatTypingIndicator(){
+      if(typingIndicatorWired) return;
+      typingIndicatorWired = true;
+      const input = document.getElementById("gameChatInput");
+      if(!input) return;
+      input.addEventListener("input", () => {
+        if(input.value.trim()) broadcastTyping(); else clearOwnTyping();
+      });
+      input.addEventListener("keydown", (e) => { if(e.key === "Enter") clearOwnTyping(); });
+      input.addEventListener("blur", clearOwnTyping);
+    }
+
     function connectChat(){
       chatReady = false;
       chatSeenKeys = new Set();
       chatMessages = [];
+      connectChatTyping();
       chatRef = fbDb.ref("rooms/baseplate/chat").limitToLast(50);
       chatRef.on("child_added", (snap) => {
         const msg = snap.val() || {};
@@ -6488,6 +6610,7 @@
     }
 
     function disconnectChat(){
+      disconnectChatTyping();
       if(chatRef){ chatRef.off(); chatRef = null; }
       chatReady = false;
       chatSeenKeys = new Set();
@@ -6573,7 +6696,8 @@
       const now = Date.now();
       recentOwnMessages = recentOwnMessages.filter(m => now - m.ts < 15000);
       const combinedTail = recentOwnMessages.map(m => m.text).join("") + body;
-      if(!looksLikeProfanity(body) && looksLikeProfanity(combinedTail)){
+      if((!looksLikeProfanity(body) && looksLikeProfanity(combinedTail)) ||
+         (!looksLikeSensitiveTerm(body) && looksLikeSensitiveTerm(combinedTail))){
         appendSystemChatLine("That message looks like it's spelling out something against the rules across multiple messages - it wasn't sent.");
         return;
       }
@@ -6679,6 +6803,7 @@
         if(!input.value.trim()) return;
         sendChatMessage(input.value);
         input.value = "";
+        clearOwnTyping();
         scrollChatToBottom(true);
         pill.classList.add("hidden");
       }
@@ -6709,6 +6834,18 @@
       });
       document.getElementById("chatWhisperChipClear").addEventListener("click", clearWhisperTarget);
 
+      // clicking/tapping anywhere outside the chat panel blurs the message
+      // box if it's focused, so people don't get "stuck" typing into chat
+      // (keys like WASD silently going nowhere) after clicking back into
+      // the game. Doesn't close the panel - just releases keyboard focus.
+      document.addEventListener("pointerdown", (e) => {
+        if(document.activeElement !== input) return;
+        if(panel.contains(e.target)) return;
+        input.blur();
+        clearOwnTyping();
+      });
+
+      wireChatTypingIndicator();
       wireChatModeration();
     }
 
@@ -7843,7 +7980,6 @@
     function openCharacterPreview(name){
       previewName = name;
       initCharPreview();
-      resizePreviewCanvas();
 
       if(previewRig){ previewScene.remove(previewRig.group); disposeObject3D(previewRig.group); previewRig = null; }
       // placeholder rig while we fetch their real saved colors, so the
@@ -7856,7 +7992,12 @@
       document.getElementById("charPreviewTag").textContent = t("playingNow");
       refreshCharPreviewAction();
 
+      // unhide FIRST, then size the canvas - the wrap is display:none until
+      // this point, so measuring it any earlier reads 0x0 and the canvas
+      // ends up permanently sized to nothing (a blank box, nothing ever
+      // rendered into it even after the overlay becomes visible)
       document.getElementById("charPreviewOverlay").classList.remove("hidden");
+      resizePreviewCanvas();
       if(previewAnimId) cancelAnimationFrame(previewAnimId);
       previewTick();
 
