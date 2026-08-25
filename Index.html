@@ -281,6 +281,87 @@
   .gp-play-btn:hover{ background:#3d5ce0; }
   .gp-play-btn:active{ transform:scale(0.98); }
 
+  /* ---------- Experience page (full page, opens instead of the old side panel) ---------- */
+  .gp-panel.gp-fullpage{
+    width:100%; max-width:none; left:0; border-left:none; z-index:950;
+    animation:fadeUp .25s ease both;
+  }
+  .gp-panel.gp-fullpage .gp-banner{ aspect-ratio:auto; height:min(38vh,320px); }
+  .gp-fp-body{ max-width:640px; margin:0 auto; width:100%; padding-bottom:40px; }
+  .gp-fp-headrow{ display:flex; align-items:flex-end; gap:14px; padding:26px 24px 4px; }
+  .gp-fp-headrow .gp-profile{ position:static; border-width:3px; }
+  .gp-fp-headrow .gp-title{ font-size:21px; }
+  .gp-fp-play{
+    margin:18px 24px 0; padding:13px; background:#4a6cf7; border:none; border-radius:10px;
+    color:#fff; font-size:14.5px; font-weight:700; cursor:pointer; transition:background .15s, transform .1s;
+  }
+  .gp-fp-play:hover{ background:#3d5ce0; }
+  .gp-fp-play:active{ transform:scale(0.98); }
+  .gp-stats{ margin:0 24px; }
+  .gp-desc{ padding:10px 24px 0; }
+  .gp-meta{ padding:14px 24px 0; }
+
+  .gp-section{ margin:22px 24px 0; }
+  .gp-section-title{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-2); margin-bottom:10px; }
+  .gp-info-box{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px; padding:14px 16px;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .gp-info-row{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; }
+  .gp-info-row .gi-label{ color:var(--text-3); }
+  .gp-info-row .gi-value{ color:var(--text-1); font-weight:600; }
+  .gp-servers-btn{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px; padding:14px 16px;
+    color:var(--text-0); cursor:pointer; font-size:13.5px; font-weight:700; transition:border-color .15s, background .15s;
+  }
+  .gp-servers-btn:hover{ border-color:var(--grey-3); background:var(--grey-1); }
+  .gp-servers-btn .gsb-sub{ font-size:11.5px; color:var(--text-3); font-weight:500; margin-top:2px; }
+  .gp-servers-btn svg{ width:16px; height:16px; flex-shrink:0; color:var(--text-3); }
+
+  /* ---------- Servers page (Friends / Servers tabs) ---------- */
+  .srv-page{
+    position:fixed; inset:0; background:var(--bg-2); z-index:960; display:flex; flex-direction:column;
+    animation:fadeUp .2s ease both;
+  }
+  .srv-topbar{ display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--border-soft); flex-shrink:0; }
+  .srv-back-btn{
+    width:34px; height:34px; border-radius:9px; background:var(--bg-1); border:1px solid var(--border-soft);
+    display:flex; align-items:center; justify-content:center; color:var(--text-1); cursor:pointer; flex-shrink:0;
+  }
+  .srv-back-btn:hover{ background:var(--grey-1); color:var(--text-0); }
+  .srv-back-btn svg{ width:16px; height:16px; }
+  .srv-title{ font-size:15.5px; font-weight:800; color:var(--text-0); }
+  .srv-tabs{ display:flex; gap:6px; padding:14px 20px 0; flex-shrink:0; }
+  .srv-tab-btn{
+    flex:1; padding:10px 0; text-align:center; font-size:12.5px; font-weight:700; color:var(--text-2);
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:9px; cursor:pointer; transition:.15s;
+  }
+  .srv-tab-btn.active{ background:var(--grey-2); color:var(--text-0); border-color:var(--grey-3); }
+  .srv-body{ flex:1; overflow-y:auto; padding:18px 20px 30px; max-width:640px; margin:0 auto; width:100%; }
+
+  .srv-faces-row{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .srv-faces-row .friend-avatar{ width:38px; height:38px; }
+
+  .srv-card{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:14px; padding:16px; margin-bottom:14px;
+  }
+  .srv-card-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .srv-card-name{ font-size:13.5px; font-weight:700; color:var(--text-0); }
+  .srv-card-count{ font-size:12px; color:var(--text-2); font-weight:600; }
+  .srv-card-count.srv-full{ color:#ff9a9d; }
+  .srv-join-btn{
+    width:100%; padding:11px; background:#4a6cf7; border:none; border-radius:9px; color:#fff;
+    font-size:13px; font-weight:700; cursor:pointer; transition:background .15s;
+  }
+  .srv-join-btn:hover{ background:#3d5ce0; }
+  .srv-join-btn.srv-disabled{ background:var(--grey-2); color:var(--text-3); cursor:not-allowed; }
+  .srv-empty-note{ text-align:center; color:var(--text-3); font-size:12.5px; padding:30px 14px; }
+  .srv-friend-row{
+    display:flex; align-items:center; gap:12px; padding:10px; border-radius:10px; margin-bottom:6px;
+  }
+  .srv-friend-row .n-text{ font-size:13px; color:var(--text-1); font-weight:600; }
+
   /* ---------- Loading screen: game background + profile + creator ---------- */
   .game-loading{ background-size:cover; background-position:center; }
   .game-loading::before{
@@ -1395,6 +1476,7 @@
     </div>
 
     <div id="gamePanelRoot"></div>
+    <div id="serversPageRoot"></div>
 
     <!-- SETTINGS HUB (3 buttons) -->
     <div id="pageSettingsHub" class="hidden">
@@ -4977,40 +5059,67 @@
     }catch(e){}
   }
 
-  /* ============ game info / join panel ============ */
+  /* ============ experience page (opens full-page when a game card is tapped) ============ */
+  const SERVER_CAPACITY = 15; // each server can hold up to 15 people
   let gpCurrentGameId = null;
+
+  // how many accounts are currently in the (single, shared) baseplate room -
+  // this doubles as "server 1"'s live player count until real sharded
+  // servers exist server-side
+  async function getCurrentRoomPlayerKeys(gameId){
+    await fbReady;
+    try{
+      const snap = await fbDb.ref("rooms/" + gameId + "/players").once("value");
+      const v = snap.val() || {};
+      return Object.keys(v);
+    }catch(e){ return []; }
+  }
+
   async function openGamePanel(gameId){
     const game = GAMES_CATALOG[gameId];
     if(!game) return;
     gpCurrentGameId = gameId;
     const root = document.getElementById("gamePanelRoot");
     root.innerHTML =
-      '<div class="notif-panel-overlay" id="gpOverlay"></div>' +
-      '<div class="gp-panel">' +
+      '<div class="gp-panel gp-fullpage">' +
         '<div class="gp-banner" style="background:' + game.background + '">' +
           '<div class="gp-close-btn" id="gpCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>' +
-          '<div class="gp-profile" style="background:' + game.profile + '"></div>' +
         '</div>' +
-        '<div class="gp-head">' +
-          '<div class="gp-title">' + escapeHtml(game.title) + '</div>' +
-          '<div class="gp-creator">By <b>' + escapeHtml(game.creator) + '</b></div>' +
+        '<div class="gp-fp-body">' +
+          '<div class="gp-fp-headrow">' +
+            '<div class="gp-profile" style="background:' + game.profile + '"></div>' +
+            '<div class="gp-head" style="padding:0;">' +
+              '<div class="gp-title">' + escapeHtml(game.title) + '</div>' +
+              '<div class="gp-creator">By <b>' + escapeHtml(game.creator) + '</b></div>' +
+            '</div>' +
+          '</div>' +
+          '<button class="gp-fp-play" id="gpPlayBtn">Play</button>' +
+          '<div class="gp-stats">' +
+            '<div class="gp-stat"><div class="gp-stat-num" id="gpVisits">-</div><div class="gp-stat-label">Visits</div></div>' +
+            '<div class="gp-stat gp-reactable" id="gpLikeStat"><div class="gp-stat-num" id="gpLikes">-</div><div class="gp-stat-label">Likes</div></div>' +
+            '<div class="gp-stat gp-reactable" id="gpDislikeStat"><div class="gp-stat-num" id="gpDislikes">-</div><div class="gp-stat-label">Dislikes</div></div>' +
+          '</div>' +
+          '<div class="gp-desc">' + escapeHtml(game.sub) + '</div>' +
+          '<div class="gp-section">' +
+            '<div class="gp-section-title">Information</div>' +
+            '<div class="gp-info-box">' +
+              '<div class="gp-info-row"><span class="gi-label">Released</span><span class="gi-value">' + fmtCreatedDate(game.createdAt) + '</span></div>' +
+              '<div class="gp-info-row"><span class="gi-label">Owner</span><span class="gi-value">' + escapeHtml(game.creator) + '</span></div>' +
+              '<div class="gp-info-row"><span class="gi-label">Game Size</span><span class="gi-value">' + SERVER_CAPACITY + '</span></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="gp-section">' +
+            '<button class="gp-servers-btn" id="gpServersBtn">' +
+              '<span><span>Servers</span><div class="gsb-sub">See who\'s playing and pick a server</div></span>' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>' +
+            '</button>' +
+          '</div>' +
         '</div>' +
-        '<div class="gp-stats">' +
-          '<div class="gp-stat"><div class="gp-stat-num" id="gpVisits">-</div><div class="gp-stat-label">Visits</div></div>' +
-          '<div class="gp-stat gp-reactable" id="gpLikeStat"><div class="gp-stat-num" id="gpLikes">-</div><div class="gp-stat-label">Likes</div></div>' +
-          '<div class="gp-stat gp-reactable" id="gpDislikeStat"><div class="gp-stat-num" id="gpDislikes">-</div><div class="gp-stat-label">Dislikes</div></div>' +
-        '</div>' +
-        '<div class="gp-meta">Created ' + fmtCreatedDate(game.createdAt) + '</div>' +
-        '<div class="gp-desc">' + escapeHtml(game.sub) + '</div>' +
-        '<button class="gp-play-btn" id="gpPlayBtn">Play</button>' +
       '</div>';
 
-    document.getElementById("gpOverlay").addEventListener("click", closeGamePanel);
     document.getElementById("gpCloseBtn").addEventListener("click", closeGamePanel);
-    document.getElementById("gpPlayBtn").addEventListener("click", () => {
-      closeGamePanel();
-      game.start();
-    });
+    document.getElementById("gpPlayBtn").addEventListener("click", () => attemptJoinGame(gameId));
+    document.getElementById("gpServersBtn").addEventListener("click", () => openServersPage(gameId));
 
     const likeStat = document.getElementById("gpLikeStat");
     const dislikeStat = document.getElementById("gpDislikeStat");
@@ -5041,6 +5150,119 @@
   function closeGamePanel(){
     gpCurrentGameId = null;
     document.getElementById("gamePanelRoot").innerHTML = "";
+  }
+
+  // shared join gate: used by the Play button, the servers list, and
+  // friend-invite joins - blocks the join and shows a toast if the server
+  // is already at capacity instead of letting people pile in past 15
+  async function attemptJoinGame(gameId, opts){
+    opts = opts || {};
+    const game = GAMES_CATALOG[gameId];
+    if(!game) return;
+    const keys = await getCurrentRoomPlayerKeys(gameId);
+    const alreadyIn = fbUid && keys.includes(fbUid);
+    if(!alreadyIn && keys.length >= SERVER_CAPACITY){
+      showServerFullToast(opts.friendName);
+      return false;
+    }
+    closeServersPage();
+    closeGamePanel();
+    game.start();
+    return true;
+  }
+  function showServerFullToast(friendName){
+    const msg = friendName
+      ? "This server is full - " + friendName + " will need to come back later."
+      : "This server is full. Come back later.";
+    if(typeof showToast === "function"){ showToast(msg); return; }
+    const el = document.createElement("div");
+    el.className = "gp-full-toast";
+    el.textContent = msg;
+    Object.assign(el.style, {
+      position:"fixed", left:"50%", bottom:"26px", transform:"translateX(-50%)",
+      background:"rgba(10,10,11,0.92)", color:"#fff", padding:"12px 18px", borderRadius:"10px",
+      fontSize:"12.5px", zIndex:9999, border:"1px solid rgba(255,255,255,0.15)"
+    });
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3200);
+  }
+
+  /* ============ servers page: Friends tab / Servers tab ============ */
+  let srvCurrentGameId = null;
+  let srvActiveTab = "friends";
+  async function openServersPage(gameId){
+    srvCurrentGameId = gameId;
+    srvActiveTab = "friends";
+    const root = document.getElementById("serversPageRoot");
+    root.innerHTML =
+      '<div class="srv-page">' +
+        '<div class="srv-topbar">' +
+          '<div class="srv-back-btn" id="srvBackBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>' +
+          '<div class="srv-title">Servers</div>' +
+        '</div>' +
+        '<div class="srv-tabs">' +
+          '<button class="srv-tab-btn" id="srvTabFriends">Friends</button>' +
+          '<button class="srv-tab-btn" id="srvTabServers">Servers</button>' +
+        '</div>' +
+        '<div class="srv-body" id="srvBody"></div>' +
+      '</div>';
+
+    document.getElementById("srvBackBtn").addEventListener("click", closeServersPage);
+    document.getElementById("srvTabFriends").addEventListener("click", () => { srvActiveTab = "friends"; renderServersPage(); });
+    document.getElementById("srvTabServers").addEventListener("click", () => { srvActiveTab = "servers"; renderServersPage(); });
+    renderServersPage();
+  }
+  function closeServersPage(){
+    srvCurrentGameId = null;
+    const root = document.getElementById("serversPageRoot");
+    if(root) root.innerHTML = "";
+  }
+  async function renderServersPage(){
+    const gameId = srvCurrentGameId;
+    if(!gameId) return;
+    document.getElementById("srvTabFriends").classList.toggle("active", srvActiveTab === "friends");
+    document.getElementById("srvTabServers").classList.toggle("active", srvActiveTab === "servers");
+    const body = document.getElementById("srvBody");
+    body.innerHTML = '<div class="srv-empty-note">Loading...</div>';
+
+    const keys = await getCurrentRoomPlayerKeys(gameId);
+    if(srvCurrentGameId !== gameId) return; // page closed/changed while this was in flight
+
+    if(srvActiveTab === "friends"){
+      const friendsHere = (fbFriendMirror.friends || []).filter(k => keys.includes(k));
+      if(!friendsHere.length){
+        body.innerHTML = '<div class="srv-empty-note">Your friends aren\'t playing this game.</div>';
+        return;
+      }
+      body.innerHTML = friendsHere.map(k =>
+        '<div class="srv-friend-row" data-srv-friend="' + k + '">' +
+          '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(k) + '</div></div>' +
+          '<div class="n-text">' + escapeHtml(displayNameFor(k)) + '</div>' +
+        '</div>'
+      ).join("");
+      body.querySelectorAll("[data-srv-friend]").forEach(row => {
+        row.style.cursor = "pointer";
+        row.addEventListener("click", () => attemptJoinGame(gameId, { friendName: displayNameFor(row.getAttribute("data-srv-friend")) }));
+      });
+    } else {
+      const count = keys.length;
+      const full = count >= SERVER_CAPACITY;
+      const faces = keys.slice(0, SERVER_CAPACITY).map(k =>
+        '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(k) + '</div></div>'
+      ).join("");
+      body.innerHTML =
+        '<div class="srv-card">' +
+          '<div class="srv-card-top">' +
+            '<div class="srv-card-name">Server 1</div>' +
+            '<div class="srv-card-count' + (full ? ' srv-full' : '') + '">' + count + '/' + SERVER_CAPACITY + '</div>' +
+          '</div>' +
+          '<div class="srv-faces-row">' + (faces || '<div class="srv-empty-note" style="padding:6px 0;">No one here yet - be the first!</div>') + '</div>' +
+          '<button class="srv-join-btn' + (full ? ' srv-disabled' : '') + '" id="srvJoinBtn">' + (full ? "Server full" : "Join") + '</button>' +
+        '</div>';
+      const joinBtn = document.getElementById("srvJoinBtn");
+      if(!full) joinBtn.addEventListener("click", () => attemptJoinGame(gameId));
+      else joinBtn.addEventListener("click", () => showServerFullToast());
+    }
   }
 
   document.querySelectorAll(".game-card[data-game-id]").forEach(card => {
