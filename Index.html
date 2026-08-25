@@ -923,6 +923,42 @@
   .friend-info .f-sub{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
   .friend-actions{ display:flex; gap:8px; flex-shrink:0; }
 
+  /* ---------- Home dashboard: friends strip ---------- */
+  .home-friends-section{ margin:22px 0 28px; }
+  .home-friends-title{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-2); margin-bottom:12px; }
+  .home-friends-strip{ display:flex; gap:16px; flex-wrap:wrap; }
+  .hf-item{ display:flex; flex-direction:column; align-items:center; gap:6px; width:64px; position:relative; }
+  .hf-circle{
+    width:52px; height:52px; border-radius:50%; overflow:hidden; cursor:pointer; position:relative;
+    background:var(--bg-1); border:1px solid var(--border-soft); transition:border-color .15s, transform .12s;
+  }
+  .hf-circle:hover{ border-color:var(--grey-3); transform:translateY(-2px); }
+  .hf-circle .avatar-img{ width:100%; height:100%; }
+  .hf-circle .avatar-img svg{ width:100%; height:100%; display:block; }
+  .hf-dot{
+    position:absolute; bottom:1px; right:1px; width:13px; height:13px; border-radius:50%;
+    background:var(--text-3); border:2px solid var(--bg-2); z-index:2;
+  }
+  .hf-dot.online{ background:#3ecf6e; box-shadow:0 0 6px rgba(62,207,110,0.6); }
+  .hf-name{ font-size:10.5px; color:var(--text-2); text-align:center; max-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .home-friends-empty{ font-size:12px; color:var(--text-3); }
+
+  /* small "join their game" popover, anchored under the friend circle */
+  .hf-popover{
+    position:absolute; top:60px; left:50%; transform:translateX(-50%); z-index:30; width:180px;
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:12px; padding:10px;
+    box-shadow:0 14px 34px rgba(0,0,0,0.5); animation:lbPanelIn .16s ease both;
+  }
+  .hf-popover-game{ display:flex; align-items:center; gap:8px; }
+  .hf-popover-thumb{ width:34px; height:34px; border-radius:8px; flex-shrink:0; background-size:cover; background-position:center; }
+  .hf-popover-title{ font-size:12.5px; font-weight:700; color:var(--text-0); }
+  .hf-popover-sub{ font-size:10.5px; color:var(--text-2); }
+  .hf-popover-join{
+    width:100%; margin-top:9px; padding:8px; background:#4a6cf7; border:none; border-radius:7px;
+    color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .hf-popover-join:hover{ background:#3d5ce0; }
+
   /* ---------- Friend profile page ---------- */
   .friend-profile-panel{
     display:flex; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:16px;
@@ -946,18 +982,26 @@
   .customize-layout{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
   .customize-panel{
     background:linear-gradient(180deg,var(--bg-2),var(--bg-1)); border:1px solid var(--border-soft); border-radius:16px; padding:20px;
-    box-shadow:0 10px 26px rgba(0,0,0,0.28); transition:border-color .2s;
+    box-shadow:0 10px 26px rgba(0,0,0,0.28); transition:border-color .2s, box-shadow .2s; position:relative; overflow:hidden;
   }
-  .customize-panel:hover{ border-color:var(--grey-3); }
+  .customize-panel::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, transparent, #4a6cf7, transparent);
+  }
+  .customize-panel:hover{ border-color:var(--grey-3); box-shadow:0 14px 32px rgba(0,0,0,0.36); }
   .customize-panel-left, .customize-panel-right{ flex:1 1 220px; min-width:220px; }
   .customize-panel-center{ flex:1 1 260px; min-width:260px; display:flex; flex-direction:column; align-items:center; gap:12px; }
   .customize-panel-title{
     font-size:12px; font-weight:700; color:var(--text-1); margin-bottom:16px; letter-spacing:0.6px; text-transform:uppercase;
-    padding-bottom:10px; border-bottom:1px solid var(--border-soft);
+    padding-bottom:10px; border-bottom:1px solid var(--border-soft); display:flex; align-items:center; gap:7px;
   }
+  .customize-panel-title svg{ width:14px; height:14px; color:#4a6cf7; flex-shrink:0; }
   .customize-slider-label{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-1); margin:14px 0 6px; }
-  .customize-slider-val{ color:var(--text-0); font-weight:700; font-variant-numeric:tabular-nums; }
-  .customize-layout input[type="range"]{ width:100%; accent-color:#4a5fd6; }
+  .customize-slider-val{
+    color:#c7d1ff; font-weight:700; font-variant-numeric:tabular-nums; background:rgba(74,108,247,0.14);
+    padding:1px 8px; border-radius:6px; font-size:11.5px;
+  }
+  .customize-layout input[type="range"]{ width:100%; accent-color:#4a6cf7; height:4px; }
   .customize-hint{ margin-top:16px; font-size:11.5px; color:var(--text-3); line-height:1.4; }
 
   .customize-color-row{
@@ -976,11 +1020,11 @@
   }
   .customize-color-row .ccr-swatch-wrap input[type="color"]::-webkit-color-swatch-wrapper{ padding:0; border-radius:50%; }
   .customize-color-row .ccr-swatch-wrap input[type="color"]::-webkit-color-swatch{ border:none; border-radius:50%; }
-  .customize-color-row .ccr-swatch-wrap input[type="color"]:hover{ border-color:#4a5fd6; transform:scale(1.06); }
+  .customize-color-row .ccr-swatch-wrap input[type="color"]:hover{ border-color:#4a6cf7; transform:scale(1.06); }
 
-  .customize-presets{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+  .customize-presets{ display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
   .customize-preset-swatch{
-    width:24px; height:24px; border-radius:50%; border:2px solid transparent; cursor:pointer;
+    width:26px; height:26px; border-radius:50%; border:2px solid transparent; cursor:pointer;
     transition:transform .12s, border-color .12s; box-shadow:0 2px 6px rgba(0,0,0,0.3);
   }
   .customize-preset-swatch:hover{ transform:scale(1.18); border-color:#f2f2f2; }
@@ -998,6 +1042,11 @@
   }
   .customize-canvas-wrap:hover .customize-inspect-hint{ opacity:1; }
   .customize-inspect-hint svg{ width:14px; height:14px; }
+  #customizeSaveBtn{
+    background:#4a6cf7; border:none; color:#fff; font-weight:700; transition:background .15s, transform .1s;
+  }
+  #customizeSaveBtn:hover{ background:#3d5ce0; }
+  #customizeSaveBtn:active{ transform:scale(0.98); }
 
   /* ---- inspect (full free-look) page ---- */
   .inspect-screen{
@@ -1272,7 +1321,6 @@
     </div>
 
     <div class="sb-spacer"></div>
-    <button class="logout-btn" id="logoutBtn" data-i18n="logout">Log out</button>
   </div>
 
   <div class="mobile-bottom-nav">
@@ -1309,6 +1357,12 @@
         <h2><span data-i18n="welcomeBack">Welcome back</span><span id="welcomeName"></span></h2>
         <p data-i18n="homeSub">Here's what's happening in your BlockVerse.</p>
       </div>
+
+      <div class="home-friends-section">
+        <div class="home-friends-title" data-i18n="friends">Friends</div>
+        <div class="home-friends-strip" id="homeFriendsStrip"></div>
+      </div>
+
       <div class="game-grid">
         <div class="game-card" id="playBaseplateBtn" data-game-id="baseplate">
           <div class="game-card-thumb">
@@ -1491,7 +1545,7 @@
 
       <div class="customize-layout">
         <div class="customize-panel customize-panel-left">
-          <div class="customize-panel-title">Body / Size</div>
+          <div class="customize-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 12h16"/></svg>Body / Size</div>
 
           <label class="customize-slider-label">
             <span>Height</span><span class="customize-slider-val" id="custHeightVal">100%</span>
@@ -1514,12 +1568,12 @@
               Tap to inspect
             </div>
           </div>
-          <button class="submit-btn" id="customizeSaveBtn" style="max-width:220px;">Save character</button>
+          <button class="submit-btn" id="customizeSaveBtn" style="max-width:280px; width:100%;">Save character</button>
           <div class="msg" id="customizeMsg"></div>
         </div>
 
         <div class="customize-panel customize-panel-right">
-          <div class="customize-panel-title">Colors</div>
+          <div class="customize-panel-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1-.3-.3-.4-.7-.4-1 0-.8.7-1.5 1.5-1.5H16c3.3 0 6-2.7 6-6 0-4.4-4-8-10-8z"/></svg>Colors</div>
 
           <div class="customize-color-row">
             <div class="ccr-swatch-wrap"><input type="color" id="custTorso" value="#4a5fd6"></div>
@@ -3854,7 +3908,7 @@
     el.className = "ingame-toast";
     el.setAttribute("data-invite-id", inviteId);
     el.innerHTML =
-      '<div class="friend-avatar">' + initialsAvatar(name) + '</div>' +
+      '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(fromKey) + '</div></div>' +
       '<div class="it-body"><div class="it-text"><b>' + escapeHtml(name) + '</b> ' + t("invitedYouSuffix") + '</div>' +
         '<div class="it-actions">' +
           '<button class="it-btn primary" data-invite-accept>' + t("accept") + '</button>' +
@@ -3897,7 +3951,7 @@
       : "";
 
     el.innerHTML =
-      '<div class="friend-avatar">' + initialsAvatar(displayNameFor(userKey)) + '</div>' +
+      '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(userKey) + '</div></div>' +
       '<div class="it-body"><div class="it-text">' + html + '</div>' + actionsHtml + '</div>';
 
     stack.appendChild(el);
@@ -4137,6 +4191,80 @@
       : '<div class="friend-empty">' + t("noSuggestions") + '</div>';
 
     updateFriendBadge();
+    renderHomeFriendsStrip();
+  }
+
+  /* ============ home dashboard: friends strip ============ */
+  // Shows every friend as a circular face avatar with a green/grey status
+  // dot. "Online" already means "currently inside Baseplate" (see
+  // isKeyOnline/onlineUsernameKeys above) since that's the only game right
+  // now, so a friend showing green is also always "in a game" - tapping
+  // them opens a small popover with that game's mini profile and a Join
+  // button, which just puts you in the same shared Baseplate room as them.
+  let hfOpenPopoverKey = null;
+  function renderHomeFriendsStrip(){
+    const strip = document.getElementById("homeFriendsStrip");
+    if(!strip) return;
+    const friends = fbFriendMirror.friends || [];
+    if(friends.length === 0){
+      strip.innerHTML = '<div class="home-friends-empty">' + (t("noFriendsYet") || "No friends yet.") + '</div>';
+      return;
+    }
+    strip.innerHTML = friends.map(k => {
+      const online = isKeyOnline(k);
+      return (
+        '<div class="hf-item" data-hf-key="' + k + '">' +
+          '<div class="hf-circle" data-hf-circle="' + k + '">' +
+            '<div class="avatar-img">' + avatarFaceSvg(k) + '</div>' +
+            '<span class="hf-dot' + (online ? ' online' : '') + '"></span>' +
+          '</div>' +
+          '<div class="hf-name">' + escapeHtml(displayNameFor(k)) + '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    strip.querySelectorAll("[data-hf-circle]").forEach(circle => {
+      circle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const key = circle.getAttribute("data-hf-circle");
+        if(hfOpenPopoverKey === key){ closeHomeFriendPopover(); return; }
+        if(!isKeyOnline(key)) return; // offline friends have nowhere to join
+        openHomeFriendPopover(key);
+      });
+    });
+  }
+  function openHomeFriendPopover(key){
+    closeHomeFriendPopover();
+    hfOpenPopoverKey = key;
+    const item = document.querySelector('.hf-item[data-hf-key="' + key + '"]');
+    if(!item) return;
+    const game = GAMES_CATALOG.baseplate;
+    const pop = document.createElement("div");
+    pop.className = "hf-popover";
+    pop.id = "hfPopover";
+    pop.innerHTML =
+      '<div class="hf-popover-game">' +
+        '<div class="hf-popover-thumb" style="background:' + game.background + '"></div>' +
+        '<div><div class="hf-popover-title">' + escapeHtml(game.title) + '</div>' +
+        '<div class="hf-popover-sub">' + escapeHtml(displayNameFor(key)) + "'s server</div></div>" +
+      '</div>' +
+      '<button class="hf-popover-join" id="hfPopoverJoin">Join</button>';
+    item.appendChild(pop);
+    document.getElementById("hfPopoverJoin").addEventListener("click", () => {
+      closeHomeFriendPopover();
+      game.start(); // same shared Baseplate room, so joining puts you right alongside them
+    });
+    setTimeout(() => document.addEventListener("click", hfOutsideClickHandler), 0);
+  }
+  function hfOutsideClickHandler(e){
+    const pop = document.getElementById("hfPopover");
+    if(pop && !pop.contains(e.target)) closeHomeFriendPopover();
+  }
+  function closeHomeFriendPopover(){
+    hfOpenPopoverKey = null;
+    const pop = document.getElementById("hfPopover");
+    if(pop) pop.remove();
+    document.removeEventListener("click", hfOutsideClickHandler);
   }
 
   /* ============ friend profile modal (mini 3D character viewer) ============ */
@@ -4553,7 +4681,7 @@
       ? requests.map(k => {
           return (
             '<div class="notif-row" data-notif-user="' + k + '">' +
-              '<div class="friend-avatar">' + initialsAvatar(displayNameFor(k)) + '</div>' +
+              '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(k) + '</div></div>' +
               '<div class="n-text"><b>' + escapeHtml(displayNameFor(k)) + '</b> ' + t("incomingFrom") + '</div>' +
               '<div class="friend-actions">' +
                 '<button class="friend-btn primary" data-notif-accept="' + k + '">' + t("accept") + '</button>' +
@@ -4570,7 +4698,7 @@
           const name = inv.fromName || displayNameFor(inv.fromKey);
           return (
             '<div class="notif-row" data-invite-row="' + inv.id + '">' +
-              '<div class="friend-avatar">' + initialsAvatar(name) + '</div>' +
+              '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(inv.fromKey) + '</div></div>' +
               '<div class="n-text"><b>' + escapeHtml(name) + '</b> ' + t("invitedYouSuffix") +
                 '<div class="n-time">' + timeAgoShort(inv.ts) + '</div>' +
               '</div>' +
@@ -4733,7 +4861,7 @@
   // tapping any nav item inside the drawer should also close it (showPage()
   // already calls closeMobileDrawer(), but sb-items that don't call
   // showPage directly - like the user row / logout - need it too)
-  document.querySelectorAll(".sidebar .sb-item, .sidebar .sb-user, .sidebar .logout-btn").forEach(el => {
+  document.querySelectorAll(".sidebar .sb-item, .sidebar .sb-user").forEach(el => {
     el.addEventListener("click", closeMobileDrawer);
   });
   document.querySelectorAll(".mbn-item").forEach(item => {
@@ -4784,16 +4912,17 @@
        "reactions": { ".read": "auth != null", "$uid": { ".write": "auth != null && auth.uid === $uid", ".validate": "newData.isString() && (newData.val() === 'like' || newData.val() === 'dislike')" } }
   */
   async function registerVisitOnce(gameId){
-    const key = currentAccountKey();
-    if(!key) return;
+    await fbReady;
+    const uid = fbUid;
+    if(!uid) return;
     try{
-      if(!firebase.auth().currentUser) await firebase.auth().signInAnonymously().catch(()=>{});
-      const ref = fbDb.ref("rooms/" + gameId + "/visitors/" + key);
+      const ref = fbDb.ref("rooms/" + gameId + "/visitors/" + uid);
       const snap = await ref.once("value");
       if(!snap.exists()) await ref.set(true); // first-ever join for this account - counts once, forever
     }catch(e){}
   }
   async function getGameStats(gameId){
+    await fbReady;
     try{
       const [visitorsSnap, reactionsSnap] = await Promise.all([
         fbDb.ref("rooms/" + gameId + "/visitors").once("value"),
@@ -4803,18 +4932,17 @@
       const reactions = reactionsSnap.val() || {};
       let likes = 0, dislikes = 0;
       Object.keys(reactions).forEach(k => { if(reactions[k] === "like") likes++; else if(reactions[k] === "dislike") dislikes++; });
-      const myKey = currentAccountKey();
-      return { visits: Object.keys(visitors).length, likes, dislikes, myReaction: myKey ? (reactions[myKey] || null) : null };
+      return { visits: Object.keys(visitors).length, likes, dislikes, myReaction: fbUid ? (reactions[fbUid] || null) : null };
     }catch(e){
       return { visits: 0, likes: 0, dislikes: 0, myReaction: null };
     }
   }
   async function setMyReaction(gameId, reaction){ // reaction: "like" | "dislike" | null (null clears it)
-    const key = currentAccountKey();
-    if(!key) return;
+    await fbReady;
+    const uid = fbUid;
+    if(!uid) return;
     try{
-      if(!firebase.auth().currentUser) await firebase.auth().signInAnonymously().catch(()=>{});
-      const ref = fbDb.ref("rooms/" + gameId + "/reactions/" + key);
+      const ref = fbDb.ref("rooms/" + gameId + "/reactions/" + uid);
       if(reaction) await ref.set(reaction); else await ref.remove();
     }catch(e){}
   }
@@ -4938,7 +5066,8 @@
     selectedGender = null;
     tabLogin.click();
   }
-  document.getElementById("logoutBtn").addEventListener("click", doLogout);
+  // sidebar's standalone Log out button was removed - logging out now only
+  // happens from the Settings hub tile (openLogoutTile above)
 
   /* ============ 3D game: Baseplate ============ */
   const BaseplateGame = (function(){
