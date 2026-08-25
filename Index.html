@@ -24,9 +24,26 @@
     --text-2:#7a7a80;
     --text-3:#55555a;
     --danger:#e5484d;
-    font-family:'Segoe UI',Roboto,Arial,sans-serif;
+    --accent:#4a6cf7;
+    font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
+  ::selection{ background:rgba(74,108,247,0.35); color:#fff; }
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:var(--grey-2); border-radius:8px; border:2px solid transparent; background-clip:padding-box; }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--grey-3); background-clip:padding-box; }
+  button{ font-family:inherit; }
+  button:active{ transform:scale(.97); }
+  button:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+  input[type="text"], input[type="password"], textarea{
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, textarea:focus{
+    border-color:var(--accent) !important; box-shadow:0 0 0 3px rgba(74,108,247,0.15);
+  }
   html,body{height:100%;}
   body{
     margin:0;
@@ -178,12 +195,19 @@
   }
   .sb-section-label{ font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--text-3); margin:14px 8px 8px; }
   .sb-item{
-    display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:9px;
+    position:relative; display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:9px;
     color:var(--text-1); font-size:13.5px; cursor:pointer; margin-bottom:3px;
     transition:background .15s, color .15s, padding-left .15s;
   }
+  .sb-item::before{
+    content:""; position:absolute; left:-16px; top:50%; transform:translateY(-50%) scaleY(0);
+    width:3px; height:18px; border-radius:0 3px 3px 0; background:var(--accent);
+    transition:transform .18s ease; transform-origin:center;
+  }
   .sb-item:hover{ background:var(--grey-1); color:var(--text-0); padding-left:15px; }
   .sb-item.active{ background:var(--grey-2); color:var(--text-0); }
+  .sb-item.active::before{ transform:translateY(-50%) scaleY(1); }
+  .sb-item.active .sb-icon{ color:var(--accent); }
   .sb-icon{ width:18px; text-align:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
   .sb-icon svg{ width:16px; height:16px; }
   .sb-badge{
@@ -6306,7 +6330,7 @@
     const PROFANITY_LIST = [
       // English
       "fuck","fuk","fck","shit","bitch","bytch","cunt","dick","pussy","pussi",
-      "ass","asshole","asswhole","ass hole","nigger","nigga","nig","faggot","fag","retard",
+      "ass","asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
       "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
       "sex","porn","nude","nudes","rape",
       // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
@@ -6329,7 +6353,9 @@
     // off-platform) and a couple of safety-flag words. Matched and hashed
     // the same way as PROFANITY_LIST (see buildProfanityPattern below).
     const SENSITIVE_TERMS_LIST = [
-      "predator","predators","groomer","groomers",
+      "predator","predators","preditor","preditors","predetor","predetors","pred","preds",
+      "ped","peds","pedo","pedos","pedophile","pedophiles","paedophile","paedophiles",
+      "groomer","groomers","grooming",
       "discord","youtube","yt","tiktok","tik tok","twitter","x.com","instagram","insta",
       "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game"
     ];
@@ -6389,7 +6415,7 @@
     // short/ambiguous sensitive terms get word boundaries so they don't
     // false-positive as substrings of unrelated words (e.g. "yt" inside
     // "party", "snap" inside "snapshot", "insta" inside "instant")
-    const SENSITIVE_BOUNDARY_PROTECTED = new Set(["yt","snap","insta","kik","x.com"]);
+    const SENSITIVE_BOUNDARY_PROTECTED = new Set(["yt","snap","insta","kik","x.com","pred","preds","ped","peds"]);
     function buildSensitivePattern(){
       const parts = SENSITIVE_TERMS_LIST.map(w => {
         const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
@@ -6431,6 +6457,17 @@
     // formatting; if normalization caught something but no raw substring
     // lines up (a heavily obfuscated spelling), hash the whole message as a
     // safe fallback rather than let it through unmarked.
+    // matches links/URLs so kids can't be steered to an outside site via
+    // chat: "http(s)://...", "www.something", or a bare "word.tld" (e.g.
+    // "website.com", "join.gg/abc"). Requires a real-looking TLD (2+
+    // letters) so ordinary sentences with a period ("ok. sounds good") or
+    // decimals ("v2.0") don't get flagged.
+    const LINK_PATTERN_SRC = "\\b((https?:\\/\\/|www\\.)\\S+|[a-z0-9-]+\\.(?:com|net|org|io|gg|me|co|xyz|link|gl|tv|app|dev|to|us|info|biz|club|site|online|live|shop|fun)(?:\\/\\S*)?)\\b";
+    function looksLikeLink(text){
+      if(!text) return false;
+      return new RegExp(LINK_PATTERN_SRC, "i").test(text);
+    }
+
     function censorText(text){
       if(!text) return text;
       let out = text;
@@ -6440,6 +6477,10 @@
       }
       if(looksLikeSensitiveTerm(out)){
         const replaced = out.replace(new RegExp(sensitivePatternSrc, "giu"), m => "#".repeat(m.length));
+        if(replaced !== out) out = replaced;
+      }
+      if(looksLikeLink(out)){
+        const replaced = out.replace(new RegExp(LINK_PATTERN_SRC, "gi"), m => "#".repeat(m.length));
         if(replaced !== out) out = replaced;
       }
       return out;
