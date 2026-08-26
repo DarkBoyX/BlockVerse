@@ -153,6 +153,30 @@
   .mini-btn.shutdown{ background:#3a3320; border-color:#5c4f26; color:#ffd98a; }
   .mini-btn.shutdown:hover{ background:#4a4128; }
   .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); display:inline-block; margin-right:5px; box-shadow:0 0 6px rgba(62,207,110,0.7); }
+
+  /* ---------- Tabs ---------- */
+  .admin-tabs{
+    display:flex; gap:4px; margin:0 0 20px; background:var(--bg-1); border:1px solid var(--border-soft);
+    border-radius:11px; padding:4px; overflow-x:auto;
+  }
+  .admin-tab{
+    flex:1; white-space:nowrap; text-align:center; padding:9px 10px; border-radius:8px; cursor:pointer;
+    font-size:12.5px; font-weight:600; color:var(--text-2); transition:background .15s, color .15s; user-select:none;
+  }
+  .admin-tab:hover{ color:var(--text-1); }
+  .admin-tab.active{ background:var(--grey-2); color:var(--text-0); }
+  .admin-tab .tab-count{
+    display:inline-block; margin-left:5px; background:var(--grey-1); color:var(--text-2); font-size:10px;
+    padding:1px 6px; border-radius:9px;
+  }
+  .admin-tab.active .tab-count{ background:var(--grey-3); color:var(--text-0); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+  .tab-panel .section-title:first-child{ margin-top:0; padding-top:0; border-top:none; }
+
+  /* ---------- Banned tab ---------- */
+  .ban-reason{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
+  .ban-meta{ font-size:10px; color:var(--text-3); margin-top:2px; }
 </style>
 </head>
 <body>
@@ -183,49 +207,78 @@
   <div id="publishScreen" class="hidden">
     <div class="role-badge" id="roleBadge"><span class="role-dot"></span><span id="roleBadgeText"></span></div>
 
-    <div class="stats-strip">
-      <div class="stat-box"><div class="stat-num" id="statTotal">-</div><div class="stat-label">Accounts</div></div>
-      <div class="stat-box stat-danger"><div class="stat-num" id="statBanned">-</div><div class="stat-label">Banned</div></div>
-      <div class="stat-box owner-only"><div class="stat-num" id="statVersion">-</div><div class="stat-label">Live version</div></div>
+    <div class="admin-tabs" id="adminTabs">
+      <div class="admin-tab active" data-tab="dashboard">Dashboard</div>
+      <div class="admin-tab" data-tab="accounts">Accounts<span class="tab-count" id="tabCountAccounts">-</span></div>
+      <div class="admin-tab" data-tab="banned">Banned<span class="tab-count" id="tabCountBanned">-</span></div>
+      <div class="admin-tab" data-tab="games">Games<span class="tab-count" id="tabCountGames">-</span></div>
     </div>
 
-    <div class="status-block owner-only">
-      <div class="status-row"><span>Current version</span><span id="curVersion">-</span></div>
-      <div class="status-row"><span>Last published</span><span id="curTs">-</span></div>
+    <!-- Dashboard tab: quick stats + publish -->
+    <div class="tab-panel active" data-panel="dashboard">
+      <div class="stats-strip">
+        <div class="stat-box"><div class="stat-num" id="statTotal">-</div><div class="stat-label">Accounts</div></div>
+        <div class="stat-box stat-danger"><div class="stat-num" id="statBanned">-</div><div class="stat-label">Banned</div></div>
+        <div class="stat-box owner-only"><div class="stat-num" id="statVersion">-</div><div class="stat-label">Live version</div></div>
+      </div>
+
+      <div class="status-block owner-only">
+        <div class="status-row"><span>Current version</span><span id="curVersion">-</span></div>
+        <div class="status-row"><span>Last published</span><span id="curTs">-</span></div>
+      </div>
+      <button class="btn danger owner-only" id="publishBtn">Publish update &amp; disconnect players</button>
+      <div class="msg owner-only" id="publishMsg"></div>
+      <p class="note owner-only">
+        Publishing bumps the live version. Anyone currently in the game gets pulled
+        out immediately with a "please refresh" message; anyone just browsing the
+        site gets the same notice next time they interact with it.
+      </p>
     </div>
-    <button class="btn danger owner-only" id="publishBtn">Publish update &amp; disconnect players</button>
-    <div class="msg owner-only" id="publishMsg"></div>
-    <p class="note owner-only">
-      Publishing bumps the live version. Anyone currently in the game gets pulled
-      out immediately with a "please refresh" message; anyone just browsing the
-      site gets the same notice next time they interact with it.
-    </p>
 
-    <div class="section-title">Accounts <span class="count-pill" id="acctCountPill">-</span></div>
-    <div class="acct-search-wrap">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input type="text" id="acctSearch" class="acct-search" placeholder="Search by username...">
+    <!-- Accounts tab: everyone, search + moderate -->
+    <div class="tab-panel" data-panel="accounts">
+      <div class="section-title">Accounts <span class="count-pill" id="acctCountPill">-</span></div>
+      <div class="acct-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="acctSearch" class="acct-search" placeholder="Search by username...">
+      </div>
+      <div class="acct-list" id="acctList"></div>
+      <p class="note">
+        Kick pulls someone out of Baseplate only. Ban blocks login and logs them
+        out everywhere immediately. Terminate permanently deletes the account and
+        unfriends it from everyone. None of this is undoable except Ban (you can unban
+        from here or from the dedicated Banned tab).
+      </p>
     </div>
-    <div class="acct-list" id="acctList"></div>
-    <p class="note">
-      Kick pulls someone out of Baseplate only. Ban blocks login and logs them
-      out everywhere immediately. Terminate permanently deletes the account and
-      unfriends it from everyone. None of this is undoable except Ban (you can unban).
-    </p>
 
-    <div class="section-title">Requested Games <span class="count-pill" id="reqCountPill">-</span></div>
-    <div class="game-req-list" id="reqGamesList"></div>
-    <p class="note">
-      Accept publishes the game (icon + banner) to the home page for everyone.
-      Deny sends the reason back to the creator so they can fix it up and resubmit.
-    </p>
+    <!-- Banned tab: just banned accounts, fast unban -->
+    <div class="tab-panel" data-panel="banned">
+      <div class="section-title">Banned accounts <span class="count-pill" id="banCountPill">-</span></div>
+      <div class="acct-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="banSearch" class="acct-search" placeholder="Search banned users...">
+      </div>
+      <div class="acct-list" id="banList"></div>
+      <p class="note">Unban clears the ban immediately and lets them log back in right away.</p>
+    </div>
 
-    <div class="section-title">Published Games <span class="count-pill" id="pubCountPill">-</span></div>
-    <div class="game-req-list" id="pubGamesList"></div>
-    <p class="note">
-      Shutdown pulls a live game off the home page immediately - the creator can
-      resubmit it any time from Studio.
-    </p>
+    <!-- Games tab: requested + published -->
+    <div class="tab-panel" data-panel="games">
+      <div class="section-title">Requested Games <span class="count-pill" id="reqCountPill">-</span></div>
+      <div class="game-req-list" id="reqGamesList"></div>
+      <p class="note">
+        Accept publishes the game (icon + banner) to the home page for everyone.
+        Deny sends the reason back to the creator so they can fix it up and resubmit.
+      </p>
+
+      <div class="section-title">Published Games <span class="count-pill" id="pubCountPill">-</span></div>
+      <div class="game-req-list" id="pubGamesList"></div>
+      <p class="note">
+        Shutdown pulls a live game off the home page immediately - the creator can
+        resubmit it any time from Studio.
+      </p>
+    </div>
+
   </div>
 
   </div>
@@ -287,6 +340,15 @@
   });
   gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
 
+  /* ============ Tabs ============ */
+  document.getElementById("adminTabs").addEventListener("click", (e) => {
+    const tabEl = e.target.closest(".admin-tab");
+    if(!tabEl) return;
+    const name = tabEl.getAttribute("data-tab");
+    document.querySelectorAll(".admin-tab").forEach(t => t.classList.toggle("active", t === tabEl));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.getAttribute("data-panel") === name));
+  });
+
   function loadStatus(){
     db.ref("blockverse_version").once("value").then(snap => {
       const v = snap.val();
@@ -320,6 +382,8 @@
   /* ============ Accounts ============ */
   const acctList = document.getElementById("acctList");
   const acctSearch = document.getElementById("acctSearch");
+  const banList = document.getElementById("banList");
+  const banSearch = document.getElementById("banSearch");
   let allAccounts = []; // [{key, username}]
   let banStatus = {};   // key -> ban record or null
 
@@ -336,15 +400,32 @@
       allAccounts = Object.keys(names).map(key => ({ key, username: (names[key] && names[key].username) || key }))
         .sort((a,b) => a.username.localeCompare(b.username));
       renderAccounts();
+      renderBanned();
     }catch(e){
       acctList.innerHTML = '<p class="note">Couldn\'t load accounts.</p>';
     }
+  }
+
+  // shared by both the Accounts tab and the Banned tab's ban/unban buttons
+  function setBan(key, username){
+    const banned = !!banStatus[key];
+    if(banned){
+      return db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
+    }
+    const reason = prompt("Ban reason for " + username + " (shown to them):") || "";
+    return db.ref("blockverse_account_bans/" + key).set({ reason, by: currentRole, ts: firebase.database.ServerValue.TIMESTAMP }).then(loadAccounts);
+  }
+
+  function unban(key){
+    return db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
   }
 
   function renderAccounts(){
     const q = (acctSearch.value || "").trim().toLowerCase();
     const rows = allAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
     document.getElementById("acctCountPill").textContent = rows.length + " / " + allAccounts.length;
+    const tabCountAccounts = document.getElementById("tabCountAccounts");
+    if(tabCountAccounts) tabCountAccounts.textContent = allAccounts.length;
 
     const statTotal = document.getElementById("statTotal");
     const statBanned = document.getElementById("statBanned");
@@ -395,15 +476,7 @@
       });
 
       const banBtn = row.querySelector(".ban-btn");
-      if(banBtn) banBtn.addEventListener("click", () => {
-        const banned = !!banStatus[key];
-        if(banned){
-          db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
-        } else {
-          const reason = prompt("Ban reason for " + username + " (shown to them):") || "";
-          db.ref("blockverse_account_bans/" + key).set({ reason, by: currentRole, ts: firebase.database.ServerValue.TIMESTAMP }).then(loadAccounts);
-        }
-      });
+      if(banBtn) banBtn.addEventListener("click", () => setBan(key, username));
 
       const termBtn = row.querySelector(".terminate-btn");
       if(termBtn) termBtn.addEventListener("click", async () => {
@@ -414,6 +487,50 @@
       });
     });
   }
+
+  /* ============ Banned tab ============ */
+  function renderBanned(){
+    if(!banList) return;
+    const q = (banSearch && banSearch.value || "").trim().toLowerCase();
+    const bannedKeys = Object.keys(banStatus);
+    const bannedAccounts = allAccounts.filter(a => bannedKeys.includes(a.key));
+    const rows = bannedAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
+
+    document.getElementById("banCountPill").textContent = rows.length + " / " + bannedAccounts.length;
+    const tabCountBanned = document.getElementById("tabCountBanned");
+    if(tabCountBanned) tabCountBanned.textContent = bannedAccounts.length;
+
+    if(bannedAccounts.length === 0){ banList.innerHTML = '<p class="note">No banned accounts right now.</p>'; return; }
+    if(rows.length === 0){ banList.innerHTML = '<p class="note">No banned accounts match that search.</p>'; return; }
+
+    const isAdminRole = currentRole === "admin";
+    banList.innerHTML = rows.map(a => {
+      const b = banStatus[a.key] || {};
+      const reason = b.reason ? escapeHtml(b.reason) : "No reason given";
+      const meta = (b.by ? "Banned by " + escapeHtml(b.by) : "") + (b.ts ? " &middot; " + new Date(b.ts).toLocaleString() : "");
+      return '<div class="acct-row" data-key="' + a.key + '">' +
+        '<div>' +
+          '<div class="acct-name">' + escapeHtml(a.username) + '</div>' +
+          '<div class="acct-key">' + escapeHtml(a.key) + '</div>' +
+          '<div class="ban-reason">' + reason + '</div>' +
+          (meta ? '<div class="ban-meta">' + meta + '</div>' : '') +
+        '</div>' +
+        '<div class="acct-actions">' +
+          (isAdminRole ? '' : '<button class="mini-btn ban unban-btn">Unban</button>') +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    banList.querySelectorAll(".unban-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const row = btn.closest(".acct-row");
+        const key = row.getAttribute("data-key");
+        btn.disabled = true; btn.textContent = "...";
+        unban(key);
+      });
+    });
+  }
+  if(banSearch) banSearch.addEventListener("input", renderBanned);
   acctSearch.addEventListener("input", renderAccounts);
 
   function escapeHtml(s){
@@ -456,6 +573,13 @@
     return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
   }
 
+  function updateGamesTabCount(){
+    const req = parseInt(document.getElementById("reqCountPill").textContent, 10) || 0;
+    const pub = parseInt(document.getElementById("pubCountPill").textContent, 10) || 0;
+    const tabCountGames = document.getElementById("tabCountGames");
+    if(tabCountGames) tabCountGames.textContent = req + pub;
+  }
+
   async function loadGameRequests(){
     if(!auth.currentUser) await auth.signInAnonymously().catch(()=>{});
     db.ref("game_requests").orderByChild("ts").on("value", (snap) => {
@@ -474,6 +598,7 @@
 
   function renderGameRequests(list){
     document.getElementById("reqCountPill").textContent = list.length;
+    updateGamesTabCount();
     const wrap = document.getElementById("reqGamesList");
     if(list.length === 0){ wrap.innerHTML = '<p class="note">No games waiting for review.</p>'; return; }
     wrap.innerHTML = list.map(r => {
@@ -533,6 +658,7 @@
 
   function renderPublishedGames(list){
     document.getElementById("pubCountPill").textContent = list.length;
+    updateGamesTabCount();
     const wrap = document.getElementById("pubGamesList");
     if(list.length === 0){ wrap.innerHTML = '<p class="note">No published games yet.</p>'; return; }
     wrap.innerHTML = list.map(g => {
