@@ -689,17 +689,21 @@
   let gizmoGroup = null;
   let dragState = null; // active gizmo drag info
 
+  const keysDown = {}; // wasd + space
+  const freecam = { yaw:0, pitch:0, speedMult:1 };
+  const playMode = { active:false, loading:false, camYaw:0, camPitch:0.25, camDist:9, velocityY:0, onGround:true, groundY:0 };
+
   const lightState = { brightness: 1, time: 13 }; // time: 0-24 hours
   let hemiLight, sunLight;
 
   const MATERIALS = {
-    wood:   { label:"Wood",   color:0x8a5a34, rough:true  },
-    stone:  { label:"Stone",  color:0x8c8c8c, rough:true  },
-    ice:    { label:"Ice",    color:0xbfe3ff, rough:false },
-    snow:   { label:"Snow",   color:0xf3f6f8, rough:true  },
-    metal:  { label:"Metal",  color:0x9aa0a6, rough:false },
-    plastic:{ label:"Plastic",color:0xdedede, rough:false },
-    neon:   { label:"Neon",   color:0x39ff88, rough:false, emissive:true }
+    wood:   { label:"Wood",    color:0x8a5a34, roughness:0.85, metalness:0.0  },
+    stone:  { label:"Stone",   color:0x8c8c8c, roughness:0.95, metalness:0.0  },
+    ice:    { label:"Ice",     color:0xbfe3ff, roughness:0.06, metalness:0.0, opacityBoost:0.25 },
+    snow:   { label:"Snow",    color:0xf3f6f8, roughness:0.9,  metalness:0.0  },
+    metal:  { label:"Metal",   color:0x9aa0a6, roughness:0.28, metalness:0.85 },
+    plastic:{ label:"Plastic", color:0xdedede, roughness:0.35, metalness:0.0  },
+    neon:   { label:"Neon",    color:0x39ff88, roughness:0.4,  metalness:0.0, emissive:true }
   };
   const PART_KINDS = {
     cube:     { label:"Block",    icon:'<rect x="4" y="4" width="16" height="16" rx="2"/>' },
@@ -707,6 +711,98 @@
     cylinder: { label:"Tube",     icon:'<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12a8 3 0 0 0 16 0V6"/>' },
     ledge:    { label:"Ledge",    icon:'<rect x="3" y="9" width="18" height="6" rx="1.5"/>' }
   };
+
+  /* ---- procedural material textures (so materials actually LOOK different, not just tinted) ---- */
+  const _matTextureCache = {};
+  function buildMaterialCanvas(matKey, baseColor){
+    const size = 128;
+    const c = document.createElement("canvas");
+    c.width = size; c.height = size;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(0,0,size,size);
+
+    function rgb(hex, amt){
+      const col = new THREE.Color(hex);
+      col.offsetHSL(0, 0, amt);
+      return "#" + col.getHexString();
+    }
+
+    if(matKey === "wood"){
+      // horizontal grain streaks
+      for(let y=0; y<size; y += 4){
+        ctx.strokeStyle = rgb(baseColor, (Math.sin(y*0.6)*0.06) - 0.04);
+        ctx.lineWidth = 1 + Math.random()*1.5;
+        ctx.beginPath();
+        let py = y + Math.sin(y*0.3)*2;
+        ctx.moveTo(0, py);
+        for(let x=0; x<size; x+=8){ py += (Math.random()-0.5)*2; ctx.lineTo(x, py); }
+        ctx.stroke();
+      }
+    }else if(matKey === "stone"){
+      for(let i=0;i<900;i++){
+        const x = Math.random()*size, y = Math.random()*size;
+        const shade = (Math.random()-0.5)*0.22;
+        ctx.fillStyle = rgb(baseColor, shade);
+        const s = 1 + Math.random()*2.5;
+        ctx.fillRect(x,y,s,s);
+      }
+    }else if(matKey === "snow"){
+      for(let i=0;i<500;i++){
+        const x = Math.random()*size, y = Math.random()*size;
+        ctx.fillStyle = rgb(baseColor, Math.random()*0.12);
+        const s = 1 + Math.random()*2;
+        ctx.fillRect(x,y,s,s);
+      }
+    }else if(matKey === "metal"){
+      const grad = ctx.createLinearGradient(0,0,size,size);
+      grad.addColorStop(0, rgb(baseColor, 0.18));
+      grad.addColorStop(0.5, rgb(baseColor, -0.1));
+      grad.addColorStop(1, rgb(baseColor, 0.1));
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,size,size);
+      for(let y=0;y<size;y+=6){
+        ctx.strokeStyle = rgb(baseColor, 0.06);
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(size,y); ctx.stroke();
+      }
+    }else if(matKey === "ice"){
+      const grad = ctx.createLinearGradient(0,0,size,size);
+      grad.addColorStop(0, rgb(baseColor, 0.15));
+      grad.addColorStop(1, rgb(baseColor, -0.08));
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,size,size);
+      ctx.strokeStyle = rgb(baseColor, 0.25);
+      for(let i=0;i<10;i++){
+        ctx.beginPath();
+        const x1=Math.random()*size, y1=Math.random()*size;
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x1+(Math.random()-0.5)*40, y1+(Math.random()-0.5)*40);
+        ctx.stroke();
+      }
+    }else if(matKey === "neon"){
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(0,0,size,size);
+      const grad = ctx.createRadialGradient(size/2,size/2,4,size/2,size/2,size*0.7);
+      grad.addColorStop(0, "#ffffff");
+      grad.addColorStop(0.35, baseColor);
+      grad.addColorStop(1, rgb(baseColor,-0.2));
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,size,size);
+    }
+    // plastic: stays flat/clean, no extra pass needed
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1,1);
+    return tex;
+  }
+  function getMaterialTexture(matKey){
+    if(!_matTextureCache[matKey]){
+      const m = MATERIALS[matKey] || MATERIALS.plastic;
+      _matTextureCache[matKey] = buildMaterialCanvas(matKey, "#" + m.color.toString(16).padStart(6,"0"));
+    }
+    return _matTextureCache[matKey];
+  }
 
   function openEditor(game){
     currentGame = game;
@@ -724,6 +820,10 @@
     renderExplorer();
     selectObject(null);
     setTool("select");
+    camera.position.set(24, 20, 24);
+    freecam.yaw = Math.PI * 1.25;
+    freecam.pitch = -0.5;
+    updateFreecamQuaternion();
     onResize();
   }
 
@@ -750,35 +850,36 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
-
-    const orbit = { target:new THREE.Vector3(0,3,0), radius:38, theta:Math.PI*0.28, phi:Math.PI*0.32 };
-    function updateCamera(){
-      const x = orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
-      const y = orbit.target.y + orbit.radius * Math.cos(orbit.phi);
-      const z = orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
-      camera.position.set(x,y,z);
-      camera.lookAt(orbit.target);
-    }
-    updateCamera();
+    camera = new THREE.PerspectiveCamera(65, 1, 0.1, 2000);
 
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
 
-    let dragging = false, panning = false, lastX = 0, lastY = 0, moved = 0;
+    /* ---- edit-mode freecam: WASD to move, right-drag to look, scroll to boost speed ---- */
+    camera.position.set(24, 20, 24);
+    freecam.yaw = Math.PI * 1.25;
+    freecam.pitch = -0.5;
+    updateFreecamQuaternion();
+
+    let lookDragging = false, lastX = 0, lastY = 0, moved = 0;
+    let gizmoDragActive = false;
 
     canvasEl.addEventListener("mousedown", (e) => {
       moved = 0;
+      if(playMode.active){
+        if(e.button === 2){ lookDragging = true; lastX = e.clientX; lastY = e.clientY; }
+        return;
+      }
       // first: did we hit a gizmo handle?
       if(gizmoGroup && currentTool !== "select"){
         const hit = pickGizmoHandle(e);
-        if(hit){ beginGizmoDrag(hit, e); return; }
+        if(hit){ beginGizmoDrag(hit, e); gizmoDragActive = true; return; }
       }
-      if(e.button === 2){ panning = true; } else { dragging = true; }
+      if(e.button === 2){ lookDragging = true; }
       lastX = e.clientX; lastY = e.clientY;
     });
-    window.addEventListener("mouseup", (e) => {
-      dragging = false; panning = false;
+    window.addEventListener("mouseup", () => {
+      lookDragging = false; gizmoDragActive = false;
       if(dragState){ endGizmoDrag(); }
     });
     window.addEventListener("mousemove", (e) => {
@@ -788,41 +889,157 @@
 
       if(dragState){ updateGizmoDrag(e); return; }
 
-      if(dragging){
-        orbit.theta -= dx * 0.006;
-        orbit.phi = Math.max(0.15, Math.min(Math.PI-0.15, orbit.phi - dy * 0.006));
-        updateCamera();
-      }else if(panning){
-        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
-        const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
-        orbit.target.addScaledVector(right, -dx * 0.04);
-        orbit.target.addScaledVector(up, dy * 0.04);
-        updateCamera();
+      if(lookDragging){
+        if(playMode.active){
+          playMode.camYaw -= dx * 0.006;
+          playMode.camPitch = Math.max(-1.1, Math.min(0.9, playMode.camPitch - dy * 0.006));
+        }else{
+          freecam.yaw -= dx * 0.0032;
+          freecam.pitch = Math.max(-1.5, Math.min(1.5, freecam.pitch - dy * 0.0032));
+          updateFreecamQuaternion();
+        }
       }
     });
     canvasEl.addEventListener("contextmenu", (e) => e.preventDefault());
     canvasEl.addEventListener("wheel", (e) => {
       e.preventDefault();
-      orbit.radius = Math.max(6, Math.min(140, orbit.radius + e.deltaY * 0.03));
-      updateCamera();
+      if(playMode.active){
+        playMode.camDist = Math.max(4, Math.min(22, playMode.camDist + e.deltaY * 0.02));
+      }else{
+        freecam.speedMult = Math.max(0.25, Math.min(6, freecam.speedMult - e.deltaY * 0.0018));
+      }
     }, { passive:false });
 
     canvasEl.addEventListener("click", (e) => {
       if(moved > 6) return; // ignore drag-releases
       closeObjCtxMenu();
+      if(playMode.active) return;
       if(currentTool !== "select") return; // gizmo tools don't reselect on plain click (handled by handle hit)
       const hit = pickObject(e);
       selectObject(hit ? hit.id : null);
       if(hit) showObjCtxMenu(hit, e.clientX, e.clientY);
     });
 
+    /* ---- keyboard: WASD move (edit freecam or play rig), Space jump, Enter chat ---- */
+    window.addEventListener("keydown", (e) => {
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if(tag === "INPUT" || tag === "TEXTAREA") return; // don't steal keys while typing
+      const k = e.key.toLowerCase();
+      if(["w","a","s","d"].includes(k)) keysDown[k] = true;
+      if(k === " "){ e.preventDefault(); keysDown[" "] = true; }
+      if(k === "enter" && playMode.active && !playMode.loading){
+        openChatInput();
+      }
+    });
+    window.addEventListener("keyup", (e) => {
+      const k = e.key.toLowerCase();
+      if(["w","a","s","d"].includes(k)) keysDown[k] = false;
+      if(k === " ") keysDown[" "] = false;
+    });
+
     window.addEventListener("resize", onResize);
 
+    const clock = new THREE.Clock();
     function animate(){
       requestAnimationFrame(animate);
+      const dt = Math.min(0.05, clock.getDelta());
+      if(playMode.active && !playMode.loading){
+        updatePlayMode(dt);
+      }else if(!playMode.active){
+        updateFreecam(dt);
+      }
       renderer.render(scene, camera);
     }
     animate();
+  }
+
+  /* ---- freecam helpers ---- */
+  function updateFreecamQuaternion(){
+    camera.quaternion.setFromEuler(new THREE.Euler(freecam.pitch, freecam.yaw, 0, "YXZ"));
+  }
+  function updateFreecam(dt){
+    const forward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+    const speed = 16 * freecam.speedMult;
+    const move = new THREE.Vector3();
+    if(keysDown["w"]) move.add(forward);
+    if(keysDown["s"]) move.sub(forward);
+    if(keysDown["d"]) move.add(right);
+    if(keysDown["a"]) move.sub(right);
+    if(move.lengthSq() > 0){
+      move.normalize().multiplyScalar(speed * dt);
+      camera.position.add(move);
+    }
+  }
+
+  /* ---- play mode: third-person rig movement, jump, camera orbit ---- */
+  function updatePlayMode(dt){
+    const rig = playRigGroup;
+    if(!rig) return;
+
+    // camera orbit around rig based on camYaw/camPitch/camDist
+    const pivot = rig.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+    const camOffset = new THREE.Vector3(
+      Math.sin(playMode.camYaw) * Math.cos(playMode.camPitch),
+      Math.sin(playMode.camPitch) + 0.35,
+      Math.cos(playMode.camYaw) * Math.cos(playMode.camPitch)
+    ).multiplyScalar(playMode.camDist);
+    camera.position.copy(pivot).add(camOffset);
+    camera.lookAt(pivot);
+
+    // movement relative to camera facing (forward = where camera looks, flattened)
+    const flatForward = new THREE.Vector3(-Math.sin(playMode.camYaw), 0, -Math.cos(playMode.camYaw));
+    const flatRight = new THREE.Vector3(flatForward.z, 0, -flatForward.x);
+    const moveDir = new THREE.Vector3();
+    if(keysDown["w"]) moveDir.add(flatForward);
+    if(keysDown["s"]) moveDir.sub(flatForward);
+    if(keysDown["d"]) moveDir.add(flatRight);
+    if(keysDown["a"]) moveDir.sub(flatRight);
+
+    const isMoving = moveDir.lengthSq() > 0;
+    if(isMoving){
+      moveDir.normalize();
+      rig.position.addScaledVector(moveDir, 7 * dt);
+      const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+      rig.rotation.y += ((((targetAngle - rig.rotation.y + Math.PI) % (Math.PI*2)) + Math.PI*2) % (Math.PI*2) - Math.PI) * Math.min(1, dt*10);
+    }
+
+    // simple gravity + jump against baseplate top (y=0)
+    if(keysDown[" "] && playMode.onGround){
+      playMode.velocityY = 8;
+      playMode.onGround = false;
+    }
+    playMode.velocityY -= 22 * dt;
+    rig.position.y += playMode.velocityY * dt;
+    if(rig.position.y <= playMode.groundY){
+      rig.position.y = playMode.groundY;
+      playMode.velocityY = 0;
+      playMode.onGround = true;
+    }
+
+    animateRig(rig, isMoving, !playMode.onGround, dt);
+    updateChatBubblePosition();
+  }
+
+  /* ---- rig walk-cycle animation (ported from BlockVerse's arm/leg swing idea) ---- */
+  function animateRig(rig, isMoving, inAir, dt){
+    if(!rig.userData.animT) rig.userData.animT = 0;
+    rig.userData.animT += dt * (isMoving ? 7 : 2.2);
+    const t = rig.userData.animT;
+    const parts = rig.userData.parts;
+    if(!parts) return;
+    if(inAir){
+      parts.lArm.rotation.x = -0.9; parts.rArm.rotation.x = -0.9;
+      parts.lLeg.rotation.x = 0.3; parts.rLeg.rotation.x = -0.3;
+    }else if(isMoving){
+      const swing = Math.sin(t) * 0.9;
+      parts.lArm.rotation.x = swing; parts.rArm.rotation.x = -swing;
+      parts.lLeg.rotation.x = -swing; parts.rLeg.rotation.x = swing;
+    }else{
+      const idle = Math.sin(t) * 0.05;
+      parts.lArm.rotation.x = idle; parts.rArm.rotation.x = -idle;
+      parts.lLeg.rotation.x = 0; parts.rLeg.rotation.x = 0;
+    }
   }
 
   function onResize(){
@@ -896,9 +1113,17 @@
 
   function materialFor(matKey, transparency){
     const m = MATERIALS[matKey] || MATERIALS.plastic;
-    const opts = { color:m.color, transparent: transparency > 0, opacity: 1 - transparency };
-    if(m.emissive){ opts.emissive = new THREE.Color(m.color); opts.emissiveIntensity = 0.55; }
-    return new THREE.MeshLambertMaterial(opts);
+    const opacity = 1 - transparency - (m.opacityBoost || 0);
+    const opts = {
+      color: m.color,
+      map: getMaterialTexture(matKey),
+      roughness: m.roughness,
+      metalness: m.metalness,
+      transparent: transparency > 0 || !!m.opacityBoost,
+      opacity: Math.max(0.15, opacity)
+    };
+    if(m.emissive){ opts.emissive = new THREE.Color(m.color); opts.emissiveIntensity = 0.7; }
+    return new THREE.MeshStandardMaterial(opts);
   }
 
   function addSceneObject(opts){
@@ -976,11 +1201,10 @@
 
   /* ---------------- Play button (spawns the player's real BlockVerse rig) ---------------- */
   let playRigGroup = null;
-  let isPlaying = false;
 
   function initPlayButton(){
     document.getElementById("editorPlayBtn").addEventListener("click", async () => {
-      if(isPlaying){ stopPlay(); return; }
+      if(playMode.active){ stopPlay(); return; }
       await startPlay();
     });
   }
@@ -1009,28 +1233,53 @@
     head.position.y = legH + torsoH + headSize/2;
     group.add(head);
 
+    // arms/legs get their own pivot groups positioned at the shoulder/hip so rotation swings naturally
     const armGeo = new THREE.BoxGeometry(0.6, torsoH, 0.6);
-    const lArm = new THREE.Mesh(armGeo, mkMat(leftArmColor));
-    lArm.position.set(-1.3, legH + torsoH/2, 0);
-    group.add(lArm);
-    const rArm = new THREE.Mesh(armGeo.clone(), mkMat(rightArmColor));
-    rArm.position.set(1.3, legH + torsoH/2, 0);
-    group.add(rArm);
+    const lArmPivot = new THREE.Group(); lArmPivot.position.set(-1.3, legH + torsoH, 0);
+    const lArmMesh = new THREE.Mesh(armGeo, mkMat(leftArmColor)); lArmMesh.position.y = -torsoH/2;
+    lArmPivot.add(lArmMesh); group.add(lArmPivot);
+
+    const rArmPivot = new THREE.Group(); rArmPivot.position.set(1.3, legH + torsoH, 0);
+    const rArmMesh = new THREE.Mesh(armGeo.clone(), mkMat(rightArmColor)); rArmMesh.position.y = -torsoH/2;
+    rArmPivot.add(rArmMesh); group.add(rArmPivot);
 
     const legGeo = new THREE.BoxGeometry(0.8, legH, 0.8);
-    const lLeg = new THREE.Mesh(legGeo, mkMat(leftLegColor));
-    lLeg.position.set(-0.55, legH/2, 0);
-    group.add(lLeg);
-    const rLeg = new THREE.Mesh(legGeo.clone(), mkMat(rightLegColor));
-    rLeg.position.set(0.55, legH/2, 0);
-    group.add(rLeg);
+    const lLegPivot = new THREE.Group(); lLegPivot.position.set(-0.55, legH, 0);
+    const lLegMesh = new THREE.Mesh(legGeo, mkMat(leftLegColor)); lLegMesh.position.y = -legH/2;
+    lLegPivot.add(lLegMesh); group.add(lLegPivot);
 
+    const rLegPivot = new THREE.Group(); rLegPivot.position.set(0.55, legH, 0);
+    const rLegMesh = new THREE.Mesh(legGeo.clone(), mkMat(rightLegColor)); rLegMesh.position.y = -legH/2;
+    rLegPivot.add(rLegMesh); group.add(rLegPivot);
+
+    group.userData.parts = { lArm:lArmPivot, rArm:rArmPivot, lLeg:lLegPivot, rLeg:rLegPivot };
+    group.userData.legH = legH;
     return group;
   }
 
+  function showPlayLoading(show){
+    let el = document.getElementById("playLoadingScreen");
+    if(show){
+      if(!el){
+        el = document.createElement("div");
+        el.id = "playLoadingScreen";
+        el.style.cssText = "position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(10,10,11,0.92);backdrop-filter:blur(3px);";
+        el.innerHTML = '<div class="spin" style="width:26px;height:26px;border-width:3px;"></div><div style="font-size:13px;color:#c8c8cc;font-weight:600;">Loading play test&hellip;</div>';
+        document.querySelector(".viewport-wrap").appendChild(el);
+      }
+      el.style.display = "flex";
+    }else if(el){
+      el.remove();
+    }
+  }
+
   async function startPlay(){
+    playMode.loading = true;
+    showPlayLoading(true);
+
     const spawn = sceneObjects.find(o => o.className === "SpawnLocation");
     const spawnPos = spawn ? spawn.mesh.position : new THREE.Vector3(0,0,0);
+    const spawnHalfH = spawn ? spawn.props.size[1]/2 : 0;
 
     let avatar = null;
     try{
@@ -1040,16 +1289,29 @@
       console.error("Studio: couldn't load avatar for play test:", err);
     }
 
+    // small artificial delay so the loading screen is visible even on a fast connection
+    await new Promise(res => setTimeout(res, 550));
+
     playRigGroup = buildRig(avatar);
-    const spawnHalfH = spawn ? spawn.props.size[1]/2 : 0;
-    playRigGroup.position.set(spawnPos.x, spawnPos.y + spawnHalfH, spawnPos.z);
+    playMode.groundY = spawnPos.y + spawnHalfH;
+    playRigGroup.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
     scene.add(playRigGroup);
 
-    isPlaying = true;
+    playMode.active = true;
+    playMode.loading = false;
+    playMode.velocityY = 0;
+    playMode.onGround = true;
+    playMode.camYaw = playRigGroup.rotation.y;
+    playMode.camPitch = 0.25;
+    playMode.camDist = 9;
+
+    showPlayLoading(false);
+
     const btn = document.getElementById("editorPlayBtn");
     btn.classList.add("playing");
-    btn.querySelector("span").textContent = "Close";
+    btn.querySelector("span").textContent = "Leave";
     btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat";
     showToast(avatar ? "Playing with your BlockVerse rig" : "Playing (no saved avatar found, using defaults)");
   }
 
@@ -1059,12 +1321,72 @@
       playRigGroup.traverse((c) => { if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); });
       playRigGroup = null;
     }
-    isPlaying = false;
+    closeChatInput();
+    removeChatBubble();
+    playMode.active = false;
+    playMode.loading = false;
+    showPlayLoading(false);
+
     const btn = document.getElementById("editorPlayBtn");
     btn.classList.remove("playing");
     btn.querySelector("span").textContent = "Play";
     btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    setTool(currentTool); // refreshes the viewport hint back to edit-mode text
   }
+
+  /* ---- in-play chat: Enter opens a box, Enter again sends a floating bubble over the rig ---- */
+  let chatBubbleEl = null, chatBubbleUntil = 0;
+  function openChatInput(){
+    if(document.getElementById("playChatInput")) return;
+    const box = document.createElement("input");
+    box.id = "playChatInput";
+    box.type = "text";
+    box.maxLength = 80;
+    box.placeholder = "Say something...";
+    box.style.cssText = "position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:25;width:260px;background:rgba(19,19,21,0.92);border:1px solid #333338;border-radius:9px;color:#f2f2f2;font-size:13px;padding:9px 12px;outline:none;font-family:inherit;";
+    document.querySelector(".viewport-wrap").appendChild(box);
+    box.focus();
+    box.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        const text = box.value.trim();
+        closeChatInput();
+        if(text) showChatBubble(text);
+      }else if(e.key === "Escape"){
+        closeChatInput();
+      }
+      e.stopPropagation();
+    });
+    box.addEventListener("blur", closeChatInput);
+  }
+  function closeChatInput(){
+    const box = document.getElementById("playChatInput");
+    if(box) box.remove();
+  }
+  function showChatBubble(text){
+    removeChatBubble();
+    chatBubbleEl = document.createElement("div");
+    chatBubbleEl.style.cssText = "position:absolute;z-index:24;background:rgba(255,255,255,0.95);color:#111;font-size:12px;font-weight:600;padding:6px 10px;border-radius:10px;pointer-events:none;max-width:200px;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,0.3);";
+    chatBubbleEl.textContent = text;
+    document.querySelector(".viewport-wrap").appendChild(chatBubbleEl);
+    chatBubbleUntil = performance.now() + 3200;
+  }
+  function removeChatBubble(){
+    if(chatBubbleEl){ chatBubbleEl.remove(); chatBubbleEl = null; }
+  }
+  function updateChatBubblePosition(){
+    if(!chatBubbleEl || !playRigGroup) return;
+    if(performance.now() > chatBubbleUntil){ removeChatBubble(); return; }
+    const headPos = playRigGroup.position.clone();
+    headPos.y += (playRigGroup.userData.legH || 2) * 2 + 1.4;
+    const proj = headPos.project(camera);
+    const wrap = document.querySelector(".viewport-wrap");
+    const x = (proj.x * 0.5 + 0.5) * wrap.clientWidth;
+    const y = (-proj.y * 0.5 + 0.5) * wrap.clientHeight;
+    chatBubbleEl.style.left = x + "px";
+    chatBubbleEl.style.top = y + "px";
+    chatBubbleEl.style.transform = "translate(-50%,-100%)";
+  }
+
 
   function setTool(tool){
     currentTool = tool;
