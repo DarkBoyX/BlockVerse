@@ -125,19 +125,140 @@
   .game-card{
     background:var(--bg-2); border:1px solid var(--border-soft); border-radius:14px; overflow:hidden;
     cursor:pointer; transition:transform .15s, border-color .15s, box-shadow .15s; animation:fadeUp .35s ease both;
+    position:relative;
   }
   .game-card:hover{ transform:translateY(-3px); border-color:var(--grey-3); box-shadow:0 10px 26px rgba(0,0,0,0.4); }
   .game-card .gc-thumb{
     width:100%; aspect-ratio:16/10; background:
       linear-gradient(180deg, #4a6cf7 0%, #7aa2ff 55%, #3ecf6e 55%, #2fae59 100%);
+    background-size:cover; background-position:center;
     position:relative;
   }
   .game-card .gc-thumb::after{
     content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.35) 100%);
   }
-  .game-card .gc-body{ padding:12px 13px 14px; }
-  .game-card .gc-name{ font-size:13.5px; font-weight:700; margin-bottom:3px; }
-  .game-card .gc-meta{ font-size:11.5px; color:var(--text-3); }
+  .game-card .gc-body{ padding:12px 13px 14px; display:flex; align-items:flex-start; gap:8px; }
+  .game-card .gc-body-text{ flex:1; min-width:0; }
+  .game-card .gc-name{ font-size:13.5px; font-weight:700; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .game-card .gc-meta{ font-size:11.5px; color:var(--text-3); display:flex; align-items:center; gap:6px; }
+  .gc-status-pill{ font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; padding:2px 6px; border-radius:5px; }
+  .gc-status-pill.draft{ background:var(--grey-1); color:var(--text-2); }
+  .gc-status-pill.pending{ background:#3a3320; color:#ffd98a; }
+  .gc-status-pill.published{ background:#173b26; color:#6be29a; }
+  .gc-status-pill.denied{ background:#3a1c1d; color:#ff9d9f; }
+
+  .gc-menu-btn{
+    flex-shrink:0; width:26px; height:26px; border-radius:7px; border:1px solid transparent; background:transparent;
+    color:var(--text-2); display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .gc-menu-btn:hover{ background:var(--grey-1); color:var(--text-0); border-color:var(--border-soft); }
+  .gc-menu-btn svg{ width:16px; height:16px; }
+
+  .gc-menu-pop{
+    position:fixed; z-index:400; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:10px;
+    box-shadow:0 14px 40px rgba(0,0,0,0.55); padding:6px; min-width:170px; animation:fadeUp .12s ease both;
+  }
+  .gc-menu-pop .gc-menu-item{
+    display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:7px; font-size:12.5px; font-weight:600;
+    color:var(--text-1); cursor:pointer; transition:background .12s, color .12s;
+  }
+  .gc-menu-pop .gc-menu-item:hover{ background:var(--grey-1); color:var(--text-0); }
+  .gc-menu-pop .gc-menu-item.danger:hover{ background:rgba(229,72,77,0.15); color:#ff9a9d; }
+  .gc-menu-pop .gc-menu-item svg{ width:14px; height:14px; flex-shrink:0; }
+  .gc-menu-pop .gc-menu-sep{ height:1px; background:var(--border-soft); margin:5px 2px; }
+  .hidden{ display:none !important; }
+
+  /* ---------- Game Settings page ---------- */
+  #gameSettingsScreen{ display:none; position:fixed; inset:0; background:var(--bg-0); z-index:300; overflow-y:auto; }
+  #gameSettingsScreen.show{ display:block; }
+  .gs-topbar{
+    display:flex; align-items:center; gap:14px; padding:16px 26px; border-bottom:1px solid var(--border-soft);
+    background:var(--bg-1); position:sticky; top:0; z-index:2;
+  }
+  .gs-back-btn{
+    width:34px; height:34px; border-radius:9px; border:1px solid var(--border); background:var(--grey-1);
+    color:var(--text-1); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  .gs-back-btn:hover{ background:var(--grey-2); color:var(--text-0); }
+  .gs-back-btn svg{ width:16px; height:16px; }
+  .gs-title{ font-size:15px; font-weight:800; }
+  .gs-sub{ font-size:11.5px; color:var(--text-2); }
+  .gs-body{ max-width:640px; margin:0 auto; padding:28px 22px 60px; }
+  .gs-section{ margin-bottom:26px; }
+  .gs-label{ font-size:12px; font-weight:700; color:var(--text-1); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .gs-hint{ font-size:11px; color:var(--text-3); margin-top:6px; line-height:1.5; }
+
+  .gs-banner-drop{
+    width:100%; aspect-ratio:3/1; border-radius:12px; border:1px dashed var(--border); background:var(--bg-1);
+    background-size:cover; background-position:center; position:relative; cursor:pointer; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; transition:border-color .15s;
+  }
+  .gs-banner-drop:hover{ border-color:var(--accent); }
+  .gs-banner-drop .gs-drop-empty{ display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--text-2); font-size:12px; }
+  .gs-banner-drop .gs-drop-empty svg{ width:22px; height:22px; }
+  .gs-banner-drop.has-img .gs-drop-empty{ display:none; }
+  .gs-banner-drop .gs-drop-edit{
+    position:absolute; right:10px; bottom:10px; background:rgba(0,0,0,0.6); color:#fff; font-size:11px; font-weight:600;
+    padding:6px 10px; border-radius:7px; display:none;
+  }
+  .gs-banner-drop.has-img .gs-drop-edit{ display:block; }
+
+  .gs-icon-row{ display:flex; align-items:center; gap:16px; }
+  .gs-icon-drop{
+    width:84px; height:84px; border-radius:16px; border:1px dashed var(--border); background:var(--bg-1);
+    background-size:cover; background-position:center; cursor:pointer; flex-shrink:0; position:relative; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; color:var(--text-2); transition:border-color .15s;
+  }
+  .gs-icon-drop:hover{ border-color:var(--accent); }
+  .gs-icon-drop svg{ width:22px; height:22px; }
+  .gs-icon-drop.has-img svg{ display:none; }
+
+  .gs-slider-row{ display:flex; align-items:center; gap:14px; }
+  .gs-slider-row input[type="range"]{ flex:1; accent-color:var(--accent); }
+  .gs-slider-val{ font-size:13.5px; font-weight:800; min-width:56px; text-align:right; }
+
+  .gs-toggle-row{
+    display:flex; align-items:center; justify-content:space-between; background:var(--bg-1); border:1px solid var(--border-soft);
+    border-radius:11px; padding:13px 15px;
+  }
+  .gs-toggle-row .gs-tr-text{ font-size:13px; font-weight:600; }
+  .gs-toggle-row .gs-tr-sub{ font-size:11px; color:var(--text-2); margin-top:2px; }
+  .gs-switch{ position:relative; width:42px; height:24px; flex-shrink:0; }
+  .gs-switch input{ opacity:0; width:0; height:0; }
+  .gs-switch .gs-slider-track{
+    position:absolute; inset:0; background:var(--grey-2); border-radius:14px; cursor:pointer; transition:background .15s;
+  }
+  .gs-switch .gs-slider-track::before{
+    content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%;
+    transition:transform .15s;
+  }
+  .gs-switch input:checked + .gs-slider-track{ background:var(--accent); }
+  .gs-switch input:checked + .gs-slider-track::before{ transform:translateX(18px); }
+
+  .gs-status-banner{
+    border-radius:11px; padding:13px 15px; font-size:12.5px; font-weight:600; margin-bottom:22px;
+    display:flex; align-items:center; gap:9px;
+  }
+  .gs-status-banner svg{ width:16px; height:16px; flex-shrink:0; }
+  .gs-status-banner.pending{ background:#3a3320; color:#ffd98a; }
+  .gs-status-banner.published{ background:#173b26; color:#6be29a; }
+  .gs-status-banner.denied{ background:#3a1c1d; color:#ff9d9f; }
+
+  .gs-actions{ display:flex; gap:10px; margin-top:6px; }
+  .gs-btn{
+    flex:1; padding:12px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; border:1px solid var(--border);
+    background:var(--grey-1); color:var(--text-0); transition:background .15s;
+  }
+  .gs-btn:hover{ background:var(--grey-2); }
+  .gs-btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .gs-btn.primary:hover{ filter:brightness(1.08); }
+  .gs-btn.danger{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  .gs-btn.danger:hover{ background:#4a2224; }
+  .gs-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .gs-msg{ font-size:12px; text-align:center; margin-top:10px; min-height:16px; }
+  .gs-msg.error{ color:#ff9a9d; }
+  .gs-msg.success{ color:#6be29a; }
 
   .new-game-card{
     background:var(--bg-2); border:1px dashed var(--border); border-radius:14px;
@@ -427,6 +548,81 @@
   </div>
 </div>
 
+<!-- ================= GAME SETTINGS ================= -->
+<div id="gameSettingsScreen">
+  <div class="gs-topbar">
+    <button class="gs-back-btn" id="gsBackBtn" title="Back to dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div>
+      <div class="gs-title" id="gsTitle">Game Settings</div>
+      <div class="gs-sub">Icon, banner, server size &amp; visibility</div>
+    </div>
+  </div>
+  <div class="gs-body">
+    <div class="gs-status-banner hidden" id="gsStatusBanner"></div>
+
+    <div class="gs-section">
+      <div class="gs-label">Game name</div>
+      <input type="text" id="gsNameInput" maxlength="40" placeholder="Untitled Game">
+    </div>
+
+    <div class="gs-section">
+      <div class="gs-label">Banner</div>
+      <div class="gs-banner-drop" id="gsBannerDrop">
+        <div class="gs-drop-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="8" cy="9" r="1.5"/></svg>
+          <span>Click to upload a banner (shown at the top of your game page)</span>
+        </div>
+        <div class="gs-drop-edit">Change</div>
+      </div>
+      <input type="file" id="gsBannerInput" accept="image/*" class="hidden">
+    </div>
+
+    <div class="gs-section">
+      <div class="gs-label">Icon</div>
+      <div class="gs-icon-row">
+        <div class="gs-icon-drop" id="gsIconDrop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="8" cy="9" r="1.5"/></svg>
+        </div>
+        <div class="gs-hint">Square image works best. Shown on your game's card and on the home page once published.</div>
+      </div>
+      <input type="file" id="gsIconInput" accept="image/*" class="hidden">
+    </div>
+
+    <div class="gs-section">
+      <div class="gs-label">Max players per server</div>
+      <div class="gs-slider-row">
+        <input type="range" id="gsMaxPlayers" min="1" max="100" step="1" value="20">
+        <div class="gs-slider-val" id="gsMaxPlayersVal">20</div>
+      </div>
+      <div class="gs-hint">How many people can be in one server of this game at once. 100 max.</div>
+    </div>
+
+    <div class="gs-section">
+      <div class="gs-toggle-row">
+        <div>
+          <div class="gs-tr-text">Public game</div>
+          <div class="gs-tr-sub">Public games can be requested for the home page. Private games stay in your Studio only.</div>
+        </div>
+        <label class="gs-switch">
+          <input type="checkbox" id="gsPublicToggle">
+          <span class="gs-slider-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="gs-actions">
+      <button class="gs-btn" id="gsSaveBtn">Save</button>
+      <button class="gs-btn primary" id="gsPublishBtn">Submit for Review</button>
+    </div>
+    <div class="gs-actions" id="gsWithdrawRow" style="display:none;">
+      <button class="gs-btn danger" id="gsWithdrawBtn">Take Game Offline</button>
+    </div>
+    <div class="gs-msg" id="gsMsg"></div>
+  </div>
+</div>
+
 <!-- ================= EDITOR ================= -->
 <div id="editorScreen">
   <div class="editor-topbar">
@@ -645,6 +841,7 @@
         try{ localStorage.setItem(gamesStorageKey(), JSON.stringify(cloud)); }catch(e){}
       }
       renderGameGrid();
+      loadGames().forEach(g => { if(g.publishStatus === "pending" || g.publishStatus === "published") watchGameRequestStatus(g); });
     }).catch(() => renderGameGrid());
   }
 
@@ -655,23 +852,80 @@
     grid.innerHTML = "";
     grid.appendChild(newCard);
     games.slice().reverse().forEach(g => {
+      const status = g.publishStatus || "draft"; // draft | pending | published | denied
+      const statusLabel = { draft:"Draft", pending:"In review", published:"Published", denied:"Denied" }[status];
       const card = document.createElement("div");
       card.className = "game-card";
       card.innerHTML =
-        '<div class="gc-thumb"></div>' +
+        '<div class="gc-thumb"' + (g.icon ? ' style="background-image:url(\'' + g.icon + '\')"' : '') + '></div>' +
         '<div class="gc-body">' +
-          '<div class="gc-name"></div>' +
-          '<div class="gc-meta">' + new Date(g.created).toLocaleDateString() + '</div>' +
+          '<div class="gc-body-text">' +
+            '<div class="gc-name"></div>' +
+            '<div class="gc-meta"><span>' + new Date(g.created).toLocaleDateString() + '</span><span class="gc-status-pill ' + status + '">' + statusLabel + '</span></div>' +
+          '</div>' +
+          '<button class="gc-menu-btn" title="Game options">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>' +
+          '</button>' +
         '</div>';
       card.querySelector(".gc-name").textContent = g.name;
-      card.addEventListener("click", () => openEditor(g));
+      card.addEventListener("click", (e) => {
+        if(e.target.closest(".gc-menu-btn")) return;
+        openEditor(g);
+      });
+      card.querySelector(".gc-menu-btn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openGameCardMenu(g, e.currentTarget);
+      });
       grid.appendChild(card);
     });
   }
 
+  /* ---- the 3-lines "≡" menu popover shown from each game card ---- */
+  let openCardMenuEl = null;
+  function closeGameCardMenu(){
+    if(openCardMenuEl){ openCardMenuEl.remove(); openCardMenuEl = null; }
+    document.removeEventListener("click", closeGameCardMenu);
+  }
+  function openGameCardMenu(game, anchorBtn){
+    closeGameCardMenu();
+    const rect = anchorBtn.getBoundingClientRect();
+    const menu = document.createElement("div");
+    menu.className = "gc-menu-pop";
+    const status = game.publishStatus || "draft";
+    menu.innerHTML =
+      '<div class="gc-menu-item" data-act="open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg> Open in Studio</div>' +
+      '<div class="gc-menu-item" data-act="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg> Game Settings</div>' +
+      '<div class="gc-menu-sep"></div>' +
+      '<div class="gc-menu-item danger" data-act="delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Delete Game</div>';
+    document.body.appendChild(menu);
+    const menuW = menu.offsetWidth, menuH = menu.offsetHeight;
+    menu.style.left = Math.min(rect.left, window.innerWidth - menuW - 12) + "px";
+    menu.style.top = Math.min(rect.bottom + 6, window.innerHeight - menuH - 12) + "px";
+    openCardMenuEl = menu;
+    menu.querySelector('[data-act="open"]').addEventListener("click", () => { closeGameCardMenu(); openEditor(game); });
+    menu.querySelector('[data-act="settings"]').addEventListener("click", () => { closeGameCardMenu(); openGameSettings(game); });
+    menu.querySelector('[data-act="delete"]').addEventListener("click", () => { closeGameCardMenu(); deleteGame(game); });
+    setTimeout(() => document.addEventListener("click", closeGameCardMenu), 0);
+  }
+
+  function deleteGame(game){
+    if(!confirm('Delete "' + game.name + '"? This cannot be undone.')) return;
+    const games = loadGames().filter(g => g.id !== game.id);
+    saveGames(games);
+    if(game.publishStatus === "pending" || game.publishStatus === "published"){
+      fbDb.ref("game_requests/" + game.id).remove().catch(() => {});
+      fbDb.ref("published_games/" + game.id).remove().catch(() => {});
+    }
+    renderGameGrid();
+  }
+
   document.getElementById("newGameCard").addEventListener("click", () => {
     const name = "Untitled Game " + (loadGames().length + 1);
-    const game = { id: "g_" + Date.now().toString(36) + Math.random().toString(36).slice(2,7), name, created: Date.now() };
+    const game = {
+      id: "g_" + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+      name, created: Date.now(),
+      icon: "", banner: "", maxPlayers: 20, isPublic: false, publishStatus: "draft"
+    };
     const games = loadGames();
     games.push(game);
     saveGames(games);
@@ -831,6 +1085,247 @@
     document.getElementById("editorScreen").classList.remove("show");
     document.getElementById("dashScreen").classList.add("show");
   });
+
+  /* ---------------- Game Settings page (icon/banner/server size/visibility/publish) ---------------- */
+  let gsGame = null; // the game object currently being edited on this page
+  let gsIconData = "", gsBannerData = "";
+
+  function fileToDataUrl(file, maxDim){
+    return new Promise((resolve, reject) => {
+      if(!file || !file.type.startsWith("image/")){ reject(new Error("not an image")); return; }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("read failed"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("decode failed"));
+        img.onload = () => {
+          // downscale so large photos don't blow up Realtime Database node size
+          let { width, height } = img;
+          if(width > maxDim || height > maxDim){
+            const scale = maxDim / Math.max(width, height);
+            width = Math.round(width * scale); height = Math.round(height * scale);
+          }
+          const cvs = document.createElement("canvas");
+          cvs.width = width; cvs.height = height;
+          cvs.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(cvs.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function openGameSettings(game){
+    gsGame = game;
+    gsIconData = game.icon || "";
+    gsBannerData = game.banner || "";
+    document.getElementById("dashScreen").classList.remove("show");
+    document.getElementById("gameSettingsScreen").classList.add("show");
+    document.getElementById("gsTitle").textContent = game.name || "Game Settings";
+    document.getElementById("gsNameInput").value = game.name || "";
+    document.getElementById("gsMaxPlayers").value = game.maxPlayers || 20;
+    document.getElementById("gsMaxPlayersVal").textContent = game.maxPlayers || 20;
+    document.getElementById("gsPublicToggle").checked = !!game.isPublic;
+    applyImgPreview("gsBannerDrop", gsBannerData);
+    applyImgPreview("gsIconDrop", gsIconData);
+    document.getElementById("gsMsg").textContent = "";
+    refreshGameSettingsStatus();
+  }
+
+  function applyImgPreview(elId, dataUrl){
+    const el = document.getElementById(elId);
+    if(dataUrl){ el.style.backgroundImage = "url('" + dataUrl + "')"; el.classList.add("has-img"); }
+    else { el.style.backgroundImage = ""; el.classList.remove("has-img"); }
+  }
+
+  function refreshGameSettingsStatus(){
+    const status = gsGame.publishStatus || "draft";
+    const banner = document.getElementById("gsStatusBanner");
+    const publishBtn = document.getElementById("gsPublishBtn");
+    const withdrawRow = document.getElementById("gsWithdrawRow");
+    banner.classList.remove("pending", "published", "denied", "hidden");
+    withdrawRow.style.display = "none";
+    if(status === "pending"){
+      banner.classList.add("pending");
+      banner.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> Waiting on admin review. You\'ll see it update here once it\'s checked.';
+      publishBtn.disabled = true; publishBtn.textContent = "Awaiting Review";
+    }else if(status === "published"){
+      banner.classList.add("published");
+      banner.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Live on the home page. Players can join it now.';
+      publishBtn.disabled = true; publishBtn.textContent = "Published";
+      withdrawRow.style.display = "flex";
+    }else if(status === "denied"){
+      banner.classList.add("denied");
+      banner.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg> Denied' + (gsGame.denyReason ? (": " + escapeHtmlStudio(gsGame.denyReason)) : ".") + ' Make changes and resubmit any time.';
+      publishBtn.disabled = false; publishBtn.textContent = "Resubmit for Review";
+    }else{
+      banner.classList.add("hidden");
+      publishBtn.disabled = false; publishBtn.textContent = "Submit for Review";
+    }
+  }
+
+  function escapeHtmlStudio(s){
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  document.getElementById("gsBackBtn").addEventListener("click", () => {
+    document.getElementById("gameSettingsScreen").classList.remove("show");
+    document.getElementById("dashScreen").classList.add("show");
+    renderGameGrid();
+  });
+
+  document.getElementById("gsBannerDrop").addEventListener("click", () => document.getElementById("gsBannerInput").click());
+  document.getElementById("gsIconDrop").addEventListener("click", () => document.getElementById("gsIconInput").click());
+
+  document.getElementById("gsBannerInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      gsBannerData = await fileToDataUrl(file, 960);
+      applyImgPreview("gsBannerDrop", gsBannerData);
+    }catch(err){
+      document.getElementById("gsMsg").textContent = "Couldn't read that image.";
+      document.getElementById("gsMsg").className = "gs-msg error";
+    }
+    e.target.value = "";
+  });
+  document.getElementById("gsIconInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      gsIconData = await fileToDataUrl(file, 256);
+      applyImgPreview("gsIconDrop", gsIconData);
+    }catch(err){
+      document.getElementById("gsMsg").textContent = "Couldn't read that image.";
+      document.getElementById("gsMsg").className = "gs-msg error";
+    }
+    e.target.value = "";
+  });
+
+  document.getElementById("gsMaxPlayers").addEventListener("input", (e) => {
+    document.getElementById("gsMaxPlayersVal").textContent = e.target.value;
+  });
+
+  function collectGameSettingsFromForm(){
+    return {
+      name: (document.getElementById("gsNameInput").value || "Untitled Game").trim().slice(0, 40),
+      icon: gsIconData,
+      banner: gsBannerData,
+      maxPlayers: Math.max(1, Math.min(100, parseInt(document.getElementById("gsMaxPlayers").value, 10) || 20)),
+      isPublic: document.getElementById("gsPublicToggle").checked
+    };
+  }
+
+  function persistGameSettings(patch){
+    const games = loadGames();
+    const idx = games.findIndex(g => g.id === gsGame.id);
+    if(idx === -1) return;
+    Object.assign(games[idx], patch);
+    gsGame = games[idx];
+    saveGames(games);
+  }
+
+  document.getElementById("gsSaveBtn").addEventListener("click", () => {
+    const form = collectGameSettingsFromForm();
+    persistGameSettings(form);
+    document.getElementById("gsTitle").textContent = form.name;
+    const msg = document.getElementById("gsMsg");
+    msg.textContent = "Saved."; msg.className = "gs-msg success";
+    setTimeout(() => { if(msg.textContent === "Saved.") msg.textContent = ""; }, 1800);
+  });
+
+  document.getElementById("gsPublishBtn").addEventListener("click", async () => {
+    const msg = document.getElementById("gsMsg");
+    const form = collectGameSettingsFromForm();
+    if(!form.isPublic){
+      msg.textContent = "Turn on \"Public game\" before submitting for review.";
+      msg.className = "gs-msg error";
+      return;
+    }
+    if(!form.icon){
+      msg.textContent = "Add an icon before submitting - it's shown on the home page.";
+      msg.className = "gs-msg error";
+      return;
+    }
+    const btn = document.getElementById("gsPublishBtn");
+    btn.disabled = true; btn.textContent = "Submitting...";
+    try{
+      if(!fbAuth.currentUser) await fbAuth.signInAnonymously();
+      persistGameSettings(Object.assign({}, form, { publishStatus: "pending", denyReason: "" }));
+      await fbDb.ref("game_requests/" + gsGame.id).set({
+        gameId: gsGame.id,
+        ownerKey: currentUserKey,
+        ownerName: currentUsername,
+        name: form.name,
+        icon: form.icon,
+        banner: form.banner,
+        maxPlayers: form.maxPlayers,
+        status: "pending",
+        ts: firebase.database.ServerValue.TIMESTAMP
+      });
+      msg.textContent = "Submitted! You'll see it update here once it's reviewed.";
+      msg.className = "gs-msg success";
+      refreshGameSettingsStatus();
+      watchGameRequestStatus(gsGame);
+    }catch(err){
+      console.error("Publish request failed:", err);
+      msg.textContent = "Couldn't submit - check your connection and try again.";
+      msg.className = "gs-msg error";
+      btn.disabled = false; btn.textContent = "Submit for Review";
+    }
+  });
+
+  document.getElementById("gsWithdrawBtn").addEventListener("click", async () => {
+    if(!confirm("Take \"" + gsGame.name + "\" offline? Players won't be able to join it from the home page anymore.")) return;
+    const btn = document.getElementById("gsWithdrawBtn");
+    btn.disabled = true;
+    try{
+      await fbDb.ref("published_games/" + gsGame.id).remove();
+      await fbDb.ref("game_requests/" + gsGame.id).remove();
+      persistGameSettings({ publishStatus: "draft" });
+      refreshGameSettingsStatus();
+      showToast("Taken offline");
+    }catch(err){
+      alert("Couldn't take the game offline - check your connection and try again.");
+    }
+    btn.disabled = false;
+  });
+
+  // live-updates the settings page (and dashboard pill) if an admin
+  // accepts/denies this game while the creator has it open
+  function watchGameRequestStatus(game){
+    fbDb.ref("game_requests/" + game.id).on("value", (snap) => {
+      const req = snap.val();
+      const games = loadGames();
+      const idx = games.findIndex(g => g.id === game.id);
+      if(idx === -1) return;
+      if(!req){
+        // request node removed: either accepted-and-migrated (check published_games) or denied-and-cleared
+        fbDb.ref("published_games/" + game.id).once("value").then(pubSnap => {
+          const wasPublished = games[idx].publishStatus === "published";
+          if(pubSnap.exists() && games[idx].publishStatus !== "published"){
+            games[idx].publishStatus = "published";
+            saveGames(games);
+            if(gsGame && gsGame.id === game.id) refreshGameSettingsStatus();
+            showToast('"' + games[idx].name + '" was approved and is now live!');
+          }else if(!pubSnap.exists() && wasPublished){
+            games[idx].publishStatus = "draft";
+            saveGames(games);
+            if(gsGame && gsGame.id === game.id) refreshGameSettingsStatus();
+          }
+        });
+        return;
+      }
+      if(req.status === "denied" && games[idx].publishStatus !== "denied"){
+        games[idx].publishStatus = "denied";
+        games[idx].denyReason = req.denyReason || "";
+        saveGames(games);
+        if(gsGame && gsGame.id === game.id) refreshGameSettingsStatus();
+        showToast('"' + games[idx].name + '" was denied.');
+      }
+    });
+  }
 
   document.getElementById("editorSaveBtn").addEventListener("click", () => {
     if(!currentGame) return;
