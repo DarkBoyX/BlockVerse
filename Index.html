@@ -1486,7 +1486,7 @@
         <div class="home-friends-strip" id="homeFriendsStrip"></div>
       </div>
 
-      <div class="game-grid">
+      <div class="game-grid" id="homeGameGrid">
         <div class="game-card" id="playBaseplateBtn" data-game-id="baseplate">
           <div class="game-card-thumb">
             <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
@@ -5039,6 +5039,67 @@
     }
   };
 
+  /* ============ community games: published from Studio, approved by an admin ============
+     Lives at published_games/<gameId> in Firebase - an admin moves a request there
+     from admin.html once they accept it. These don't have real gameplay wired up yet,
+     so Play shows an honest "not ready yet" toast rather than pretending to launch. */
+  function addPublishedGameToCatalog(gameId, g){
+    GAMES_CATALOG[gameId] = {
+      id: gameId,
+      title: g.name || "Untitled Game",
+      sub: "A community-made BlockVerse game.",
+      creator: g.ownerName || "Unknown",
+      createdAt: g.publishedAt || Date.now(),
+      background: g.banner ? ("url('" + g.banner + "') center/cover") : "linear-gradient(160deg,#2a2a30 0%,#3a3a42 100%)",
+      profile: g.icon ? ("url('" + g.icon + "') center/cover") : "linear-gradient(135deg,#5a6cd6,#3a4aa8)",
+      maxPlayers: g.maxPlayers || 20,
+      isCommunity: true,
+      start: () => {
+        closeGamePanel();
+        const msg = "\"" + (g.name || "This game") + "\" doesn't have a published experience to join yet.";
+        if(typeof showToast === "function"){ showToast(msg); return; }
+        const el = document.createElement("div");
+        el.textContent = msg;
+        Object.assign(el.style, {
+          position:"fixed", left:"50%", bottom:"26px", transform:"translateX(-50%)",
+          background:"rgba(10,10,11,0.92)", color:"#fff", padding:"12px 18px", borderRadius:"10px",
+          fontSize:"12.5px", zIndex:9999, border:"1px solid rgba(255,255,255,0.15)"
+        });
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3200);
+      }
+    };
+  }
+
+  function renderHomeGameGrid(publishedList){
+    const grid = document.getElementById("homeGameGrid");
+    grid.querySelectorAll(".game-card[data-community]").forEach(el => el.remove());
+    publishedList.forEach(g => {
+      const card = document.createElement("div");
+      card.className = "game-card";
+      card.setAttribute("data-community", "1");
+      card.setAttribute("data-game-id", g.id);
+      const thumbStyle = g.icon ? (' style="background:url(\'' + g.icon + '\') center/cover;"') : "";
+      card.innerHTML =
+        '<div class="game-card-thumb"' + thumbStyle + '></div>' +
+        '<div class="game-card-info">' +
+          '<div class="game-card-title"></div>' +
+          '<div class="game-card-sub">By ' + escapeHtml(g.ownerName || "Unknown") + '</div>' +
+        '</div>';
+      card.querySelector(".game-card-title").textContent = g.name || "Untitled Game";
+      card.addEventListener("click", () => openGamePanel(g.id));
+      grid.appendChild(card);
+    });
+  }
+
+  function watchPublishedGames(){
+    fbDb.ref("published_games").on("value", (snap) => {
+      const val = snap.val() || {};
+      Object.keys(val).forEach(id => addPublishedGameToCatalog(id, val[id]));
+      renderHomeGameGrid(Object.keys(val).map(id => Object.assign({ id }, val[id])));
+    });
+  }
+
   function fmtCreatedDate(ms){
     const d = new Date(ms);
     return d.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"numeric" });
@@ -5109,6 +5170,7 @@
     const game = GAMES_CATALOG[gameId];
     if(!game) return;
     gpCurrentGameId = gameId;
+    const capacity = game.maxPlayers || SERVER_CAPACITY;
     const root = document.getElementById("gamePanelRoot");
     root.innerHTML =
       '<div class="gp-panel gp-fullpage">' +
@@ -5135,7 +5197,7 @@
             '<div class="gp-info-box">' +
               '<div class="gp-info-row"><span class="gi-label">Released</span><span class="gi-value">' + fmtCreatedDate(game.createdAt) + '</span></div>' +
               '<div class="gp-info-row"><span class="gi-label">Owner</span><span class="gi-value">' + escapeHtml(game.creator) + '</span></div>' +
-              '<div class="gp-info-row"><span class="gi-label">Game Size</span><span class="gi-value">' + SERVER_CAPACITY + '</span></div>' +
+              '<div class="gp-info-row"><span class="gi-label">Game Size</span><span class="gi-value">' + capacity + '</span></div>' +
             '</div>' +
           '</div>' +
           '<div class="gp-section">' +
@@ -5323,6 +5385,7 @@
     startFriendNoticePolling();
     registerSession(key);
     startModerationListeners(key);
+    watchPublishedGames();
 
     // pull any previously-saved customization for this account down from
     // Firebase (covers logging in on a new device/browser)
