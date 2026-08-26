@@ -892,7 +892,7 @@
       if(lookDragging){
         if(playMode.active){
           playMode.camYaw -= dx * 0.006;
-          playMode.camPitch = Math.max(-1.1, Math.min(0.9, playMode.camPitch - dy * 0.006));
+          playMode.camPitch = Math.max(-1.1, Math.min(0.9, playMode.camPitch + dy * 0.006));
         }else{
           freecam.yaw -= dx * 0.0032;
           freecam.pitch = Math.max(-1.5, Math.min(1.5, freecam.pitch - dy * 0.0032));
@@ -917,11 +917,15 @@
       if(currentTool !== "select") return; // gizmo tools don't reselect on plain click (handled by handle hit)
       const hit = pickObject(e);
       selectObject(hit ? hit.id : null);
-      if(hit) showObjCtxMenu(hit, e.clientX, e.clientY);
     });
 
-    /* ---- keyboard: WASD move (edit freecam or play rig), Space jump, Enter chat ---- */
+    /* ---- keyboard: WASD move (edit freecam or play rig), Space jump, Enter chat, F5 play/stop, Backspace delete, F focus ---- */
     window.addEventListener("keydown", (e) => {
+      if(e.key === "F5"){
+        e.preventDefault();
+        if(!playMode.loading){ if(playMode.active) stopPlay(); else startPlay(); }
+        return;
+      }
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if(tag === "INPUT" || tag === "TEXTAREA") return; // don't steal keys while typing
       const k = e.key.toLowerCase();
@@ -929,6 +933,14 @@
       if(k === " "){ e.preventDefault(); keysDown[" "] = true; }
       if(k === "enter" && playMode.active && !playMode.loading){
         openChatInput();
+      }
+      if(playMode.active) return; // remaining shortcuts (delete/focus) are studio-mode only
+      if(k === "backspace" && selectedId && selectedId !== "__light__"){
+        e.preventDefault();
+        deleteObject(selectedId);
+      }
+      if(k === "f" && selectedId){
+        focusCameraOnObject(selectedId);
       }
     });
     window.addEventListener("keyup", (e) => {
@@ -1004,41 +1016,67 @@
       rig.rotation.y += ((((targetAngle - rig.rotation.y + Math.PI) % (Math.PI*2)) + Math.PI*2) % (Math.PI*2) - Math.PI) * Math.min(1, dt*10);
     }
 
-    // simple gravity + jump against baseplate top (y=0)
+    // gravity + jump, colliding against whatever part/platform is directly beneath the rig (not just the baseplate)
     if(keysDown[" "] && playMode.onGround){
-      playMode.velocityY = 8;
+      playMode.velocityY = 10;
       playMode.onGround = false;
     }
-    playMode.velocityY -= 22 * dt;
+    playMode.velocityY -= 28 * dt;
     rig.position.y += playMode.velocityY * dt;
-    if(rig.position.y <= playMode.groundY){
-      rig.position.y = playMode.groundY;
-      playMode.velocityY = 0;
+
+    const standY = groundHeightBelow(rig.position.x, rig.position.z, rig.position.y + 3);
+    if(rig.position.y <= standY){
+      rig.position.y = standY;
+      if(playMode.velocityY < 0) playMode.velocityY = 0;
       playMode.onGround = true;
+    }else{
+      playMode.onGround = false;
     }
 
     animateRig(rig, isMoving, !playMode.onGround, dt);
     updateChatBubblePosition();
   }
 
+  /* ---- find the top surface directly beneath (x,z) among scene parts, falling back to spawn ground ---- */
+  function groundHeightBelow(x, z, fromY){
+    if(!raycaster) return playMode.groundY;
+    const origin = new THREE.Vector3(x, fromY, z);
+    raycaster.set(origin, new THREE.Vector3(0, -1, 0));
+    raycaster.far = fromY + 50;
+    const meshes = sceneObjects.filter(o => o.className !== "SpawnLocation").map(o => o.mesh);
+    const hits = raycaster.intersectObjects(meshes);
+    if(hits.length) return hits[0].point.y;
+    return playMode.groundY;
+  }
+
   /* ---- rig walk-cycle animation (ported from BlockVerse's arm/leg swing idea) ---- */
   function animateRig(rig, isMoving, inAir, dt){
-    if(!rig.userData.animT) rig.userData.animT = 0;
-    rig.userData.animT += dt * (isMoving ? 7 : 2.2);
+    if(rig.userData.animT === undefined) rig.userData.animT = 0;
+    if(rig.userData.animBlend === undefined) rig.userData.animBlend = 0; // 0=idle,1=walk
+    rig.userData.animT += dt * (isMoving ? 8 : 2);
     const t = rig.userData.animT;
     const parts = rig.userData.parts;
     if(!parts) return;
+
+    // smoothly blend between idle and walk poses so transitions don't pop
+    const targetBlend = isMoving ? 1 : 0;
+    rig.userData.animBlend += (targetBlend - rig.userData.animBlend) * Math.min(1, dt * 8);
+    const blend = rig.userData.animBlend;
+
     if(inAir){
-      parts.lArm.rotation.x = -0.9; parts.rArm.rotation.x = -0.9;
-      parts.lLeg.rotation.x = 0.3; parts.rLeg.rotation.x = -0.3;
-    }else if(isMoving){
-      const swing = Math.sin(t) * 0.9;
-      parts.lArm.rotation.x = swing; parts.rArm.rotation.x = -swing;
-      parts.lLeg.rotation.x = -swing; parts.rLeg.rotation.x = swing;
+      const jumpBlend = Math.min(1, (rig.userData.jumpT = (rig.userData.jumpT || 0) + dt * 6));
+      parts.lArm.rotation.x = THREE.MathUtils.lerp(parts.lArm.rotation.x, -0.9, jumpBlend);
+      parts.rArm.rotation.x = THREE.MathUtils.lerp(parts.rArm.rotation.x, -0.9, jumpBlend);
+      parts.lLeg.rotation.x = THREE.MathUtils.lerp(parts.lLeg.rotation.x, 0.35, jumpBlend);
+      parts.rLeg.rotation.x = THREE.MathUtils.lerp(parts.rLeg.rotation.x, -0.35, jumpBlend);
     }else{
-      const idle = Math.sin(t) * 0.05;
-      parts.lArm.rotation.x = idle; parts.rArm.rotation.x = -idle;
-      parts.lLeg.rotation.x = 0; parts.rLeg.rotation.x = 0;
+      rig.userData.jumpT = 0;
+      const walkSwing = Math.sin(t) * 0.85;
+      const idleSwing = Math.sin(t * 0.55) * 0.05;
+      const armSwing = THREE.MathUtils.lerp(idleSwing, walkSwing, blend);
+      const legSwing = THREE.MathUtils.lerp(0, walkSwing, blend);
+      parts.lArm.rotation.x = armSwing;  parts.rArm.rotation.x = -armSwing;
+      parts.lLeg.rotation.x = -legSwing; parts.rLeg.rotation.x = legSwing;
     }
   }
 
@@ -1184,6 +1222,7 @@
   function initToolbar(){
     document.querySelectorAll(".tool-tab").forEach(tab => {
       tab.addEventListener("click", () => {
+        if(playMode.active) return; // tools are studio-mode only
         const tool = tab.dataset.tool;
         if(tool === "parts"){
           togglePartsPicker();
@@ -1307,11 +1346,20 @@
 
     showPlayLoading(false);
 
+    // lock studio editing entirely while play-testing: no gizmos, no add/select tools, no context menus
+    if(gizmoGroup){ scene.remove(gizmoGroup); gizmoGroup = null; }
+    closeObjCtxMenu();
+    hidePartsPicker();
+    selectObject(null);
+    const tabbar = document.getElementById("toolTabbar");
+    if(tabbar) tabbar.style.display = "none";
+    document.getElementById("addPartBtn").disabled = true;
+
     const btn = document.getElementById("editorPlayBtn");
     btn.classList.add("playing");
     btn.querySelector("span").textContent = "Leave";
     btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat";
+    document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat &middot; F5 to stop";
     showToast(avatar ? "Playing with your BlockVerse rig" : "Playing (no saved avatar found, using defaults)");
   }
 
@@ -1326,6 +1374,11 @@
     playMode.active = false;
     playMode.loading = false;
     showPlayLoading(false);
+
+    // restore studio editing controls
+    const tabbar = document.getElementById("toolTabbar");
+    if(tabbar) tabbar.style.display = "";
+    document.getElementById("addPartBtn").disabled = false;
 
     const btn = document.getElementById("editorPlayBtn");
     btn.classList.remove("playing");
@@ -1422,6 +1475,7 @@
     document.getElementById("partsPicker").classList.remove("show");
   }
   document.getElementById("addPartBtn").addEventListener("click", () => {
+    if(playMode.active) return; // adding parts is studio-mode only
     addPartOfShape("cube");
   });
 
@@ -1469,14 +1523,8 @@
       deleteItem.className = "obj-ctx-item danger";
       deleteItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Delete Part';
       deleteItem.addEventListener("click", () => {
-        scene.remove(obj.mesh);
-        obj.mesh.geometry.dispose();
-        obj.mesh.material.dispose();
-        sceneObjects = sceneObjects.filter(o => o.id !== obj.id);
-        if(selectedId === obj.id) selectObject(null);
-        else renderExplorer();
+        deleteObject(obj.id);
         closeObjCtxMenu();
-        showToast("Deleted " + obj.name);
       });
       menu.appendChild(deleteItem);
     }
@@ -1485,6 +1533,34 @@
     setTimeout(() => {
       window.addEventListener("click", closeObjCtxMenu, { once:true });
     }, 0);
+  }
+
+  /* ---- delete a scene object by id (used by context menu + Backspace) ---- */
+  function deleteObject(id){
+    const obj = sceneObjects.find(o => o.id === id);
+    if(!obj || obj.className !== "Part") return; // guard system objects like Baseplate/SpawnLocation not deletable this way
+    scene.remove(obj.mesh);
+    obj.mesh.geometry.dispose();
+    obj.mesh.material.dispose();
+    sceneObjects = sceneObjects.filter(o => o.id !== id);
+    if(selectedId === id) selectObject(null);
+    else renderExplorer();
+    showToast("Deleted " + obj.name);
+  }
+
+  /* ---- fly the edit-mode freecam to look at the selected object (F key) ---- */
+  function focusCameraOnObject(id){
+    const obj = id === "__light__" ? null : sceneObjects.find(o => o.id === id);
+    if(!obj) return;
+    const size = obj.props.size;
+    const dist = Math.max(6, Math.max(size[0], size[1], size[2]) * 1.8);
+    const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+    // stand back along the reverse of current facing so the object ends up in view
+    camera.position.copy(obj.mesh.position).addScaledVector(dir, -dist);
+    const toTarget = new THREE.Vector3().subVectors(obj.mesh.position, camera.position).normalize();
+    freecam.yaw = Math.atan2(-toTarget.x, -toTarget.z);
+    freecam.pitch = Math.asin(Math.max(-1, Math.min(1, toTarget.y)));
+    updateFreecamQuaternion();
   }
 
   function addPartOfShape(shape){
@@ -1699,6 +1775,12 @@
       row.innerHTML = '<span class="exp-icon">' + iconSvg(o.className) + '</span><span></span>';
       row.querySelector("span:last-child").textContent = o.name;
       row.addEventListener("click", () => selectObject(o.id));
+      row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        if(playMode.active) return;
+        selectObject(o.id);
+        showObjCtxMenu(o, e.clientX, e.clientY);
+      });
       children.appendChild(row);
     });
     body.appendChild(children);
