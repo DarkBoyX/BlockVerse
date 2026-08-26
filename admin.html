@@ -128,6 +128,31 @@
   .mini-btn.terminate{ background:#e5484d; border-color:#e5484d; color:#fff; }
   .mini-btn.terminate:hover{ background:#c93c41; }
   .mini-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  /* ---------- Requested Games panel ---------- */
+  .game-req-list{ display:flex; flex-direction:column; gap:10px; }
+  .game-req-card{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px; overflow:hidden;
+  }
+  .grc-banner{
+    width:100%; height:84px; background:linear-gradient(135deg,var(--grey-2),var(--grey-1)); background-size:cover; background-position:center;
+  }
+  .grc-body{ padding:12px 14px; display:flex; gap:12px; align-items:flex-start; }
+  .grc-icon{
+    width:48px; height:48px; border-radius:10px; background:var(--grey-2) center/cover no-repeat; flex-shrink:0;
+    border:1px solid var(--border-soft);
+  }
+  .grc-info{ flex:1; min-width:0; }
+  .grc-name{ font-size:14px; font-weight:700; }
+  .grc-meta{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
+  .grc-actions{ display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  .mini-btn.accept{ background:#173b26; border-color:#245c39; color:#6be29a; }
+  .mini-btn.accept:hover{ background:#1e4c31; }
+  .mini-btn.deny{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  .mini-btn.deny:hover{ background:#4a2224; }
+  .mini-btn.shutdown{ background:#3a3320; border-color:#5c4f26; color:#ffd98a; }
+  .mini-btn.shutdown:hover{ background:#4a4128; }
+  .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); display:inline-block; margin-right:5px; box-shadow:0 0 6px rgba(62,207,110,0.7); }
 </style>
 </head>
 <body>
@@ -187,6 +212,20 @@
       out everywhere immediately. Terminate permanently deletes the account and
       unfriends it from everyone. None of this is undoable except Ban (you can unban).
     </p>
+
+    <div class="section-title">Requested Games <span class="count-pill" id="reqCountPill">-</span></div>
+    <div class="game-req-list" id="reqGamesList"></div>
+    <p class="note">
+      Accept publishes the game (icon + banner) to the home page for everyone.
+      Deny sends the reason back to the creator so they can fix it up and resubmit.
+    </p>
+
+    <div class="section-title">Published Games <span class="count-pill" id="pubCountPill">-</span></div>
+    <div class="game-req-list" id="pubGamesList"></div>
+    <p class="note">
+      Shutdown pulls a live game off the home page immediately - the creator can
+      resubmit it any time from Studio.
+    </p>
   </div>
 
   </div>
@@ -244,6 +283,7 @@
     document.getElementById("roleBadgeText").textContent = currentRole === "owner" ? "Owner access" : "Admin access (kick/warn only)";
     loadStatus();
     loadAccounts();
+    loadGameRequests();
   });
   gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
 
@@ -409,6 +449,123 @@
       "blockverse_sessions/" + key
     ];
     await Promise.all(paths.map(p => db.ref(p).remove().catch(()=>{})));
+  }
+
+  /* ============ Requested / Published Games ============ */
+  function escapeAttr(s){
+    return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  async function loadGameRequests(){
+    if(!auth.currentUser) await auth.signInAnonymously().catch(()=>{});
+    db.ref("game_requests").orderByChild("ts").on("value", (snap) => {
+      const val = snap.val() || {};
+      const list = Object.keys(val).map(id => Object.assign({ id }, val[id])).filter(r => r.status === "pending");
+      list.sort((a,b) => (a.ts||0) - (b.ts||0));
+      renderGameRequests(list);
+    });
+    db.ref("published_games").on("value", (snap) => {
+      const val = snap.val() || {};
+      const list = Object.keys(val).map(id => Object.assign({ id }, val[id]));
+      list.sort((a,b) => (b.publishedAt||0) - (a.publishedAt||0));
+      renderPublishedGames(list);
+    });
+  }
+
+  function renderGameRequests(list){
+    document.getElementById("reqCountPill").textContent = list.length;
+    const wrap = document.getElementById("reqGamesList");
+    if(list.length === 0){ wrap.innerHTML = '<p class="note">No games waiting for review.</p>'; return; }
+    wrap.innerHTML = list.map(r => {
+      const bannerStyle = r.banner ? ' style="background-image:url(\'' + escapeAttr(r.banner) + '\')"' : "";
+      const iconStyle = r.icon ? ' style="background-image:url(\'' + escapeAttr(r.icon) + '\')"' : "";
+      return '<div class="game-req-card" data-id="' + escapeAttr(r.id) + '">' +
+        '<div class="grc-banner"' + bannerStyle + '></div>' +
+        '<div class="grc-body">' +
+          '<div class="grc-icon"' + iconStyle + '></div>' +
+          '<div class="grc-info">' +
+            '<div class="grc-name">' + escapeAttr(r.name) + '</div>' +
+            '<div class="grc-meta">by ' + escapeAttr(r.ownerName) + ' &middot; up to ' + escapeAttr(r.maxPlayers) + ' players</div>' +
+            '<div class="grc-actions">' +
+              '<button class="mini-btn accept accept-btn">Accept &amp; Publish</button>' +
+              '<button class="mini-btn deny deny-btn">Deny</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    wrap.querySelectorAll(".game-req-card").forEach(card => {
+      const r = list.find(x => x.id === card.getAttribute("data-id"));
+      card.querySelector(".accept-btn").addEventListener("click", async (e) => {
+        e.target.disabled = true; e.target.textContent = "Publishing...";
+        try{
+          await db.ref("published_games/" + r.id).set({
+            gameId: r.id,
+            ownerKey: r.ownerKey,
+            ownerName: r.ownerName,
+            name: r.name,
+            icon: r.icon || "",
+            banner: r.banner || "",
+            maxPlayers: r.maxPlayers || 20,
+            publishedAt: firebase.database.ServerValue.TIMESTAMP,
+            publishedBy: currentRole
+          });
+          await db.ref("game_requests/" + r.id).remove();
+        }catch(err){
+          alert("Couldn't publish that game - check your connection and try again.");
+          e.target.disabled = false; e.target.textContent = "Accept & Publish";
+        }
+      });
+      card.querySelector(".deny-btn").addEventListener("click", async () => {
+        const reason = prompt("Reason for denying \"" + r.name + "\" (shown to the creator):") || "";
+        try{
+          await db.ref("game_requests/" + r.id).update({ status: "denied", denyReason: reason });
+          // clear the request node shortly after so it doesn't linger in the pending queue,
+          // once the creator's studio page has had a chance to pick up the denial
+          setTimeout(() => db.ref("game_requests/" + r.id).remove().catch(()=>{}), 4000);
+        }catch(err){
+          alert("Couldn't deny that game - check your connection and try again.");
+        }
+      });
+    });
+  }
+
+  function renderPublishedGames(list){
+    document.getElementById("pubCountPill").textContent = list.length;
+    const wrap = document.getElementById("pubGamesList");
+    if(list.length === 0){ wrap.innerHTML = '<p class="note">No published games yet.</p>'; return; }
+    wrap.innerHTML = list.map(g => {
+      const bannerStyle = g.banner ? ' style="background-image:url(\'' + escapeAttr(g.banner) + '\')"' : "";
+      const iconStyle = g.icon ? ' style="background-image:url(\'' + escapeAttr(g.icon) + '\')"' : "";
+      return '<div class="game-req-card" data-id="' + escapeAttr(g.id) + '">' +
+        '<div class="grc-banner"' + bannerStyle + '></div>' +
+        '<div class="grc-body">' +
+          '<div class="grc-icon"' + iconStyle + '></div>' +
+          '<div class="grc-info">' +
+            '<div class="grc-name"><span class="live-dot"></span>' + escapeAttr(g.name) + '</div>' +
+            '<div class="grc-meta">by ' + escapeAttr(g.ownerName) + ' &middot; up to ' + escapeAttr(g.maxPlayers) + ' players</div>' +
+            '<div class="grc-actions">' +
+              '<button class="mini-btn shutdown shutdown-btn">Shutdown</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    wrap.querySelectorAll(".game-req-card").forEach(card => {
+      const g = list.find(x => x.id === card.getAttribute("data-id"));
+      card.querySelector(".shutdown-btn").addEventListener("click", async (e) => {
+        if(!confirm('Shut down "' + g.name + '"? It will be pulled off the home page immediately.')) return;
+        e.target.disabled = true; e.target.textContent = "...";
+        try{
+          await db.ref("published_games/" + g.id).remove();
+        }catch(err){
+          alert("Couldn't shut that game down - check your connection and try again.");
+          e.target.disabled = false; e.target.textContent = "Shutdown";
+        }
+      });
+    });
   }
 </script>
 </body>
