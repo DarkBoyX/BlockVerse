@@ -236,16 +236,9 @@
   .prop-shape-btn:hover{ border-color:var(--accent); color:var(--text-0); background:rgba(74,108,247,0.06); }
 
   /* ---- Explorer/Light tabs ---- */
-  .explorer-tabs{ display:flex; border-bottom:1px solid var(--border-soft); }
-  .exp-tab-btn{
-    flex:1; text-align:center; padding:11px 0; font-size:11.5px; font-weight:700; letter-spacing:.3px;
-    text-transform:uppercase; color:var(--text-3); cursor:pointer; border-bottom:2px solid transparent;
-    transition:color .15s, border-color .15s;
-  }
-  .exp-tab-btn:hover{ color:var(--text-1); }
-  .exp-tab-btn.active{ color:var(--text-0); border-color:var(--accent); }
-  .light-body{ flex:1; overflow-y:auto; padding:12px 12px; display:none; }
-  .light-body.show{ display:block; }
+  .explorer-tabs{ display:none; }
+  .exp-tab-btn{ display:none; }
+  .light-body{ display:none; }
   .light-field{ margin-bottom:16px; }
   .light-field label{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-2); margin-bottom:8px; }
   .light-field label b{ color:var(--text-0); font-weight:700; }
@@ -265,6 +258,39 @@
   select.prop-select:focus{ border-color:var(--accent); }
   .prop-coords{ display:flex; gap:10px; font-size:11.5px; color:var(--text-1); }
   .prop-coords span b{ color:var(--text-3); font-weight:600; margin-right:3px; }
+
+  /* ---- Object context menu (left-click on a part) ---- */
+  .obj-ctx-menu{
+    position:fixed; z-index:60; background:var(--bg-2); border:1px solid var(--border-soft);
+    border-radius:10px; padding:5px; box-shadow:0 14px 34px rgba(0,0,0,0.45); min-width:150px;
+    animation:popIn .12s ease both;
+  }
+  .obj-ctx-item{
+    display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:7px; cursor:pointer;
+    font-size:12.5px; color:var(--text-1); transition:background .12s, color .12s;
+  }
+  .obj-ctx-item:hover{ background:var(--grey-1); color:var(--text-0); }
+  .obj-ctx-item.danger:hover{ background:rgba(229,72,77,0.15); color:#ff9a9d; }
+  .obj-ctx-item svg{ width:14px; height:14px; flex-shrink:0; }
+  .obj-ctx-rename-row{ display:flex; gap:5px; padding:4px; }
+  .obj-ctx-rename-row input{
+    flex:1; background:var(--bg-1); border:1px solid var(--border); border-radius:6px;
+    color:var(--text-0); font-size:12px; padding:6px 8px; outline:none; font-family:inherit;
+  }
+  .obj-ctx-rename-row input:focus{ border-color:var(--accent); }
+  .obj-ctx-rename-row button{
+    background:var(--accent); border:none; color:#fff; border-radius:6px; padding:0 10px; font-size:11.5px;
+    cursor:pointer; font-weight:700;
+  }
+
+  /* ---- Play button ---- */
+  .editor-play-btn{
+    display:flex; align-items:center; gap:6px; background:#2fae59; border:none; color:#fff;
+    font-size:12.5px; font-weight:700; border-radius:8px; padding:8px 14px; cursor:pointer; transition:filter .15s;
+  }
+  .editor-play-btn:hover{ filter:brightness(1.1); }
+  .editor-play-btn.playing{ background:var(--grey-2); }
+  .editor-play-btn svg{ width:13px; height:13px; }
 
   /* ---- Properties (left) ---- */
   .props-panel{
@@ -417,6 +443,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       Part
     </button>
+    <button class="editor-play-btn" id="editorPlayBtn">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      <span>Play</span>
+    </button>
     <button class="editor-save-btn" id="editorSaveBtn">Save</button>
   </div>
   <div class="editor-body">
@@ -459,12 +489,11 @@
     </div>
 
     <div class="explorer-panel">
-      <div class="explorer-tabs">
-        <div class="exp-tab-btn active" data-exptab="explorer">Explorer</div>
-        <div class="exp-tab-btn" data-exptab="light">Light</div>
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        Explorer
       </div>
       <div class="explorer-body show" id="explorerBody"></div>
-      <div class="light-body" id="lightBody"></div>
     </div>
   </div>
 </div>
@@ -688,12 +717,11 @@
     if(!editorInited){
       initThree();
       initToolbar();
-      initExplorerTabs();
+      initPlayButton();
       editorInited = true;
     }
     buildDefaultScene();
     renderExplorer();
-    renderLightPanel();
     selectObject(null);
     setTool("select");
     onResize();
@@ -781,9 +809,11 @@
 
     canvasEl.addEventListener("click", (e) => {
       if(moved > 6) return; // ignore drag-releases
+      closeObjCtxMenu();
       if(currentTool !== "select") return; // gizmo tools don't reselect on plain click (handled by handle hit)
       const hit = pickObject(e);
       selectObject(hit ? hit.id : null);
+      if(hit) showObjCtxMenu(hit, e.clientX, e.clientY);
     });
 
     window.addEventListener("resize", onResize);
@@ -944,6 +974,98 @@
     });
   }
 
+  /* ---------------- Play button (spawns the player's real BlockVerse rig) ---------------- */
+  let playRigGroup = null;
+  let isPlaying = false;
+
+  function initPlayButton(){
+    document.getElementById("editorPlayBtn").addEventListener("click", async () => {
+      if(isPlaying){ stopPlay(); return; }
+      await startPlay();
+    });
+  }
+
+  function buildRig(avatar){
+    avatar = avatar || {};
+    const torsoColor = avatar.torso || "#4a6cf7";
+    const leftArmColor = avatar.leftArm || avatar.leftArmColor || "#4a6cf7";
+    const rightArmColor = avatar.rightArm || avatar.rightArmColor || "#4a6cf7";
+    const leftLegColor = avatar.leftLeg || avatar.leftLegColor || "#3a3a3e";
+    const rightLegColor = avatar.rightLeg || avatar.rightLegColor || "#3a3a3e";
+    const headColor = avatar.headColor || "#f0c090";
+    const heightScale = avatar.heightScale || 1;
+    const headScale = avatar.headScale || 1;
+
+    const group = new THREE.Group();
+    const mkMat = (hex) => new THREE.MeshLambertMaterial({ color: new THREE.Color(hex) });
+
+    const legH = 2 * heightScale, torsoH = 2 * heightScale, headSize = 1.2 * headScale;
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(2,torsoH,1), mkMat(torsoColor));
+    torso.position.y = legH + torsoH/2;
+    group.add(torso);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(headSize,headSize,headSize), mkMat(headColor));
+    head.position.y = legH + torsoH + headSize/2;
+    group.add(head);
+
+    const armGeo = new THREE.BoxGeometry(0.6, torsoH, 0.6);
+    const lArm = new THREE.Mesh(armGeo, mkMat(leftArmColor));
+    lArm.position.set(-1.3, legH + torsoH/2, 0);
+    group.add(lArm);
+    const rArm = new THREE.Mesh(armGeo.clone(), mkMat(rightArmColor));
+    rArm.position.set(1.3, legH + torsoH/2, 0);
+    group.add(rArm);
+
+    const legGeo = new THREE.BoxGeometry(0.8, legH, 0.8);
+    const lLeg = new THREE.Mesh(legGeo, mkMat(leftLegColor));
+    lLeg.position.set(-0.55, legH/2, 0);
+    group.add(lLeg);
+    const rLeg = new THREE.Mesh(legGeo.clone(), mkMat(rightLegColor));
+    rLeg.position.set(0.55, legH/2, 0);
+    group.add(rLeg);
+
+    return group;
+  }
+
+  async function startPlay(){
+    const spawn = sceneObjects.find(o => o.className === "SpawnLocation");
+    const spawnPos = spawn ? spawn.mesh.position : new THREE.Vector3(0,0,0);
+
+    let avatar = null;
+    try{
+      const snap = await fbDb.ref("blockverse_users/" + currentUserKey + "/avatar").once("value");
+      avatar = snap.val();
+    }catch(err){
+      console.error("Studio: couldn't load avatar for play test:", err);
+    }
+
+    playRigGroup = buildRig(avatar);
+    const spawnHalfH = spawn ? spawn.props.size[1]/2 : 0;
+    playRigGroup.position.set(spawnPos.x, spawnPos.y + spawnHalfH, spawnPos.z);
+    scene.add(playRigGroup);
+
+    isPlaying = true;
+    const btn = document.getElementById("editorPlayBtn");
+    btn.classList.add("playing");
+    btn.querySelector("span").textContent = "Close";
+    btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    showToast(avatar ? "Playing with your BlockVerse rig" : "Playing (no saved avatar found, using defaults)");
+  }
+
+  function stopPlay(){
+    if(playRigGroup){
+      scene.remove(playRigGroup);
+      playRigGroup.traverse((c) => { if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); });
+      playRigGroup = null;
+    }
+    isPlaying = false;
+    const btn = document.getElementById("editorPlayBtn");
+    btn.classList.remove("playing");
+    btn.querySelector("span").textContent = "Play";
+    btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  }
+
   function setTool(tool){
     currentTool = tool;
     document.querySelectorAll(".tool-tab").forEach(t => t.classList.toggle("active", t.dataset.tool === tool));
@@ -981,12 +1103,74 @@
     addPartOfShape("cube");
   });
 
+  /* ---------------- Object context menu (left-click Rename / Delete) ---------------- */
+  function closeObjCtxMenu(){
+    const existing = document.getElementById("objCtxMenu");
+    if(existing) existing.remove();
+  }
+  function showObjCtxMenu(obj, x, y){
+    closeObjCtxMenu();
+    const menu = document.createElement("div");
+    menu.id = "objCtxMenu";
+    menu.className = "obj-ctx-menu";
+    menu.style.left = Math.min(x, window.innerWidth - 170) + "px";
+    menu.style.top = Math.min(y, window.innerHeight - 100) + "px";
+    menu.addEventListener("click", (e) => e.stopPropagation());
+
+    const renameItem = document.createElement("div");
+    renameItem.className = "obj-ctx-item";
+    renameItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Rename Part';
+    renameItem.addEventListener("click", () => {
+      menu.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "obj-ctx-rename-row";
+      const input = document.createElement("input");
+      input.type = "text"; input.value = obj.name;
+      const saveBtn = document.createElement("button");
+      saveBtn.textContent = "Save";
+      function commit(){
+        obj.name = input.value.trim() || obj.name;
+        renderExplorer();
+        if(selectedId === obj.id) renderProperties();
+        closeObjCtxMenu();
+      }
+      saveBtn.addEventListener("click", commit);
+      input.addEventListener("keydown", (e) => { if(e.key === "Enter") commit(); });
+      row.appendChild(input); row.appendChild(saveBtn);
+      menu.appendChild(row);
+      input.focus(); input.select();
+    });
+    menu.appendChild(renameItem);
+
+    if(obj.className === "Part"){
+      const deleteItem = document.createElement("div");
+      deleteItem.className = "obj-ctx-item danger";
+      deleteItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Delete Part';
+      deleteItem.addEventListener("click", () => {
+        scene.remove(obj.mesh);
+        obj.mesh.geometry.dispose();
+        obj.mesh.material.dispose();
+        sceneObjects = sceneObjects.filter(o => o.id !== obj.id);
+        if(selectedId === obj.id) selectObject(null);
+        else renderExplorer();
+        closeObjCtxMenu();
+        showToast("Deleted " + obj.name);
+      });
+      menu.appendChild(deleteItem);
+    }
+
+    document.body.appendChild(menu);
+    setTimeout(() => {
+      window.addEventListener("click", closeObjCtxMenu, { once:true });
+    }, 0);
+  }
+
   function addPartOfShape(shape){
     const n = sceneObjects.filter(o => o.className === "Part").length + 1;
-    const size = shape === "ledge" ? [6,1,2] : shape === "cylinder" ? [3,4,3] : [4,4,4];
+    const size = shape === "ledge" ? [3,0.5,1] : shape === "cylinder" ? [1.6,2,1.6] : [2,2,2];
     const obj = addSceneObject({
       name: (PART_KINDS[shape] ? PART_KINDS[shape].label : "Part") + n, className:"Part", shape,
-      pos:[0,3,0], size, color:0x9aa0a6, material:"plastic", transparency:0
+      pos:[0,2,0], size, color:0x9aa0a6, material:"plastic", transparency:0
     });
     renderExplorer();
     selectObject(obj.id);
@@ -1006,33 +1190,46 @@
 
     gizmoGroup = new THREE.Group();
     gizmoGroup.position.copy(obj.mesh.position);
-    const scaleRef = Math.max(2.2, Math.max(...obj.props.size) * 0.35);
+    gizmoGroup.renderOrder = 999;
+    const armLen = Math.max(2.6, Math.max(...obj.props.size) * 0.5);
+
+    function handleMat(color){
+      return new THREE.MeshBasicMaterial({ color, depthTest:false, depthWrite:false, transparent:true });
+    }
 
     if(currentTool === "move" || currentTool === "scale"){
-      ["x","y","z"].forEach(ax => {
+      ["x","y","z"].forEach((ax, axIdx) => {
         const color = axisColor(ax);
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,scaleRef,8), new THREE.MeshBasicMaterial({ color }));
+        // start the handle just outside the part's own surface so it's never buried inside it
+        const halfExtent = obj.props.size[axIdx] / 2 + 0.35;
+        const shaftLen = armLen;
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,shaftLen,10), handleMat(color));
         const tip = currentTool === "move"
-          ? new THREE.Mesh(new THREE.ConeGeometry(0.22,0.6,10), new THREE.MeshBasicMaterial({ color }))
-          : new THREE.Mesh(new THREE.BoxGeometry(0.35,0.35,0.35), new THREE.MeshBasicMaterial({ color }));
+          ? new THREE.Mesh(new THREE.ConeGeometry(0.3,0.75,12), handleMat(color))
+          : new THREE.Mesh(new THREE.BoxGeometry(0.42,0.42,0.42), handleMat(color));
+        shaft.renderOrder = 999; tip.renderOrder = 1000;
         shaft.userData = { gizmo:true, axis:ax, kind:currentTool };
         tip.userData = { gizmo:true, axis:ax, kind:currentTool };
         const dir = axisVec(ax);
-        const mid = dir.clone().multiplyScalar(scaleRef/2);
-        shaft.position.copy(mid);
-        tip.position.copy(dir.clone().multiplyScalar(scaleRef));
+        const shaftMid = dir.clone().multiplyScalar(halfExtent + shaftLen/2);
+        const tipPos = dir.clone().multiplyScalar(halfExtent + shaftLen + 0.35);
+        shaft.position.copy(shaftMid);
+        tip.position.copy(tipPos);
         if(ax === "x"){ shaft.rotation.z = -Math.PI/2; tip.rotation.z = -Math.PI/2; }
         else if(ax === "z"){ shaft.rotation.x = Math.PI/2; tip.rotation.x = Math.PI/2; }
         gizmoGroup.add(shaft); gizmoGroup.add(tip);
       });
       // center handle: free move (XZ) or uniform scale
-      const center = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12), new THREE.MeshBasicMaterial({ color:0xf2f2f2 }));
+      const center = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 14), handleMat(0xf2f2f2));
+      center.renderOrder = 1000;
       center.userData = { gizmo:true, axis:"center", kind:currentTool };
       gizmoGroup.add(center);
     }else if(currentTool === "rotate"){
-      ["x","y","z"].forEach(ax => {
+      ["x","y","z"].forEach((ax, axIdx) => {
         const color = axisColor(ax);
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(scaleRef*0.85, 0.05, 8, 32), new THREE.MeshBasicMaterial({ color }));
+        const ringRadius = Math.max(...obj.props.size)/2 + armLen * 0.5;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.07, 10, 40), handleMat(color));
+        ring.renderOrder = 999;
         ring.userData = { gizmo:true, axis:ax, kind:"rotate" };
         if(ax === "x") ring.rotation.y = Math.PI/2;
         else if(ax === "y") ring.rotation.x = Math.PI/2;
@@ -1144,21 +1341,13 @@
     wrapEls.forEach((input, i) => { input.value = Math.round(obj.props.position[i]*100)/100; });
   }
 
-  /* ---------------- Explorer / Light tabs ---------------- */
-  function initExplorerTabs(){
-    document.querySelectorAll(".exp-tab-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".exp-tab-btn").forEach(b => b.classList.toggle("active", b === btn));
-        const tab = btn.dataset.exptab;
-        document.getElementById("explorerBody").classList.toggle("show", tab === "explorer");
-        document.getElementById("lightBody").classList.toggle("show", tab === "light");
-      });
-    });
-  }
-
+  /* ---------------- Explorer (Workspace tree, incl. Light) ---------------- */
   function iconSvg(className){
     if(className === "SpawnLocation"){
       return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>';
+    }
+    if(className === "Lighting"){
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
     }
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
   }
@@ -1174,6 +1363,14 @@
 
     const children = document.createElement("div");
     children.className = "exp-children";
+
+    // Lighting lives right inside Workspace, alongside Baseplate/SpawnLocation/parts
+    const lightRow = document.createElement("div");
+    lightRow.className = "exp-row" + (selectedId === "__light__" ? " selected" : "");
+    lightRow.innerHTML = '<span class="exp-icon">' + iconSvg("Lighting") + '</span><span>Lighting</span>';
+    lightRow.addEventListener("click", () => selectObject("__light__"));
+    children.appendChild(lightRow);
+
     sceneObjects.forEach(o => {
       const row = document.createElement("div");
       row.className = "exp-row" + (o.id === selectedId ? " selected" : "");
@@ -1185,56 +1382,10 @@
     body.appendChild(children);
   }
 
-  function renderLightPanel(){
-    const body = document.getElementById("lightBody");
-    body.innerHTML = "";
-
-    function field(labelHtml, min, max, step, value, onInput){
-      const wrap = document.createElement("div");
-      wrap.className = "light-field";
-      const label = document.createElement("label");
-      label.innerHTML = labelHtml;
-      const input = document.createElement("input");
-      input.type = "range"; input.min = min; input.max = max; input.step = step; input.value = value;
-      input.addEventListener("input", () => onInput(parseFloat(input.value), label));
-      wrap.appendChild(label); wrap.appendChild(input);
-      body.appendChild(wrap);
-      return { input, label };
-    }
-
-    const bF = field('Brightness <b id="lbBrightVal">' + lightState.brightness.toFixed(2) + '</b>', 0, 2, 0.05, lightState.brightness, (v, label) => {
-      lightState.brightness = v;
-      label.querySelector("#lbBrightVal").textContent = v.toFixed(2);
-      updateSunAndSky();
-    });
-
-    const timeLabel = (t) => {
-      const h = Math.floor(t) % 24;
-      const m = Math.round((t - Math.floor(t)) * 60);
-      const suffix = h >= 12 ? "PM" : "AM";
-      const h12 = ((h % 12) || 12);
-      return h12 + ":" + String(m).padStart(2,"0") + " " + suffix;
-    };
-    const tF = field('Time of Day <b id="lbTimeVal">' + timeLabel(lightState.time) + '</b>', 0, 24, 0.1, lightState.time, (v, label) => {
-      lightState.time = v;
-      label.querySelector("#lbTimeVal").textContent = timeLabel(v);
-      updateSunAndSky();
-    });
-
-    const row = document.createElement("div");
-    row.className = "exp-row";
-    row.style.marginTop = "6px";
-    row.innerHTML = '<span class="exp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>Lighting';
-    row.classList.toggle("selected", selectedId === "__light__");
-    row.addEventListener("click", () => selectObject("__light__"));
-    body.insertBefore(row, body.firstChild);
-  }
-
   /* ---------------- Selection & Properties ---------------- */
   function selectObject(id){
     selectedId = id;
     renderExplorer();
-    renderLightPanel();
     renderProperties();
     sceneObjects.forEach(o => {
       if(!o.mesh.material.emissive) o.mesh.material.emissive = new THREE.Color(0,0,0);
@@ -1253,11 +1404,37 @@
       label.className = "prop-group-label";
       label.textContent = "Lighting";
       body.appendChild(label);
-      const note = document.createElement("div");
-      note.className = "props-empty";
-      note.style.padding = "10px 4px";
-      note.textContent = "Brightness and time of day are set from the Light tab in the Explorer panel.";
-      body.appendChild(note);
+
+      function sliderRow(labelHtml, min, max, step, value, onInput){
+        const wrap = document.createElement("div");
+        wrap.className = "light-field";
+        const lbl = document.createElement("label");
+        lbl.innerHTML = labelHtml;
+        const input = document.createElement("input");
+        input.type = "range"; input.min = min; input.max = max; input.step = step; input.value = value;
+        input.addEventListener("input", () => onInput(parseFloat(input.value), lbl));
+        wrap.appendChild(lbl); wrap.appendChild(input);
+        body.appendChild(wrap);
+      }
+
+      sliderRow('Brightness <b id="lbBrightVal">' + lightState.brightness.toFixed(2) + '</b>', 0, 2, 0.05, lightState.brightness, (v, lbl) => {
+        lightState.brightness = v;
+        lbl.querySelector("#lbBrightVal").textContent = v.toFixed(2);
+        updateSunAndSky();
+      });
+
+      const timeLabel = (t) => {
+        const h = Math.floor(t) % 24;
+        const m = Math.round((t - Math.floor(t)) * 60);
+        const suffix = h >= 12 ? "PM" : "AM";
+        const h12 = ((h % 12) || 12);
+        return h12 + ":" + String(m).padStart(2,"0") + " " + suffix;
+      };
+      sliderRow('Time of Day <b id="lbTimeVal">' + timeLabel(lightState.time) + '</b>', 0, 24, 0.1, lightState.time, (v, lbl) => {
+        lightState.time = v;
+        lbl.querySelector("#lbTimeVal").textContent = timeLabel(v);
+        updateSunAndSky();
+      });
       return;
     }
 
