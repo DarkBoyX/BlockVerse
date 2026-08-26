@@ -114,6 +114,25 @@
   .dash-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
   .dash-header h1{ margin:0; font-size:21px; }
   .dash-header p{ margin:4px 0 0; font-size:13px; color:var(--text-2); }
+
+  .dash-stats{ display:flex; gap:12px; margin-bottom:22px; }
+  .dash-stat{
+    flex:1; background:var(--bg-1); border:1px solid var(--border-soft); border-radius:13px;
+    padding:14px 16px; min-width:0;
+  }
+  .dash-stat .ds-num{ font-size:22px; font-weight:800; line-height:1.1; }
+  .dash-stat .ds-label{ font-size:11px; color:var(--text-2); margin-top:4px; text-transform:uppercase; letter-spacing:0.4px; }
+  .dash-stat.ds-published .ds-num{ color:#6be29a; }
+  .dash-stat.ds-pending .ds-num{ color:#ffd98a; }
+
+  .dash-search-wrap{ position:relative; margin-bottom:18px; max-width:340px; }
+  .dash-search-wrap svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+  .dash-search-wrap input{
+    width:100%; padding:10px 13px 10px 34px; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:13px; outline:none; transition:border-color .15s;
+  }
+  .dash-search-wrap input:focus{ border-color:var(--accent); }
+  .dash-empty-search{ color:var(--text-3); font-size:13px; padding:30px 0; text-align:center; grid-column:1/-1; }
   .new-game-btn{
     display:flex; align-items:center; gap:8px; background:var(--accent); border:none; border-radius:10px;
     color:#fff; font-size:13.5px; font-weight:700; padding:11px 18px; cursor:pointer; transition:filter .15s;
@@ -146,6 +165,7 @@
   .gc-status-pill.pending{ background:#3a3320; color:#ffd98a; }
   .gc-status-pill.published{ background:#173b26; color:#6be29a; }
   .gc-status-pill.denied{ background:#3a1c1d; color:#ff9d9f; }
+  .gc-meta-dot{ width:2px; height:2px; border-radius:50%; background:var(--text-3); flex-shrink:0; }
 
   .gc-menu-btn{
     flex-shrink:0; width:26px; height:26px; border-radius:7px; border:1px solid transparent; background:transparent;
@@ -185,12 +205,23 @@
   .gs-title{ font-size:15px; font-weight:800; }
   .gs-sub{ font-size:11.5px; color:var(--text-2); }
   .gs-body{ max-width:640px; margin:0 auto; padding:28px 22px 60px; }
-  .gs-section{ margin-bottom:26px; }
-  .gs-label{ font-size:12px; font-weight:700; color:var(--text-1); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .gs-section{
+    margin-bottom:18px; background:var(--bg-1); border:1px solid var(--border-soft); border-radius:14px;
+    padding:16px 16px 18px;
+  }
+  .gs-section.gs-section-plain{ background:transparent; border:none; padding:0; }
+  .gs-label{ font-size:12px; font-weight:700; color:var(--text-1); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .gs-label-count{ font-size:10.5px; font-weight:600; color:var(--text-3); }
   .gs-hint{ font-size:11px; color:var(--text-3); margin-top:6px; line-height:1.5; }
 
+  .gs-section input[type="text"]{
+    width:100%; padding:11px 13px; background:var(--bg-0); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:14px; outline:none; transition:border-color .15s, box-shadow .15s;
+  }
+  .gs-section input[type="text"]:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(74,108,247,0.15); }
+
   .gs-banner-drop{
-    width:100%; aspect-ratio:3/1; border-radius:12px; border:1px dashed var(--border); background:var(--bg-1);
+    width:100%; aspect-ratio:16/5; max-height:190px; border-radius:10px; border:1px dashed var(--border); background:var(--bg-0);
     background-size:cover; background-position:center; position:relative; cursor:pointer; overflow:hidden;
     display:flex; align-items:center; justify-content:center; transition:border-color .15s;
   }
@@ -206,7 +237,7 @@
 
   .gs-icon-row{ display:flex; align-items:center; gap:16px; }
   .gs-icon-drop{
-    width:84px; height:84px; border-radius:16px; border:1px dashed var(--border); background:var(--bg-1);
+    width:84px; height:84px; border-radius:16px; border:1px dashed var(--border); background:var(--bg-0);
     background-size:cover; background-position:center; cursor:pointer; flex-shrink:0; position:relative; overflow:hidden;
     display:flex; align-items:center; justify-content:center; color:var(--text-2); transition:border-color .15s;
   }
@@ -537,6 +568,16 @@
         <p>Create and edit places for BlockVerse.</p>
       </div>
     </div>
+    <div class="dash-stats" id="dashStats">
+      <div class="dash-stat"><div class="ds-num" id="dsTotal">0</div><div class="ds-label">Total games</div></div>
+      <div class="dash-stat ds-published"><div class="ds-num" id="dsPublished">0</div><div class="ds-label">Published</div></div>
+      <div class="dash-stat ds-pending"><div class="ds-num" id="dsPending">0</div><div class="ds-label">In review</div></div>
+      <div class="dash-stat"><div class="ds-num" id="dsDraft">0</div><div class="ds-label">Drafts</div></div>
+    </div>
+    <div class="dash-search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" id="dashSearch" placeholder="Search your games...">
+    </div>
     <div class="game-grid" id="gameGrid">
       <div class="new-game-card" id="newGameCard">
         <div class="ngc-plus">
@@ -563,7 +604,7 @@
     <div class="gs-status-banner hidden" id="gsStatusBanner"></div>
 
     <div class="gs-section">
-      <div class="gs-label">Game name</div>
+      <div class="gs-label"><span>Game name</span><span class="gs-label-count" id="gsNameCount">0/40</span></div>
       <input type="text" id="gsNameInput" maxlength="40" placeholder="Untitled Game">
     </div>
 
@@ -599,7 +640,7 @@
       <div class="gs-hint">How many people can be in one server of this game at once. 100 max.</div>
     </div>
 
-    <div class="gs-section">
+    <div class="gs-section gs-section-plain">
       <div class="gs-toggle-row">
         <div>
           <div class="gs-tr-text">Public game</div>
@@ -851,9 +892,35 @@
     const newCard = document.getElementById("newGameCard");
     grid.innerHTML = "";
     grid.appendChild(newCard);
-    games.slice().reverse().forEach(g => {
+
+    // stats strip
+    const counts = { published:0, pending:0, draft:0 };
+    games.forEach(g => {
+      const s = g.publishStatus || "draft";
+      if(s === "published") counts.published++;
+      else if(s === "pending") counts.pending++;
+      else counts.draft++; // denied games count as drafts (still editable/resubmittable)
+    });
+    document.getElementById("dsTotal").textContent = games.length;
+    document.getElementById("dsPublished").textContent = counts.published;
+    document.getElementById("dsPending").textContent = counts.pending;
+    document.getElementById("dsDraft").textContent = counts.draft;
+
+    const q = (document.getElementById("dashSearch").value || "").trim().toLowerCase();
+    const filtered = games.filter(g => !q || (g.name || "").toLowerCase().includes(q));
+
+    if(games.length > 0 && filtered.length === 0){
+      const empty = document.createElement("div");
+      empty.className = "dash-empty-search";
+      empty.textContent = "No games match \"" + q + "\".";
+      grid.appendChild(empty);
+      return;
+    }
+
+    filtered.slice().reverse().forEach(g => {
       const status = g.publishStatus || "draft"; // draft | pending | published | denied
       const statusLabel = { draft:"Draft", pending:"In review", published:"Published", denied:"Denied" }[status];
+      const visLabel = g.isPublic ? "Public" : "Private";
       const card = document.createElement("div");
       card.className = "game-card";
       card.innerHTML =
@@ -861,13 +928,18 @@
         '<div class="gc-body">' +
           '<div class="gc-body-text">' +
             '<div class="gc-name"></div>' +
-            '<div class="gc-meta"><span>' + new Date(g.created).toLocaleDateString() + '</span><span class="gc-status-pill ' + status + '">' + statusLabel + '</span></div>' +
+            '<div class="gc-meta">' +
+              '<span class="gc-status-pill ' + status + '">' + statusLabel + '</span>' +
+              '<span class="gc-meta-dot"></span><span>' + visLabel + '</span>' +
+              '<span class="gc-meta-dot"></span><span>' + (g.maxPlayers || 20) + ' max</span>' +
+            '</div>' +
           '</div>' +
           '<button class="gc-menu-btn" title="Game options">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>' +
           '</button>' +
         '</div>';
       card.querySelector(".gc-name").textContent = g.name;
+      card.title = "Created " + new Date(g.created).toLocaleDateString();
       card.addEventListener("click", (e) => {
         if(e.target.closest(".gc-menu-btn")) return;
         openEditor(g);
@@ -879,6 +951,7 @@
       grid.appendChild(card);
     });
   }
+  document.getElementById("dashSearch").addEventListener("input", renderGameGrid);
 
   /* ---- the 3-lines "≡" menu popover shown from each game card ---- */
   let openCardMenuEl = null;
@@ -1124,6 +1197,7 @@
     document.getElementById("gameSettingsScreen").classList.add("show");
     document.getElementById("gsTitle").textContent = game.name || "Game Settings";
     document.getElementById("gsNameInput").value = game.name || "";
+    updateGsNameCount();
     document.getElementById("gsMaxPlayers").value = game.maxPlayers || 20;
     document.getElementById("gsMaxPlayersVal").textContent = game.maxPlayers || 20;
     document.getElementById("gsPublicToggle").checked = !!game.isPublic;
@@ -1132,6 +1206,12 @@
     document.getElementById("gsMsg").textContent = "";
     refreshGameSettingsStatus();
   }
+
+  function updateGsNameCount(){
+    const val = document.getElementById("gsNameInput").value || "";
+    document.getElementById("gsNameCount").textContent = val.length + "/40";
+  }
+  document.getElementById("gsNameInput").addEventListener("input", updateGsNameCount);
 
   function applyImgPreview(elId, dataUrl){
     const el = document.getElementById(elId);
