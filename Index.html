@@ -4066,6 +4066,18 @@
   function showIngameToast({ kind, userKey, html }){
     const stack = ingameToastStack();
     if(!stack) return;
+    // De-dupe: if a request toast for this same person is already showing
+    // (e.g. Firebase re-fired child_added after a reconnect, or someone
+    // cancelled+resent a request a few times), just refresh its text instead
+    // of stacking up a pile of identical toasts.
+    if(kind === "request"){
+      const existing = stack.querySelector('[data-toast-request="' + userKey + '"]');
+      if(existing){
+        const textEl = existing.querySelector(".it-text");
+        if(textEl) textEl.innerHTML = html;
+        return;
+      }
+    }
     const el = document.createElement("div");
     el.className = "ingame-toast";
     if(kind === "request") el.setAttribute("data-toast-request", userKey);
@@ -6307,6 +6319,7 @@
       const myCustom = getMyCustom();
       onlineRef.set({
         name: currentUsername(),
+        accountKey: myAccKey || "",
         x: character.position.x, y: character.position.y, z: character.position.z,
         ry: character.rotation.y,
         ts: firebase.database.ServerValue.TIMESTAMP,
@@ -6435,11 +6448,38 @@
         .replace(/[إأآا]/g, "ا");               // unify alef variants
     }
 
+    // Invisible/zero-width characters get dropped entirely (not treated as
+    // spaces) - sites that generate "filter-proof" text often sneak these
+    // between every letter (f<ZWSP>u<ZWSP>c<ZWSP>k) specifically because
+    // they're invisible and most naive filters only strip real whitespace.
+    const INVISIBLE_CHARS_RE = /[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+
+    // Homoglyph map: visually-identical letters from other scripts (mostly
+    // Cyrillic/Greek) that "letter changer" sites substitute in because they
+    // render the same but are different codepoints, so plain diacritic
+    // stripping and NFKD alone don't catch them. NFKD already folds things
+    // like fullwidth (ａｂｃ) and Mathematical Alphanumeric (𝓯𝓾𝓬𝓴, 𝔀𝓸𝔀) styles
+    // back to plain Latin on its own, so this map only needs to cover
+    // *cross-script* lookalikes that NFKD doesn't touch.
+    const HOMOGLYPH_MAP = {
+      "а":"a", "в":"b", "с":"c", "е":"e", "н":"h", "і":"i", "ѕ":"s", "ԁ":"d",
+      "к":"k", "м":"m", "о":"o", "р":"p", "т":"t", "х":"x", "у":"y", "ц":"u",
+      "ѡ":"w", "ɡ":"g", "ⅼ":"l", "ⅰ":"i", "ο":"o", "α":"a", "ρ":"p", "τ":"t",
+      "υ":"u", "ν":"v", "κ":"k", "ѵ":"v", "ⅴ":"v", "ⅹ":"x"
+    };
+    function foldHomoglyphs(s){
+      let out = "";
+      for(const ch of s) out += HOMOGLYPH_MAP[ch] || ch;
+      return out;
+    }
+
     // collapses common leetspeak/symbol substitutions and squashes runs of
     // the same letter ("fuuuuck" -> "fuck"), so obfuscated spellings still
     // hit the same regex as the plain word
     function normalizeForFilter(text){
-      let s = stripDiacritics((text || "").toLowerCase());
+      let s = (text || "").replace(INVISIBLE_CHARS_RE, "");
+      s = stripDiacritics(s.toLowerCase());
+      s = foldHomoglyphs(s);
       s = s
         .replace(/[@]/g, "a").replace(/[4]/g, "a")
         .replace(/[3]/g, "e")
@@ -6448,9 +6488,30 @@
         .replace(/[$5]/g, "s")
         .replace(/[7+]/g, "t")
         .replace(/[8]/g, "b")
-        .replace(/[\-_.,*]/g, " ");
+        // any punctuation/symbol/separator character (not just the handful
+        // of ASCII ones we used to list) collapses to a single space - this
+        // is what actually defeats the "insert weird unicode spacing
+        // between every letter" trick, since \p{Z}/\p{P}/\p{S} covers the
+        // whole family of exotic space and punctuation codepoints, not just
+        // the few ASCII symbols we happened to think of
+        .replace(/[\p{Z}\p{P}\p{S}]/gu, " ")
+        .replace(/\s+/g, " ");
       s = s.replace(/(.)\1{2,}/g, "$1$1"); // aaaa -> aa (keeps double letters like "ss" intact)
       return s;
+    }
+
+    // Same as normalizeForFilter but with every space removed too, used as
+    // a second detection pass. This is what actually catches "f u c k" /
+    // "f-u-c-k" style spacing tricks (the site your friend found): the
+    // space-tolerant pattern only expects \s+ where a word already has an
+    // internal space (like "ass hole"), so a swear letter-spaced out with
+    // gaps between every character slides right past it. Stripping spaces
+    // entirely before matching closes that gap. It's only used for
+    // detection (looksLikeProfanity/looksLikeSensitiveTerm) - censoring
+    // still runs on the space-preserving version so legitimate sentences
+    // don't get mangled.
+    function normalizeForFilterNoSpaces(text){
+      return normalizeForFilter(text).replace(/\s+/g, "");
     }
 
     // builds the raw alternation pattern once (shared by both regexes
@@ -6475,6 +6536,19 @@
     // share across calls
     const profanityRegex = new RegExp(profanityPatternSrc, "giu");
 
+    // no-space variant of the same word list, for matching against
+    // normalizeForFilterNoSpaces() output (see comment there) - internal
+    // spaces in multi-word entries like "ass hole" are just removed instead
+    // of turned into \s+, since there's nothing left to match against
+    function buildNoSpacePattern(list){
+      const parts = list.map(w => {
+        const norm = normalizeForFilter(w).replace(/\s+/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
+    }
+    const profanityPatternNoSpaceSrc = buildNoSpacePattern(PROFANITY_LIST);
+
     // short/ambiguous sensitive terms get word boundaries so they don't
     // false-positive as substrings of unrelated words (e.g. "yt" inside
     // "party", "snap" inside "snapshot", "insta" inside "instant")
@@ -6487,10 +6561,12 @@
       return "(" + parts.join("|") + ")";
     }
     const sensitivePatternSrc = buildSensitivePattern();
+    const sensitivePatternNoSpaceSrc = buildNoSpacePattern(SENSITIVE_TERMS_LIST);
 
     function looksLikeSensitiveTerm(text){
       if(!text) return false;
-      return new RegExp(sensitivePatternSrc, "iu").test(normalizeForFilter(text));
+      if(new RegExp(sensitivePatternSrc, "iu").test(normalizeForFilter(text))) return true;
+      return new RegExp(sensitivePatternNoSpaceSrc, "iu").test(normalizeForFilterNoSpaces(text));
     }
 
     // true if ANY normalized substring of the text matches the filter -
@@ -6510,7 +6586,11 @@
     // substring-aware - not an actual model call.
     function looksLikeProfanity(text){
       if(!text) return false;
-      return new RegExp(profanityPatternSrc, "iu").test(normalizeForFilter(text));
+      if(new RegExp(profanityPatternSrc, "iu").test(normalizeForFilter(text))) return true;
+      // catches letter-spaced-out spellings ("f u c k", "f.u.c.k" with
+      // exotic separators, etc.) that still have real letters between the
+      // gaps - see normalizeForFilterNoSpaces
+      return new RegExp(profanityPatternNoSpaceSrc, "iu").test(normalizeForFilterNoSpaces(text));
     }
 
     // each matched bad word gets replaced with hashtags matching its length
@@ -7228,6 +7308,17 @@
         if(gpInput){ inputForward += -gpInput.ly; inputRight += gpInput.lx; }
       }
 
+      // Everything below was originally tuned frame-by-frame (i.e. assuming
+      // a steady 60fps), with no dt scaling at all - so on a high refresh
+      // rate display (120/144/240Hz) updateMovement() runs more times per
+      // second and the character actually walked/fell/jumped faster in real
+      // time, not just smoother. FRAME_SCALE normalizes every per-frame
+      // increment below back to "units per 1/60s" regardless of the actual
+      // framerate, so movement speed and jump arc are now the same on every
+      // device. dt is already clamped upstream (see tick()) so a lag spike
+      // can't fling someone forward either.
+      const FRAME_SCALE = dt * 60;
+
       const len = Math.hypot(inputForward, inputRight);
       const moving = len > 0.05;
       if(moving && myEmote) stopDance(); // moving always cancels an emote
@@ -7250,8 +7341,8 @@
       velZ += (targetVelZ - velZ) * accel;
 
       if(Math.hypot(velX, velZ) > 0.002){
-        character.position.x += velX;
-        character.position.z += velZ;
+        character.position.x += velX * FRAME_SCALE;
+        character.position.z += velZ * FRAME_SCALE;
         resolveTreeCollisions();
         resolveMapBoundary();
 
@@ -7311,8 +7402,8 @@
         }
       }
       if(!onGround){
-        vy += GRAVITY;
-        character.position.y += vy;
+        vy += GRAVITY * FRAME_SCALE;
+        character.position.y += vy * FRAME_SCALE;
         if(character.position.y <= groundHere){
           character.position.y = groundHere;
           if(!wasOnGround){ landSquashT = 1; playLandSound(); } // just touched down - kick off the squash
@@ -7907,9 +7998,17 @@
     }
 
     function otherRealPlayers(){
+      // Filter out both our own connection id AND any other connection that's
+      // logged into the SAME account (e.g. the same account open on another
+      // device/tab at once) - otherwise that second session shows up as a
+      // separate "other player" you can view/add-friend, which is really just
+      // yourself. Older sessions that connected before accountKey was tracked
+      // fall back to id-only filtering.
+      const myAccKey = currentAccountKey && currentAccountKey();
       return Object.keys(livePlayers)
         .filter(id => id !== playerId)
-        .map(id => ({ id, name: livePlayers[id].name || "Player" }));
+        .filter(id => !(myAccKey && livePlayers[id].accountKey && livePlayers[id].accountKey === myAccKey))
+        .map(id => ({ id, name: livePlayers[id].name || "Player", accountKey: livePlayers[id].accountKey || "" }));
     }
 
     /* ---- leaderboard: top-right "who's online" panel ---- */
@@ -7930,7 +8029,7 @@
         '<span class="lb-name">' + escapeHtml(me) + '</span><span class="lb-you">You</span></div>';
 
       others.forEach((p, i) => {
-        html += '<div class="game-lb-row" data-lb-name="' + escapeHtml(p.name) + '">' +
+        html += '<div class="game-lb-row" data-lb-name="' + escapeHtml(p.name) + '" data-lb-key="' + escapeHtml(p.accountKey) + '">' +
           '<span class="game-lb-rank">' + (i + 2) + '</span>' +
           '<span class="lb-name">' + escapeHtml(p.name) + '</span></div>';
       });
@@ -7939,7 +8038,11 @@
       panel.querySelectorAll("[data-lb-name]").forEach(row => {
         row.addEventListener("click", () => {
           closeLeaderboard();
-          openCharacterPreview(row.getAttribute("data-lb-name"));
+          // prefer the real accountKey the player broadcasts - deriving a key
+          // from the display name alone breaks if they've since changed their
+          // username, and could even point at the wrong account
+          const key = row.getAttribute("data-lb-key");
+          openCharacterPreview(row.getAttribute("data-lb-name"), key || null);
         });
       });
     }
@@ -8062,6 +8165,7 @@
     /* ---- character preview: click a player in the View tab ---- */
     let previewRenderer, previewScene, previewCamera, previewRig, previewAnimId;
     let previewName = null;
+    let previewKey = null; // real accountKey when known (see openCharacterPreview), else derived from name
 
     function initCharPreview(){
       if(previewRenderer) return;
@@ -8097,12 +8201,23 @@
 
     function refreshCharPreviewAction(){
       if(!previewName) return;
-      const targetKey = previewName.toLowerCase();
+      const targetKey = previewKey || previewName.toLowerCase();
       const btn = document.getElementById("charPreviewActionBtn");
       const blockBtn = document.getElementById("charPreviewBlockBtn");
       if(!btn) return;
       btn.classList.remove("disabled", "unfriend");
       btn.onclick = null;
+      const myKey = currentAccountKey && currentAccountKey();
+      // Viewing yourself (e.g. your own leaderboard row, or a stray duplicate
+      // entry from another device on the same account) - no friend/block
+      // actions make sense against your own account.
+      if(myKey && targetKey === myKey){
+        btn.textContent = t("you") || "You";
+        btn.classList.add("disabled");
+        if(blockBtn) blockBtn.classList.add("hidden");
+        return;
+      }
+      if(blockBtn) blockBtn.classList.remove("hidden");
       if(fbFriendMirror.friends.includes(targetKey)){
         btn.textContent = "Unfriend";
         btn.classList.add("unfriend");
@@ -8129,8 +8244,9 @@
       }
     }
 
-    function openCharacterPreview(name){
+    function openCharacterPreview(name, knownKey){
       previewName = name;
+      previewKey = knownKey || null;
       initCharPreview();
 
       if(previewRig){ previewScene.remove(previewRig.group); disposeObject3D(previewRig.group); previewRig = null; }
