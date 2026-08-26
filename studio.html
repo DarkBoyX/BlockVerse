@@ -11,6 +11,7 @@
     --border:#333338; --border-soft:#242428;
     --text-0:#f2f2f2; --text-1:#b4b4b9; --text-2:#7a7a80; --text-3:#55555a;
     --accent:#4a6cf7; --danger:#e5484d;
+    --axis-x:#e5484d; --axis-y:#3ecf6e; --axis-z:#4a6cf7;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
@@ -30,38 +31,42 @@
   #loginScreen{
     position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
     background:
-      radial-gradient(circle at 20% 0%, #19191c 0%, transparent 45%),
-      radial-gradient(circle at 80% 100%, #16161a 0%, transparent 45%),
-      var(--bg-0);
+      radial-gradient(circle at 20% 0%, #1c1c1e 0%, transparent 45%),
+      radial-gradient(circle at 80% 100%, #151517 0%, transparent 45%),
+      linear-gradient(180deg, #0d0d0e 0%, #000 100%);
     z-index:10;
   }
   .login-card{
-    width:360px; max-width:90vw; background:var(--bg-2); border:1px solid var(--border-soft);
-    border-radius:16px; padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    width:360px; max-width:90vw; background:#141416; border:1px solid #2b2b2e;
+    border-radius:16px; padding:32px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
     animation:fadeUp .4s ease both;
   }
   @keyframes fadeUp{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:translateY(0);} }
   .login-brand{
-    display:flex; align-items:center; gap:10px; margin-bottom:22px; font-weight:800; font-size:17px;
+    display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:24px; text-align:center;
   }
-  .login-brand .lb-mark{
-    width:32px; height:32px; border-radius:9px; background:var(--accent);
-    display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#fff;
+  .login-brand .lb-logo{
+    width:56px; height:56px; border-radius:14px; background:linear-gradient(160deg,#3a3a3e,#101012);
+    border:1px solid #333336; display:flex; align-items:center; justify-content:center;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 20px rgba(0,0,0,0.4);
   }
+  .login-brand .lb-logo svg{ width:30px; height:30px; }
+  .login-brand .lb-title{ font-weight:800; font-size:16.5px; color:#e8e8ea; }
+  .login-brand .lb-sub{ font-size:11px; color:#6c6c70; letter-spacing:.5px; text-transform:uppercase; }
   .login-field{ margin-bottom:14px; }
   .login-field label{ display:block; font-size:12px; color:var(--text-2); margin-bottom:6px; }
   .login-field input{
-    width:100%; background:var(--bg-1); border:1px solid var(--border); border-radius:9px;
-    color:var(--text-0); font-size:13.5px; padding:11px 12px; outline:none; font-family:inherit;
+    width:100%; background:#0d0d0e; border:1px solid #2c2c2f; border-radius:9px;
+    color:#e8e8ea; font-size:13.5px; padding:11px 12px; outline:none; font-family:inherit;
     transition:border-color .15s, box-shadow .15s;
   }
-  .login-field input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(74,108,247,0.15); }
+  .login-field input:focus{ border-color:#6c6c72; box-shadow:0 0 0 3px rgba(255,255,255,0.06); }
   .login-submit{
-    width:100%; margin-top:6px; background:var(--accent); border:none; border-radius:9px;
-    color:#fff; font-size:13.5px; font-weight:700; padding:12px 0; cursor:pointer;
-    transition:filter .15s; position:relative;
+    width:100%; margin-top:6px; background:linear-gradient(160deg,#3a3a3e,#1a1a1c); border:1px solid #3a3a3e; border-radius:9px;
+    color:#f2f2f2; font-size:13.5px; font-weight:700; padding:12px 0; cursor:pointer;
+    transition:filter .15s, background .15s; position:relative;
   }
-  .login-submit:hover{ filter:brightness(1.08); }
+  .login-submit:hover{ filter:brightness(1.25); }
   .login-submit:disabled{ opacity:.6; cursor:default; }
   .login-msg{
     margin-top:14px; font-size:12.5px; padding:9px 11px; border-radius:9px; display:none; align-items:center; gap:8px;
@@ -187,7 +192,79 @@
   .editor-save-btn:hover{ filter:brightness(1.08); }
   .editor-save-note{ font-size:11px; color:var(--text-3); margin-right:4px; transition:opacity .3s; }
 
-  .editor-body{ flex:1; display:flex; min-height:0; }
+  .editor-body{ flex:1; display:flex; min-height:0; position:relative; }
+
+  /* ---- Top-center tool tab bar ---- */
+  .tool-tabbar{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:20;
+    display:flex; gap:3px; background:var(--bg-2); border:1px solid var(--border-soft);
+    border-radius:11px; padding:4px; box-shadow:0 10px 26px rgba(0,0,0,0.4);
+  }
+  .tool-tab{
+    display:flex; flex-direction:column; align-items:center; gap:3px; width:54px; padding:7px 0 6px;
+    border-radius:8px; cursor:pointer; color:var(--text-2); transition:background .15s, color .15s; user-select:none;
+  }
+  .tool-tab:hover{ background:var(--grey-1); color:var(--text-1); }
+  .tool-tab.active{ background:var(--accent); color:#fff; }
+  .tool-tab svg{ width:16px; height:16px; }
+  .tool-tab span{ font-size:9.5px; font-weight:700; letter-spacing:.2px; }
+
+  .parts-picker{
+    position:absolute; top:64px; left:50%; transform:translateX(-50%); z-index:21;
+    background:var(--bg-2); border:1px solid var(--border-soft); border-radius:12px; padding:10px;
+    box-shadow:0 14px 34px rgba(0,0,0,0.45); display:none; gap:8px;
+  }
+  .parts-picker.show{ display:flex; animation:popIn .15s ease both; }
+  .pp-item{
+    width:76px; display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 6px;
+    border-radius:9px; cursor:pointer; color:var(--text-1); transition:background .15s, color .15s;
+  }
+  .pp-item:hover{ background:var(--grey-1); color:var(--text-0); }
+  .pp-item .pp-icon{
+    width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:8px;
+  }
+  .pp-item .pp-icon svg{ width:20px; height:20px; }
+  .pp-item span{ font-size:10.5px; font-weight:600; }
+
+  /* ---- Properties: shape-change trigger below Name ---- */
+  .prop-shape-btn{
+    width:100%; background:var(--bg-2); border:1px dashed var(--border); border-radius:7px;
+    color:var(--text-2); font-size:12px; padding:8px 0; cursor:pointer; margin-top:2px;
+    transition:border-color .15s, color .15s, background .15s; display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .prop-shape-btn:hover{ border-color:var(--accent); color:var(--text-0); background:rgba(74,108,247,0.06); }
+
+  /* ---- Explorer/Light tabs ---- */
+  .explorer-tabs{ display:flex; border-bottom:1px solid var(--border-soft); }
+  .exp-tab-btn{
+    flex:1; text-align:center; padding:11px 0; font-size:11.5px; font-weight:700; letter-spacing:.3px;
+    text-transform:uppercase; color:var(--text-3); cursor:pointer; border-bottom:2px solid transparent;
+    transition:color .15s, border-color .15s;
+  }
+  .exp-tab-btn:hover{ color:var(--text-1); }
+  .exp-tab-btn.active{ color:var(--text-0); border-color:var(--accent); }
+  .light-body{ flex:1; overflow-y:auto; padding:12px 12px; display:none; }
+  .light-body.show{ display:block; }
+  .light-field{ margin-bottom:16px; }
+  .light-field label{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-2); margin-bottom:8px; }
+  .light-field label b{ color:var(--text-0); font-weight:700; }
+  .light-field input[type="range"]{
+    width:100%; height:4px; border-radius:3px; background:var(--grey-2); appearance:none; outline:none; cursor:pointer;
+  }
+  .light-field input[type="range"]::-webkit-slider-thumb{
+    appearance:none; width:15px; height:15px; border-radius:50%; background:var(--accent); cursor:pointer;
+    box-shadow:0 0 0 3px rgba(74,108,247,0.2);
+  }
+
+  /* ---- Properties: material select ---- */
+  select.prop-select{
+    width:100%; background:var(--bg-2); border:1px solid var(--border); border-radius:7px;
+    color:var(--text-0); font-size:12.5px; padding:7px 9px; outline:none; font-family:inherit; cursor:pointer;
+  }
+  select.prop-select:focus{ border-color:var(--accent); }
+  .prop-coords{ display:flex; gap:10px; font-size:11.5px; color:var(--text-1); }
+  .prop-coords span b{ color:var(--text-3); font-weight:600; margin-right:3px; }
 
   /* ---- Properties (left) ---- */
   .props-panel{
@@ -265,7 +342,17 @@
 <!-- ================= LOGIN ================= -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="login-brand"><span class="lb-mark">BV</span> BlockVerse Studio</div>
+    <div class="login-brand">
+      <span class="lb-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#d9d9db" stroke-width="1.6" stroke-linejoin="round">
+          <path d="M12 2.5 3 7v10l9 4.5 9-4.5V7l-9-4.5z"/>
+          <path d="M3 7l9 4.5 9-4.5"/>
+          <path d="M12 11.5V21"/>
+        </svg>
+      </span>
+      <div class="lb-title">BlockVerse Studio</div>
+      <div class="lb-sub">Creator Tools</div>
+    </div>
     <form id="loginForm">
       <div class="login-field">
         <label>Username</label>
@@ -344,16 +431,40 @@
     </div>
 
     <div class="viewport-wrap">
+      <div class="tool-tabbar" id="toolTabbar">
+        <div class="tool-tab active" data-tool="select" title="Select">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 3l7 17 2.5-7.5L21 10 4 3z"/></svg>
+          <span>Select</span>
+        </div>
+        <div class="tool-tab" data-tool="move" title="Move">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 9l-3 3 3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3"/></svg>
+          <span>Move</span>
+        </div>
+        <div class="tool-tab" data-tool="rotate" title="Rotate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 3 6.2"/><path d="M4 18v-4h4"/></svg>
+          <span>Rotate</span>
+        </div>
+        <div class="tool-tab" data-tool="scale" title="Scale">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4h16"/><path d="M8 16h8v-8"/></svg>
+          <span>Scale</span>
+        </div>
+        <div class="tool-tab" data-tool="parts" title="Parts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 9h14M5 15h14"/></svg>
+          <span>Parts</span>
+        </div>
+      </div>
+      <div class="parts-picker" id="partsPicker"></div>
       <canvas id="studioCanvas"></canvas>
-      <div class="viewport-hint">Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan</div>
+      <div class="viewport-hint" id="viewportHint">Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan</div>
     </div>
 
     <div class="explorer-panel">
-      <div class="panel-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
-        Explorer
+      <div class="explorer-tabs">
+        <div class="exp-tab-btn active" data-exptab="explorer">Explorer</div>
+        <div class="exp-tab-btn" data-exptab="light">Light</div>
       </div>
-      <div class="explorer-body" id="explorerBody"></div>
+      <div class="explorer-body show" id="explorerBody"></div>
+      <div class="light-body" id="lightBody"></div>
     </div>
   </div>
 </div>
@@ -540,11 +651,33 @@
   });
 
   /* ---------------- Editor: three.js scene + explorer + properties ---------------- */
-  let scene, camera, renderer, raycaster, mouse;
-  let sceneObjects = []; // { id, name, className, mesh, props }
-  let selectedId = null;
+  let scene, camera, renderer, raycaster, mouse, canvasEl;
+  let sceneObjects = []; // { id, name, className, shape, mesh, props }
+  let selectedId = null; // object id, or "__light__"
   let editorInited = false;
   let currentGame = null;
+  let currentTool = "select"; // select | move | rotate | scale
+  let gizmoGroup = null;
+  let dragState = null; // active gizmo drag info
+
+  const lightState = { brightness: 1, time: 13 }; // time: 0-24 hours
+  let hemiLight, sunLight;
+
+  const MATERIALS = {
+    wood:   { label:"Wood",   color:0x8a5a34, rough:true  },
+    stone:  { label:"Stone",  color:0x8c8c8c, rough:true  },
+    ice:    { label:"Ice",    color:0xbfe3ff, rough:false },
+    snow:   { label:"Snow",   color:0xf3f6f8, rough:true  },
+    metal:  { label:"Metal",  color:0x9aa0a6, rough:false },
+    plastic:{ label:"Plastic",color:0xdedede, rough:false },
+    neon:   { label:"Neon",   color:0x39ff88, rough:false, emissive:true }
+  };
+  const PART_KINDS = {
+    cube:     { label:"Block",    icon:'<rect x="4" y="4" width="16" height="16" rx="2"/>' },
+    wedge:    { label:"Triangle", icon:'<path d="M4 20h16L4 4v16z"/>' },
+    cylinder: { label:"Tube",     icon:'<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12a8 3 0 0 0 16 0V6"/>' },
+    ledge:    { label:"Ledge",    icon:'<rect x="3" y="9" width="18" height="6" rx="1.5"/>' }
+  };
 
   function openEditor(game){
     currentGame = game;
@@ -554,11 +687,15 @@
 
     if(!editorInited){
       initThree();
+      initToolbar();
+      initExplorerTabs();
       editorInited = true;
     }
     buildDefaultScene();
     renderExplorer();
+    renderLightPanel();
     selectObject(null);
+    setTool("select");
     onResize();
   }
 
@@ -580,15 +717,13 @@
   });
 
   function initThree(){
-    const canvas = document.getElementById("studioCanvas");
-    renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+    canvasEl = document.getElementById("studioCanvas");
+    renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias:true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
     scene = new THREE.Scene();
-
     camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
 
-    // orbit target/state
     const orbit = { target:new THREE.Vector3(0,3,0), radius:38, theta:Math.PI*0.28, phi:Math.PI*0.32 };
     function updateCamera(){
       const x = orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
@@ -599,15 +734,32 @@
     }
     updateCamera();
 
-    let dragging = false, panning = false, lastX=0, lastY=0;
-    canvas.addEventListener("mousedown", (e) => {
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+
+    let dragging = false, panning = false, lastX = 0, lastY = 0, moved = 0;
+
+    canvasEl.addEventListener("mousedown", (e) => {
+      moved = 0;
+      // first: did we hit a gizmo handle?
+      if(gizmoGroup && currentTool !== "select"){
+        const hit = pickGizmoHandle(e);
+        if(hit){ beginGizmoDrag(hit, e); return; }
+      }
       if(e.button === 2){ panning = true; } else { dragging = true; }
       lastX = e.clientX; lastY = e.clientY;
     });
-    window.addEventListener("mouseup", () => { dragging=false; panning=false; });
+    window.addEventListener("mouseup", (e) => {
+      dragging = false; panning = false;
+      if(dragState){ endGizmoDrag(); }
+    });
     window.addEventListener("mousemove", (e) => {
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      moved += Math.abs(dx) + Math.abs(dy);
       lastX = e.clientX; lastY = e.clientY;
+
+      if(dragState){ updateGizmoDrag(e); return; }
+
       if(dragging){
         orbit.theta -= dx * 0.006;
         orbit.phi = Math.max(0.15, Math.min(Math.PI-0.15, orbit.phi - dy * 0.006));
@@ -620,29 +772,18 @@
         updateCamera();
       }
     });
-    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-    canvas.addEventListener("wheel", (e) => {
+    canvasEl.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvasEl.addEventListener("wheel", (e) => {
       e.preventDefault();
       orbit.radius = Math.max(6, Math.min(140, orbit.radius + e.deltaY * 0.03));
       updateCamera();
     }, { passive:false });
 
-    raycaster = new THREE.Raycaster();
-    mouse = new THREE.Vector2();
-    canvas.addEventListener("click", (e) => {
-      if(Math.abs(e.movementX) + Math.abs(e.movementY) > 6) return; // ignore drag-releases
-      const rect = canvas.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const meshes = sceneObjects.map(o => o.mesh);
-      const hits = raycaster.intersectObjects(meshes);
-      if(hits.length){
-        const hit = sceneObjects.find(o => o.mesh === hits[0].object);
-        if(hit) selectObject(hit.id);
-      }else{
-        selectObject(null);
-      }
+    canvasEl.addEventListener("click", (e) => {
+      if(moved > 6) return; // ignore drag-releases
+      if(currentTool !== "select") return; // gizmo tools don't reselect on plain click (handled by handle hit)
+      const hit = pickObject(e);
+      selectObject(hit ? hit.id : null);
     });
 
     window.addEventListener("resize", onResize);
@@ -665,69 +806,356 @@
     camera.updateProjectionMatrix();
   }
 
+  function mouseToNDC(e){
+    const rect = canvasEl.getBoundingClientRect();
+    return new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+  }
+  function pickObject(e){
+    const ndc = mouseToNDC(e);
+    raycaster.setFromCamera(ndc, camera);
+    const meshes = sceneObjects.map(o => o.mesh);
+    const hits = raycaster.intersectObjects(meshes);
+    if(!hits.length) return null;
+    return sceneObjects.find(o => o.mesh === hits[0].object) || null;
+  }
+
+  /* ---------------- Scene building ---------------- */
   function clearScene(){
     sceneObjects.forEach(o => scene.remove(o.mesh));
     sceneObjects = [];
     scene.children.slice().forEach(c => scene.remove(c));
+    gizmoGroup = null;
+  }
+
+  function geometryForShape(shape, size){
+    if(shape === "wedge"){
+      // triangular prism ramp: width x, height y, depth z
+      const [w,h,d] = size;
+      const geo = new THREE.BufferGeometry();
+      const hw=w/2, hh=h/2, hd=d/2;
+      const v = [
+        [-hw,-hh,-hd],[hw,-hh,-hd],[hw,-hh,hd],[-hw,-hh,hd], // bottom
+        [-hw,hh,-hd],[-hw,hh,hd]                              // top ridge (sloped up from -x side)
+      ];
+      const idx = [
+        0,1,2, 0,2,3,          // bottom
+        0,4,5, 0,5,3,          // back slope quad (split)
+        1,2,5, 1,5,4,          // sloped face
+        0,1,4,                 // side tri
+        2,3,5                  // side tri
+      ];
+      const pos = [];
+      idx.forEach(i => pos.push(...v[i]));
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      return geo;
+    }
+    if(shape === "cylinder"){
+      const [w,h,d] = size;
+      const r = Math.max(w,d)/2;
+      return new THREE.CylinderGeometry(r, r, h, 20);
+    }
+    if(shape === "ledge"){
+      return new THREE.BoxGeometry(size[0], size[1], size[2]);
+    }
+    return new THREE.BoxGeometry(size[0], size[1], size[2]);
+  }
+
+  function materialFor(matKey, transparency){
+    const m = MATERIALS[matKey] || MATERIALS.plastic;
+    const opts = { color:m.color, transparent: transparency > 0, opacity: 1 - transparency };
+    if(m.emissive){ opts.emissive = new THREE.Color(m.color); opts.emissiveIntensity = 0.55; }
+    return new THREE.MeshLambertMaterial(opts);
   }
 
   function addSceneObject(opts){
     const id = "obj_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-    const geo = new THREE.BoxGeometry(opts.size[0], opts.size[1], opts.size[2]);
-    const mat = new THREE.MeshLambertMaterial({ color: opts.color, transparent: opts.transparency > 0, opacity: 1 - opts.transparency });
-    const mesh = new THREE.Mesh(geo, mat);
+    const shape = opts.shape || "cube";
+    const material = opts.className === "Baseplate" || opts.className === "SpawnLocation"
+      ? new THREE.MeshLambertMaterial({ color: opts.color })
+      : materialFor(opts.material || "plastic", opts.transparency || 0);
+    const geo = geometryForShape(shape, opts.size);
+    const mesh = new THREE.Mesh(geo, material);
     mesh.position.set(opts.pos[0], opts.pos[1], opts.pos[2]);
+    if(opts.rot) mesh.rotation.set(opts.rot[0], opts.rot[1], opts.rot[2]);
     scene.add(mesh);
     const obj = {
-      id, name: opts.name, className: opts.className,
+      id, name: opts.name, className: opts.className, shape,
       mesh,
-      props: { position:[...opts.pos], size:[...opts.size], color: opts.color, transparency: opts.transparency, anchored: opts.anchored !== false }
+      props: {
+        position:[...opts.pos], rotation: opts.rot ? [...opts.rot] : [0,0,0], size:[...opts.size],
+        color: opts.color, material: opts.material || "plastic", transparency: opts.transparency || 0
+      }
     };
     sceneObjects.push(obj);
     return obj;
   }
 
+  function updateSunAndSky(){
+    // time 0-24: 6=sunrise, 13=noon, 19=sunset, 0/24=midnight
+    const t = lightState.time;
+    const dayAmt = Math.max(0, Math.sin((t/24) * Math.PI * 2 - Math.PI/2) * 0.5 + 0.5); // 0 night .. 1 day
+    const dayColor = new THREE.Color(0x8fc0ff);
+    const nightColor = new THREE.Color(0x0a1020);
+    const sky = dayColor.clone().lerp(nightColor, 1 - dayAmt);
+    scene.background = sky;
+    if(scene.fog) scene.fog.color = sky;
+
+    const sunAngle = (t/24) * Math.PI * 2 - Math.PI/2;
+    sunLight.position.set(Math.cos(sunAngle)*50, Math.max(4, Math.sin(sunAngle)*50), 20);
+    sunLight.intensity = Math.max(0.08, dayAmt) * lightState.brightness;
+    hemiLight.intensity = (0.35 + dayAmt * 0.55) * lightState.brightness;
+  }
+
   function buildDefaultScene(){
     clearScene();
-
-    // sky
-    scene.background = new THREE.Color(0x87b6ff);
     scene.fog = new THREE.Fog(0x87b6ff, 60, 180);
 
-    const hemi = new THREE.HemisphereLight(0xbfd9ff, 0x2f3a2b, 0.9);
-    scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-    sun.position.set(30, 50, 20);
-    scene.add(sun);
+    hemiLight = new THREE.HemisphereLight(0xbfd9ff, 0x2f3a2b, 0.9);
+    scene.add(hemiLight);
+    sunLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    sunLight.position.set(30, 50, 20);
+    scene.add(sunLight);
+    updateSunAndSky();
 
-    // Baseplate
-    addSceneObject({
-      name:"Baseplate", className:"Part",
-      pos:[0, -0.5, 0], size:[100, 1, 100],
-      color: 0x3ecf6e, transparency:0
+    addSceneObject({ name:"Baseplate", className:"Part", shape:"cube", pos:[0,-0.5,0], size:[100,1,100], color:0x3ecf6e });
+    addSceneObject({ name:"SpawnLocation", className:"SpawnLocation", shape:"cube", pos:[0,0.15,0], size:[6,0.3,6], color:0xc23b3b });
+  }
+
+  /* ---------------- Toolbar (Select / Move / Rotate / Scale / Parts) ---------------- */
+  function initToolbar(){
+    document.querySelectorAll(".tool-tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        const tool = tab.dataset.tool;
+        if(tool === "parts"){
+          togglePartsPicker();
+          return;
+        }
+        setTool(tool);
+        hidePartsPicker();
+      });
     });
-
-    // SpawnLocation
-    addSceneObject({
-      name:"SpawnLocation", className:"SpawnLocation",
-      pos:[0, 0.15, 0], size:[6, 0.3, 6],
-      color: 0xc23b3b, transparency:0
+    buildPartsPickerContent(document.getElementById("partsPicker"), (shape) => {
+      addPartOfShape(shape);
+      hidePartsPicker();
     });
   }
 
+  function setTool(tool){
+    currentTool = tool;
+    document.querySelectorAll(".tool-tab").forEach(t => t.classList.toggle("active", t.dataset.tool === tool));
+    const hint = document.getElementById("viewportHint");
+    const hints = {
+      select:"Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan &middot; Click a part to select it",
+      move:"Drag a colored arrow to move along that axis &middot; Drag the white handle to move freely",
+      rotate:"Drag a colored ring to rotate around that axis",
+      scale:"Drag a colored handle to resize along that axis &middot; Drag the white handle to scale evenly"
+    };
+    hint.innerHTML = hints[tool] || hints.select;
+    rebuildGizmo();
+  }
+
+  function buildPartsPickerContent(container, onPick){
+    container.innerHTML = "";
+    Object.keys(PART_KINDS).forEach(key => {
+      const k = PART_KINDS[key];
+      const item = document.createElement("div");
+      item.className = "pp-item";
+      item.innerHTML =
+        '<span class="pp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">' + k.icon + '</svg></span><span></span>';
+      item.querySelector("span:last-child").textContent = k.label;
+      item.addEventListener("click", () => onPick(key));
+      container.appendChild(item);
+    });
+  }
+  function togglePartsPicker(){
+    document.getElementById("partsPicker").classList.toggle("show");
+  }
+  function hidePartsPicker(){
+    document.getElementById("partsPicker").classList.remove("show");
+  }
   document.getElementById("addPartBtn").addEventListener("click", () => {
+    addPartOfShape("cube");
+  });
+
+  function addPartOfShape(shape){
     const n = sceneObjects.filter(o => o.className === "Part").length + 1;
+    const size = shape === "ledge" ? [6,1,2] : shape === "cylinder" ? [3,4,3] : [4,4,4];
     const obj = addSceneObject({
-      name:"Part" + n, className:"Part",
-      pos:[0, 3, 0], size:[4,4,4],
-      color: 0x9aa0a6, transparency:0
+      name: (PART_KINDS[shape] ? PART_KINDS[shape].label : "Part") + n, className:"Part", shape,
+      pos:[0,3,0], size, color:0x9aa0a6, material:"plastic", transparency:0
     });
     renderExplorer();
     selectObject(obj.id);
     showToast("Added " + obj.name);
-  });
+  }
 
-  /* ---- Explorer ---- */
+  /* ---------------- Gizmo (Move / Rotate / Scale handles) ---------------- */
+  function axisVec(name){
+    return name === "x" ? new THREE.Vector3(1,0,0) : name === "y" ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
+  }
+  function axisColor(name){ return name === "x" ? 0xe5484d : name === "y" ? 0x3ecf6e : 0x4a6cf7; }
+
+  function rebuildGizmo(){
+    if(gizmoGroup){ scene.remove(gizmoGroup); gizmoGroup = null; }
+    const obj = sceneObjects.find(o => o.id === selectedId);
+    if(!obj || currentTool === "select") return;
+
+    gizmoGroup = new THREE.Group();
+    gizmoGroup.position.copy(obj.mesh.position);
+    const scaleRef = Math.max(2.2, Math.max(...obj.props.size) * 0.35);
+
+    if(currentTool === "move" || currentTool === "scale"){
+      ["x","y","z"].forEach(ax => {
+        const color = axisColor(ax);
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,scaleRef,8), new THREE.MeshBasicMaterial({ color }));
+        const tip = currentTool === "move"
+          ? new THREE.Mesh(new THREE.ConeGeometry(0.22,0.6,10), new THREE.MeshBasicMaterial({ color }))
+          : new THREE.Mesh(new THREE.BoxGeometry(0.35,0.35,0.35), new THREE.MeshBasicMaterial({ color }));
+        shaft.userData = { gizmo:true, axis:ax, kind:currentTool };
+        tip.userData = { gizmo:true, axis:ax, kind:currentTool };
+        const dir = axisVec(ax);
+        const mid = dir.clone().multiplyScalar(scaleRef/2);
+        shaft.position.copy(mid);
+        tip.position.copy(dir.clone().multiplyScalar(scaleRef));
+        if(ax === "x"){ shaft.rotation.z = -Math.PI/2; tip.rotation.z = -Math.PI/2; }
+        else if(ax === "z"){ shaft.rotation.x = Math.PI/2; tip.rotation.x = Math.PI/2; }
+        gizmoGroup.add(shaft); gizmoGroup.add(tip);
+      });
+      // center handle: free move (XZ) or uniform scale
+      const center = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12), new THREE.MeshBasicMaterial({ color:0xf2f2f2 }));
+      center.userData = { gizmo:true, axis:"center", kind:currentTool };
+      gizmoGroup.add(center);
+    }else if(currentTool === "rotate"){
+      ["x","y","z"].forEach(ax => {
+        const color = axisColor(ax);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(scaleRef*0.85, 0.05, 8, 32), new THREE.MeshBasicMaterial({ color }));
+        ring.userData = { gizmo:true, axis:ax, kind:"rotate" };
+        if(ax === "x") ring.rotation.y = Math.PI/2;
+        else if(ax === "y") ring.rotation.x = Math.PI/2;
+        gizmoGroup.add(ring);
+      });
+    }
+    scene.add(gizmoGroup);
+  }
+
+  function pickGizmoHandle(e){
+    const ndc = mouseToNDC(e);
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(gizmoGroup.children);
+    if(!hits.length) return null;
+    return hits[0].object.userData;
+  }
+
+  function axisDragPlane(axisName, origin){
+    if(axisName === "center"){
+      return new THREE.Plane(new THREE.Vector3(0,1,0), -origin.y);
+    }
+    const axis = axisVec(axisName);
+    const camDir = new THREE.Vector3().subVectors(camera.position, origin).normalize();
+    const proj = axis.clone().multiplyScalar(camDir.dot(axis));
+    let normal = camDir.clone().sub(proj);
+    if(normal.lengthSq() < 1e-6) normal.set(0,1,0);
+    normal.normalize();
+    return new THREE.Plane().setFromNormalAndCoplanarPoint(normal, origin);
+  }
+  function raycastPlane(e, plane){
+    const ndc = mouseToNDC(e);
+    raycaster.setFromCamera(ndc, camera);
+    const pt = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, pt);
+    return pt;
+  }
+
+  function beginGizmoDrag(handleData, e){
+    const obj = sceneObjects.find(o => o.id === selectedId);
+    if(!obj) return;
+    const origin = obj.mesh.position.clone();
+    const plane = axisDragPlane(handleData.axis, origin);
+    const startPt = raycastPlane(e, plane) || origin.clone();
+    dragState = {
+      axis: handleData.axis, kind: handleData.kind, obj, origin, plane, startPt,
+      startPos: obj.mesh.position.clone(),
+      startSize: [...obj.props.size],
+      startRot: obj.mesh.rotation.clone(),
+      lastX: e.clientX, lastY: e.clientY
+    };
+  }
+  function updateGizmoDrag(e){
+    if(!dragState) return;
+    const { axis, kind, obj } = dragState;
+
+    if(kind === "move"){
+      const pt = raycastPlane(e, dragState.plane);
+      if(!pt) return;
+      if(axis === "center"){
+        const delta = pt.clone().sub(dragState.startPt);
+        obj.mesh.position.set(dragState.startPos.x + delta.x, dragState.startPos.y, dragState.startPos.z + delta.z);
+      }else{
+        const dir = axisVec(axis);
+        const delta = pt.clone().sub(dragState.startPt);
+        const t = delta.dot(dir);
+        obj.mesh.position.copy(dragState.startPos.clone().addScaledVector(dir, t));
+      }
+      obj.props.position = [obj.mesh.position.x, obj.mesh.position.y, obj.mesh.position.z];
+      gizmoGroup.position.copy(obj.mesh.position);
+      if(selectedId === obj.id) refreshPositionFields();
+    }else if(kind === "scale"){
+      let newSize = [...dragState.startSize];
+      if(axis === "center"){
+        if(dragState.baseMouseY === undefined) dragState.baseMouseY = e.clientY;
+        const dy = dragState.baseMouseY - e.clientY;
+        const factor = Math.max(0.15, 1 + dy * 0.01);
+        newSize = dragState.startSize.map(s => Math.max(0.2, s * factor));
+      }else{
+        const pt = raycastPlane(e, dragState.plane);
+        if(!pt) return;
+        const dir = axisVec(axis);
+        const delta = pt.clone().sub(dragState.startPt);
+        const t = delta.dot(dir);
+        const idx = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+        newSize[idx] = Math.max(0.2, dragState.startSize[idx] + t * 2);
+      }
+      obj.props.size = newSize;
+      obj.mesh.geometry.dispose();
+      obj.mesh.geometry = geometryForShape(obj.shape, newSize);
+      rebuildGizmo();
+      if(selectedId === obj.id) renderProperties();
+    }else if(kind === "rotate"){
+      const dx = e.clientX - dragState.lastX;
+      dragState.lastX = e.clientX; dragState.lastY = e.clientY;
+      const angle = dx * 0.012;
+      obj.mesh.rotateOnWorldAxis(axisVec(axis), angle);
+      obj.props.rotation = [obj.mesh.rotation.x, obj.mesh.rotation.y, obj.mesh.rotation.z];
+    }
+  }
+  function endGizmoDrag(){
+    dragState = null;
+  }
+
+  function refreshPositionFields(){
+    const wrapEls = document.querySelectorAll('.prop-row[data-field="position"] input[type="number"]');
+    if(!wrapEls.length) return;
+    const obj = sceneObjects.find(o => o.id === selectedId);
+    if(!obj) return;
+    wrapEls.forEach((input, i) => { input.value = Math.round(obj.props.position[i]*100)/100; });
+  }
+
+  /* ---------------- Explorer / Light tabs ---------------- */
+  function initExplorerTabs(){
+    document.querySelectorAll(".exp-tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".exp-tab-btn").forEach(b => b.classList.toggle("active", b === btn));
+        const tab = btn.dataset.exptab;
+        document.getElementById("explorerBody").classList.toggle("show", tab === "explorer");
+        document.getElementById("lightBody").classList.toggle("show", tab === "light");
+      });
+    });
+  }
+
   function iconSvg(className){
     if(className === "SpawnLocation"){
       return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>';
@@ -738,7 +1166,6 @@
   function renderExplorer(){
     const body = document.getElementById("explorerBody");
     body.innerHTML = "";
-
     const workspaceRow = document.createElement("div");
     workspaceRow.className = "exp-row";
     workspaceRow.innerHTML =
@@ -758,26 +1185,87 @@
     body.appendChild(children);
   }
 
-  /* ---- Properties ---- */
+  function renderLightPanel(){
+    const body = document.getElementById("lightBody");
+    body.innerHTML = "";
+
+    function field(labelHtml, min, max, step, value, onInput){
+      const wrap = document.createElement("div");
+      wrap.className = "light-field";
+      const label = document.createElement("label");
+      label.innerHTML = labelHtml;
+      const input = document.createElement("input");
+      input.type = "range"; input.min = min; input.max = max; input.step = step; input.value = value;
+      input.addEventListener("input", () => onInput(parseFloat(input.value), label));
+      wrap.appendChild(label); wrap.appendChild(input);
+      body.appendChild(wrap);
+      return { input, label };
+    }
+
+    const bF = field('Brightness <b id="lbBrightVal">' + lightState.brightness.toFixed(2) + '</b>', 0, 2, 0.05, lightState.brightness, (v, label) => {
+      lightState.brightness = v;
+      label.querySelector("#lbBrightVal").textContent = v.toFixed(2);
+      updateSunAndSky();
+    });
+
+    const timeLabel = (t) => {
+      const h = Math.floor(t) % 24;
+      const m = Math.round((t - Math.floor(t)) * 60);
+      const suffix = h >= 12 ? "PM" : "AM";
+      const h12 = ((h % 12) || 12);
+      return h12 + ":" + String(m).padStart(2,"0") + " " + suffix;
+    };
+    const tF = field('Time of Day <b id="lbTimeVal">' + timeLabel(lightState.time) + '</b>', 0, 24, 0.1, lightState.time, (v, label) => {
+      lightState.time = v;
+      label.querySelector("#lbTimeVal").textContent = timeLabel(v);
+      updateSunAndSky();
+    });
+
+    const row = document.createElement("div");
+    row.className = "exp-row";
+    row.style.marginTop = "6px";
+    row.innerHTML = '<span class="exp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>Lighting';
+    row.classList.toggle("selected", selectedId === "__light__");
+    row.addEventListener("click", () => selectObject("__light__"));
+    body.insertBefore(row, body.firstChild);
+  }
+
+  /* ---------------- Selection & Properties ---------------- */
   function selectObject(id){
     selectedId = id;
     renderExplorer();
+    renderLightPanel();
     renderProperties();
     sceneObjects.forEach(o => {
-      o.mesh.material.emissive = o.mesh.material.emissive || new THREE.Color(0,0,0);
-      if(o.id === id) o.mesh.material.emissive.setHex(0x24407a);
-      else o.mesh.material.emissive.setHex(0x000000);
+      if(!o.mesh.material.emissive) o.mesh.material.emissive = new THREE.Color(0,0,0);
+      if(o.id === id && o.props.material !== "neon") o.mesh.material.emissive.setHex(0x24407a);
+      else if(o.props.material !== "neon") o.mesh.material.emissive.setHex(0x000000);
     });
+    rebuildGizmo();
   }
 
   function renderProperties(){
     const body = document.getElementById("propsBody");
+    body.innerHTML = "";
+
+    if(selectedId === "__light__"){
+      const label = document.createElement("div");
+      label.className = "prop-group-label";
+      label.textContent = "Lighting";
+      body.appendChild(label);
+      const note = document.createElement("div");
+      note.className = "props-empty";
+      note.style.padding = "10px 4px";
+      note.textContent = "Brightness and time of day are set from the Light tab in the Explorer panel.";
+      body.appendChild(note);
+      return;
+    }
+
     const obj = sceneObjects.find(o => o.id === selectedId);
     if(!obj){
       body.innerHTML = '<div class="props-empty">Select something in the Explorer to see its properties.</div>';
       return;
     }
-    body.innerHTML = "";
 
     function groupLabel(text){
       const el = document.createElement("div");
@@ -797,10 +1285,12 @@
       else input.addEventListener("change", () => onChange(input.value));
       row.appendChild(label); row.appendChild(input);
       body.appendChild(row);
+      return row;
     }
-    function vec3Row(labelText, vec, onChange){
+    function vec3Row(labelText, fieldKey, vec, onChange){
       const row = document.createElement("div");
       row.className = "prop-row";
+      row.dataset.field = fieldKey;
       const label = document.createElement("label");
       label.textContent = labelText;
       const wrap = document.createElement("div");
@@ -838,24 +1328,70 @@
       row.appendChild(label); row.appendChild(input);
       body.appendChild(row);
     }
+    function selectRow(labelText, options, value, onChange){
+      const row = document.createElement("div");
+      row.className = "prop-row";
+      const label = document.createElement("label");
+      label.textContent = labelText;
+      const select = document.createElement("select");
+      select.className = "prop-select";
+      Object.keys(options).forEach(key => {
+        const opt = document.createElement("option");
+        opt.value = key; opt.textContent = options[key].label;
+        if(key === value) opt.selected = true;
+        select.appendChild(opt);
+      });
+      select.addEventListener("change", () => onChange(select.value));
+      row.appendChild(label); row.appendChild(select);
+      body.appendChild(row);
+    }
 
     groupLabel("Identity");
     textRow("Name", obj.name, (v) => {
       obj.name = v || obj.name;
-      if(currentGame && obj.className !== "Baseplate") { /* name only affects explorer/label */ }
       renderExplorer();
     });
-    textRow("ClassName", obj.className, null, true);
 
-    groupLabel("Transform");
-    vec3Row("Position", obj.props.position, (nv) => {
+    if(obj.className === "Part"){
+      const shapeBtn = document.createElement("button");
+      shapeBtn.className = "prop-shape-btn";
+      shapeBtn.type = "button";
+      shapeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 9h14M5 15h14"/></svg> Change shape';
+      shapeBtn.addEventListener("click", () => {
+        let popup = document.getElementById("shapeChangePopup");
+        if(popup){ popup.remove(); return; }
+        popup = document.createElement("div");
+        popup.id = "shapeChangePopup";
+        popup.className = "parts-picker show";
+        popup.style.position = "static";
+        popup.style.transform = "none";
+        popup.style.marginTop = "6px";
+        popup.style.marginBottom = "10px";
+        buildPartsPickerContent(popup, (shape) => {
+          obj.shape = shape;
+          obj.mesh.geometry.dispose();
+          obj.mesh.geometry = geometryForShape(shape, obj.props.size);
+          popup.remove();
+          rebuildGizmo();
+        });
+        shapeBtn.insertAdjacentElement("afterend", popup);
+      });
+      body.appendChild(shapeBtn);
+    }else{
+      textRow("ClassName", obj.className, null, true);
+    }
+
+    groupLabel("Coordinates");
+    vec3Row("Position", "position", obj.props.position, (nv) => {
       obj.props.position = nv;
       obj.mesh.position.set(nv[0], nv[1], nv[2]);
+      if(gizmoGroup) gizmoGroup.position.copy(obj.mesh.position);
     });
-    vec3Row("Size", obj.props.size, (nv) => {
+    vec3Row("Size", "size", obj.props.size, (nv) => {
       obj.props.size = nv;
       obj.mesh.geometry.dispose();
-      obj.mesh.geometry = new THREE.BoxGeometry(nv[0], nv[1], nv[2]);
+      obj.mesh.geometry = geometryForShape(obj.shape, nv);
+      rebuildGizmo();
     });
 
     groupLabel("Appearance");
@@ -863,7 +1399,20 @@
       obj.props.color = hex;
       obj.mesh.material.color.setHex(hex);
     });
+
+    if(obj.className === "Part"){
+      selectRow("Material", MATERIALS, obj.props.material, (matKey) => {
+        obj.props.material = matKey;
+        const m = MATERIALS[matKey];
+        obj.mesh.material.dispose();
+        obj.mesh.material = materialFor(matKey, obj.props.transparency);
+        if(selectedId === obj.id && matKey !== "neon"){
+          obj.mesh.material.emissive = new THREE.Color(0x24407a);
+        }
+      });
+    }
   }
+
 
   /* ---------------- Boot ---------------- */
   window.addEventListener("load", () => { document.getElementById("stUsername").focus(); });
