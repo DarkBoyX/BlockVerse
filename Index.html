@@ -5373,7 +5373,7 @@
      in-app case plays locally like always, the browser case hands off to
      the installed app via a custom blockverse:// URL, or shows a download
      page if nothing answers that URL. */
-  const IS_DESKTOP_APP = /BlockVerseDesktop/i.test(navigator.userAgent);
+  const IS_DESKTOP_APP = /BlockVerse(Desktop|Android)/i.test(navigator.userAgent);
 
   // Best-effort only: there's no fully reliable cross-browser way to know
   // whether a custom protocol handler actually caught a navigation before
@@ -5404,6 +5404,24 @@
   function showAppDownloadPage(gameId){
     const root = document.getElementById("appDownloadRoot");
     if(!root) return;
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const downloadHref = isAndroid ? "downloads/BlockVerse.apk" : "downloads/BlockVerse-Setup.exe";
+    const downloadLabel = isAndroid ? "Download for Android" : "Download for Windows";
+    const platformName = isAndroid ? "Android app" : "Windows app";
+    const note = isAndroid
+      ? 'After it downloads, open the file. Android may show a "blocked by Play Protect" or "install unknown apps" warning - tap <b>Install anyway</b> or enable the permission it points you to. That\'s normal for an app installed outside the Play Store and only shows up the first time.'
+      : 'After it downloads, open the file. If Windows shows a blue "Windows protected your PC" screen, click <b>More info</b> then <b>Run anyway</b> - that\'s normal for a new app and only shows up the first time.';
+    const steps = isAndroid
+      ? [
+          "Download the APK above and open it.",
+          "Allow the install-unknown-apps permission if asked, then tap Install.",
+          "Open BlockVerse from your app drawer or home screen."
+        ]
+      : [
+          "Download the installer above and open it.",
+          "Click through the setup window (Next → Install).",
+          "Open BlockVerse from your Start Menu or desktop icon."
+        ];
     root.innerHTML =
       '<div class="adp-overlay">' +
         '<div class="adp-bg"><div class="adp-orb adp-orb1"></div><div class="adp-orb adp-orb2"></div><div class="adp-orb adp-orb3"></div></div>' +
@@ -5411,16 +5429,14 @@
           '<div class="adp-close" id="adpCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>' +
           '<div class="adp-icon"><img src="icon-192.png" alt="BlockVerse"/></div>' +
           '<div class="adp-title">Get the BlockVerse app</div>' +
-          '<div class="adp-sub">Playing in a browser tab isn\'t supported anymore - BlockVerse now runs through the free Windows app for a smoother, faster experience.</div>' +
-          '<a class="adp-download-btn" id="adpDownloadBtn" href="downloads/BlockVerse-Setup.exe" download>' +
+          '<div class="adp-sub">Playing in a browser tab isn\'t supported anymore - BlockVerse now runs through the free ' + platformName + ' for a smoother, faster experience.</div>' +
+          '<a class="adp-download-btn" id="adpDownloadBtn" href="' + downloadHref + '" download>' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>' +
-            '<span>Download for Windows</span>' +
+            '<span>' + downloadLabel + '</span>' +
           '</a>' +
-          '<div class="adp-note">After it downloads, open the file. If Windows shows a blue "Windows protected your PC" screen, click <b>More info</b> then <b>Run anyway</b> - that\'s normal for a new app and only shows up the first time.</div>' +
+          '<div class="adp-note">' + note + '</div>' +
           '<div class="adp-steps">' +
-            '<div class="adp-step"><div class="adp-step-num">1</div><div class="adp-step-text">Download the installer above and open it.</div></div>' +
-            '<div class="adp-step"><div class="adp-step-num">2</div><div class="adp-step-text">Click through the setup window (Next → Install).</div></div>' +
-            '<div class="adp-step"><div class="adp-step-num">3</div><div class="adp-step-text">Open BlockVerse from your Start Menu or desktop icon.</div></div>' +
+            steps.map((s, i) => '<div class="adp-step"><div class="adp-step-num">' + (i+1) + '</div><div class="adp-step-text">' + s + '</div></div>').join("") +
           '</div>' +
           '<div class="adp-already"><span>Already have it installed?</span> <button id="adpRetryBtn">Try opening it again</button></div>' +
         '</div>' +
@@ -5590,14 +5606,19 @@
       }).catch(()=>{});
     }catch(e){}
 
+    appEntered = true;
     maybeAutoLaunchFromProtocol();
   }
 
-  // when the desktop app is opened via a blockverse://play/<gameId> link
-  // (clicked from the website), main.js loads this page with
-  // ?launch=<gameId> appended - once the account's logged in, jump
-  // straight into that game instead of leaving them sitting on the home
-  // screen. Only runs inside the real app, and only once per page load.
+  // set true once enterApp() has actually run - lets blockverseDeepLink()
+  // tell "still on the login screen" apart from "already in the app"
+  let appEntered = false;
+
+  // when the desktop/Android app is opened via a blockverse://play/<gameId>
+  // link (clicked from the website), the very first cold launch loads this
+  // page with ?launch=<gameId> appended - once the account's logged in,
+  // jump straight into that game instead of leaving them sitting on the
+  // home screen. Only runs inside the real app, and only once per page load.
   let autoLaunchHandled = false;
   function maybeAutoLaunchFromProtocol(){
     if(autoLaunchHandled || !IS_DESKTOP_APP) return;
@@ -5605,6 +5626,10 @@
     const gameId = params.get("launch");
     if(!gameId) return;
     autoLaunchHandled = true;
+    joinGameWhenReady(gameId);
+  }
+
+  function joinGameWhenReady(gameId){
     if(GAMES_CATALOG[gameId]){
       attemptJoinGame(gameId);
     } else {
@@ -5622,6 +5647,30 @@
       }, 250);
     }
   }
+
+  // Called directly by the desktop app (main.js) or the Android app
+  // (MainActivity.java) when a blockverse://play/<gameId> link is opened
+  // WHILE the app is already running - this is the fix for a real bug:
+  // previously any repeat deep link just force-reloaded the whole page,
+  // which silently kicked the player out of whatever game they were
+  // already in (even mid-session, even on a different account than the
+  // one that clicked Play on the website). Now it's a no-op with a
+  // friendly heads-up if you're already playing, instead of yanking you
+  // out of your current game.
+  window.blockverseDeepLink = function(gameId){
+    if(!gameId) return;
+    if(!appEntered){
+      // still on the login screen - stash it, enterApp() will pick it up
+      autoLaunchHandled = false;
+      history.replaceState(null, "", location.pathname + "?launch=" + encodeURIComponent(gameId));
+      return;
+    }
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+      showIngameToast({ kind:"info", userKey:"system", html:"<b>Already playing</b><br>Leave your current game first if you want to join a different one from the website." });
+      return;
+    }
+    joinGameWhenReady(gameId);
+  };
 
   function doLogout(){
     stopSessionTracking();
@@ -6152,8 +6201,14 @@
       const c = normalizeCustom(typeof custom === "object" ? custom : { torso: custom });
       const grp = new THREE.Group();
 
-      const skin = new THREE.MeshLambertMaterial({ color: 0xf0c090 });
-      const faceMat = new THREE.MeshLambertMaterial({ color: 0xf0c090, map: getFaceTexture() });
+      // MeshStandardMaterial (not Lambert) is what actually produces that
+      // glossy "plastic" look Roblox avatars have - a soft specular
+      // highlight that shifts as you orbit the camera. Lambert materials
+      // are purely flat/matte and can't produce that highlight at all,
+      // no matter how the lights are set up.
+      const PLASTIC = { roughness: 0.55, metalness: 0.06 };
+      const skin = new THREE.MeshStandardMaterial({ color: 0xf0c090, ...PLASTIC });
+      const faceMat = new THREE.MeshStandardMaterial({ color: 0xf0c090, map: getFaceTexture(), ...PLASTIC });
       // BoxGeometry face order is [+X,-X,+Y,-Y,+Z,-Z] - put the smiley on
       // both Z faces so it reads correctly regardless of which way "front"
       // ends up facing after the model's own base rotation
@@ -6162,11 +6217,11 @@
       // movement direction - see updateMovement), so only that face gets the
       // smiley; -Z (the back of the head) stays plain skin.
       const headMats = [skin, skin, skin, skin, faceMat, skin];
-      const torsoMat = new THREE.MeshLambertMaterial({ color: c.torso });
-      const lArmMat = new THREE.MeshLambertMaterial({ color: c.leftArm });
-      const rArmMat = new THREE.MeshLambertMaterial({ color: c.rightArm });
-      const lLegMat = new THREE.MeshLambertMaterial({ color: c.leftLeg });
-      const rLegMat = new THREE.MeshLambertMaterial({ color: c.rightLeg });
+      const torsoMat = new THREE.MeshStandardMaterial({ color: c.torso, ...PLASTIC });
+      const lArmMat = new THREE.MeshStandardMaterial({ color: c.leftArm, ...PLASTIC });
+      const rArmMat = new THREE.MeshStandardMaterial({ color: c.rightArm, ...PLASTIC });
+      const lLegMat = new THREE.MeshStandardMaterial({ color: c.leftLeg, ...PLASTIC });
+      const rLegMat = new THREE.MeshStandardMaterial({ color: c.rightLeg, ...PLASTIC });
 
       const TORSO_H = 1.1, TORSO_Y = 1.35;
       const HEAD_BASE_SIZE = 0.58, NECK_GAP = 0.08;
@@ -6701,9 +6756,9 @@
     const SENSITIVE_TERMS_LIST = [
       "predator","predators","preditor","preditors","predetor","predetors","pred","preds",
       "ped","peds","pedo","pedos","pedophile","pedophiles","paedophile","paedophiles",
-      "groomer","groomers","grooming",
+      "groomer","groomers","grooming","gooning",
       "discord","youtube","yt","tiktok","tik tok","twitter","x.com","instagram","insta",
-      "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game"
+      "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game","nig","nigg"
     ];
 
     // strips accents/diacritics (Latin AND Arabic), Arabic tatweel, and
