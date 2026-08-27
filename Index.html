@@ -305,6 +305,98 @@
   .gp-play-btn:hover{ background:#3d5ce0; }
   .gp-play-btn:active{ transform:scale(0.98); }
 
+  /* ---------- App download overlay (shown in a browser tab when the desktop app isn't detected) ---------- */
+  .adp-overlay{
+    position:fixed; inset:0; z-index:10000; display:flex; align-items:center; justify-content:center;
+    background:#08080a; overflow:hidden; animation:adpFadeIn .35s ease;
+  }
+  @keyframes adpFadeIn{ from{ opacity:0; } to{ opacity:1; } }
+  .adp-bg{ position:absolute; inset:0; overflow:hidden; }
+  .adp-orb{
+    position:absolute; border-radius:50%; filter:blur(60px); opacity:0.35;
+    background:radial-gradient(circle, #3a3a40, transparent 70%);
+    animation:adpFloat 14s ease-in-out infinite;
+  }
+  .adp-orb1{ width:420px; height:420px; top:-120px; left:-100px; animation-delay:0s; }
+  .adp-orb2{ width:340px; height:340px; bottom:-100px; right:-80px; background:radial-gradient(circle, #2a2a30, transparent 70%); animation-delay:-4s; }
+  .adp-orb3{ width:260px; height:260px; top:40%; left:60%; background:radial-gradient(circle, #1f1f24, transparent 70%); animation-delay:-8s; }
+  @keyframes adpFloat{
+    0%,100%{ transform:translate(0,0) scale(1); }
+    50%{ transform:translate(30px,-20px) scale(1.08); }
+  }
+  .adp-card{
+    position:relative; z-index:1; width:min(420px, 88vw); text-align:center;
+    background:linear-gradient(180deg, #141416, #0c0c0e);
+    border:1px solid rgba(255,255,255,0.08); border-radius:18px;
+    padding:36px 28px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    animation:adpCardIn .4s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes adpCardIn{
+    from{ opacity:0; transform:translateY(18px) scale(0.97); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  .adp-close{
+    position:absolute; top:14px; right:14px; width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; color:var(--text-2);
+    cursor:pointer; transition:background .15s, color .15s;
+  }
+  .adp-close:hover{ background:rgba(255,255,255,0.08); color:var(--text-0); }
+  .adp-close svg{ width:16px; height:16px; }
+  .adp-icon{
+    width:72px; height:72px; margin:0 auto 16px; border-radius:18px; overflow:hidden;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4); animation:adpIconPulse 2.4s ease-in-out infinite;
+  }
+  .adp-icon img{ width:100%; height:100%; display:block; }
+  @keyframes adpIconPulse{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.05); }
+  }
+  .adp-title{ font-size:19px; font-weight:800; color:#fff; margin-bottom:8px; }
+  .adp-sub{ font-size:13px; color:#9a9aa2; line-height:1.5; margin-bottom:22px; }
+  .adp-download-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    background:linear-gradient(135deg, #3a3a42, #1c1c20); color:#fff; text-decoration:none;
+    padding:13px; border-radius:12px; font-size:14px; font-weight:700;
+    border:1px solid rgba(255,255,255,0.12); transition:transform .12s, background .15s;
+  }
+  .adp-download-btn:hover{ background:linear-gradient(135deg, #46464f, #242428); transform:translateY(-1px); }
+  .adp-download-btn:active{ transform:translateY(0) scale(0.98); }
+  .adp-download-btn svg{ width:17px; height:17px; }
+  .adp-note{ margin-top:12px; font-size:11.5px; color:#8a8a92; line-height:1.5; text-align:left; }
+  .adp-note b{ color:#c8c8ce; }
+  .adp-steps{ margin-top:24px; display:flex; flex-direction:column; gap:12px; text-align:left; }
+  .adp-step{ display:flex; align-items:flex-start; gap:10px; }
+  .adp-step-num{
+    flex:none; width:20px; height:20px; border-radius:50%; background:rgba(255,255,255,0.08);
+    color:#cfcfd4; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;
+    margin-top:1px;
+  }
+  .adp-step-text{ font-size:12.5px; color:#b4b4bb; line-height:1.5; }
+  .adp-already{ margin-top:22px; font-size:11.5px; color:#78787f; }
+  .adp-already button{
+    background:none; border:none; color:#9fb0ff; font-size:11.5px; font-weight:600;
+    cursor:pointer; text-decoration:underline; padding:0;
+  }
+
+  /* ---------- Connection Lost overlay (shown mid-game if the network drops) ---------- */
+  .cl-icon{
+    width:64px; height:64px; margin:0 auto 18px; border-radius:50%;
+    background:rgba(229,72,77,0.12); display:flex; align-items:center; justify-content:center;
+    animation:adpIconPulse 2s ease-in-out infinite;
+  }
+  .cl-icon svg{ width:30px; height:30px; color:#e5484d; }
+  .cl-retry-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    background:linear-gradient(135deg, #3a3a42, #1c1c20); color:#fff; text-decoration:none;
+    padding:13px; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer;
+    border:1px solid rgba(255,255,255,0.12); transition:transform .12s, background .15s, opacity .15s;
+  }
+  .cl-retry-btn:hover:not(:disabled){ background:linear-gradient(135deg, #46464f, #242428); transform:translateY(-1px); }
+  .cl-retry-btn:active:not(:disabled){ transform:translateY(0) scale(0.98); }
+  .cl-retry-btn:disabled{ opacity:0.5; cursor:default; }
+  .cl-retry-btn svg{ width:16px; height:16px; }
+  .cl-cd-note{ margin-top:14px; font-size:11.5px; color:#78787f; }
+
   /* ---------- Experience page (full page, opens instead of the old side panel) ---------- */
   .gp-panel.gp-fullpage{
     width:100%; max-width:none; left:0; border-left:none; z-index:950;
@@ -1506,6 +1598,8 @@
 
     <div id="gamePanelRoot"></div>
     <div id="serversPageRoot"></div>
+    <div id="appDownloadRoot"></div>
+    <div id="connectionLostRoot"></div>
 
     <!-- SETTINGS HUB (3 buttons) -->
     <div id="pageSettingsHub" class="hidden">
@@ -2012,10 +2106,21 @@
       fbReadyResolve(user.uid);
     }
   });
-  fbAuth.signInAnonymously().catch((err) => {
-    console.error("Firebase anonymous sign-in failed:", err);
-    fbAuthError = err;
-  });
+  // SESSION persistence (not the default LOCAL) means each browser TAB
+  // gets its own anonymous uid instead of sharing one across every tab of
+  // the same profile - without this, opening 2 tabs of the same browser
+  // on the same PC signs both into the exact same anonymous account, so
+  // they overwrite the same rooms/<game>/players/<uid> node and only one
+  // of them ever shows up in the world (this is what was causing 3 people
+  // on one device to only ever show 2 characters).
+  fbAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+    .catch((err) => console.error("Firebase setPersistence failed:", err))
+    .finally(() => {
+      fbAuth.signInAnonymously().catch((err) => {
+        console.error("Firebase anonymous sign-in failed:", err);
+        fbAuthError = err;
+      });
+    });
   // If auth doesn't resolve within 6s (e.g. Anonymous sign-in isn't enabled in
   // the Firebase console yet), stop blocking forever - resolve with null so
   // callers can fail loudly instead of hanging silently.
@@ -2070,6 +2175,7 @@
   function saveMyCustom(custom){
     localStorage.setItem(customStorageKey(), JSON.stringify(custom));
     if(typeof updateHubAvatar === "function") updateHubAvatar(); // instant self-update, doesn't need the Firebase round-trip below
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.refreshOwnCharacterAppearance) BaseplateGame.refreshOwnCharacterAppearance();
     // best-effort sync to Firebase so the same account sees its look on
     // another device too; safe to fail silently (e.g. offline)
     try{
@@ -5259,10 +5365,86 @@
   // shared join gate: used by the Play button, the servers list, and
   // friend-invite joins - blocks the join and shows a toast if the server
   // is already at capacity instead of letting people pile in past 15
+  /* ============ desktop app handoff ============
+     The BlockVerse Windows app loads this exact same site inside its own
+     window and tags its user agent with "BlockVerseDesktop/1.0" (see the
+     Electron main.js). That's how the page tells "I'm already running
+     inside the real app" apart from "I'm just a normal browser tab" - the
+     in-app case plays locally like always, the browser case hands off to
+     the installed app via a custom blockverse:// URL, or shows a download
+     page if nothing answers that URL. */
+  const IS_DESKTOP_APP = /BlockVerseDesktop/i.test(navigator.userAgent);
+
+  // Best-effort only: there's no fully reliable cross-browser way to know
+  // whether a custom protocol handler actually caught a navigation before
+  // the user confirms a permission prompt. We attempt the handoff AND
+  // still show the download page a moment later as a safety net - if the
+  // app did open, the person just switches to it and ignores the browser
+  // tab; if it didn't, they've already got the download page in front of
+  // them instead of a dead click.
+  function tryOpenDesktopApp(gameId){
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (opened) => {
+        if(settled) return;
+        settled = true;
+        document.removeEventListener("visibilitychange", onHide);
+        window.removeEventListener("blur", onBlur);
+        resolve(opened);
+      };
+      const onHide = () => { if(document.hidden) finish(true); };
+      const onBlur = () => finish(true);
+      document.addEventListener("visibilitychange", onHide);
+      window.addEventListener("blur", onBlur);
+      try{ window.location.href = "blockverse://play/" + encodeURIComponent(gameId); }catch(e){}
+      setTimeout(() => finish(false), 1500);
+    });
+  }
+
+  function showAppDownloadPage(gameId){
+    const root = document.getElementById("appDownloadRoot");
+    if(!root) return;
+    root.innerHTML =
+      '<div class="adp-overlay">' +
+        '<div class="adp-bg"><div class="adp-orb adp-orb1"></div><div class="adp-orb adp-orb2"></div><div class="adp-orb adp-orb3"></div></div>' +
+        '<div class="adp-card">' +
+          '<div class="adp-close" id="adpCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>' +
+          '<div class="adp-icon"><img src="icon-192.png" alt="BlockVerse"/></div>' +
+          '<div class="adp-title">Get the BlockVerse app</div>' +
+          '<div class="adp-sub">Playing in a browser tab isn\'t supported anymore - BlockVerse now runs through the free Windows app for a smoother, faster experience.</div>' +
+          '<a class="adp-download-btn" id="adpDownloadBtn" href="downloads/BlockVerse-Setup.exe" download>' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>' +
+            '<span>Download for Windows</span>' +
+          '</a>' +
+          '<div class="adp-note">After it downloads, open the file. If Windows shows a blue "Windows protected your PC" screen, click <b>More info</b> then <b>Run anyway</b> - that\'s normal for a new app and only shows up the first time.</div>' +
+          '<div class="adp-steps">' +
+            '<div class="adp-step"><div class="adp-step-num">1</div><div class="adp-step-text">Download the installer above and open it.</div></div>' +
+            '<div class="adp-step"><div class="adp-step-num">2</div><div class="adp-step-text">Click through the setup window (Next → Install).</div></div>' +
+            '<div class="adp-step"><div class="adp-step-num">3</div><div class="adp-step-text">Open BlockVerse from your Start Menu or desktop icon.</div></div>' +
+          '</div>' +
+          '<div class="adp-already"><span>Already have it installed?</span> <button id="adpRetryBtn">Try opening it again</button></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("adpCloseBtn").addEventListener("click", () => { root.innerHTML = ""; });
+    document.getElementById("adpRetryBtn").addEventListener("click", () => {
+      tryOpenDesktopApp(gameId).then((opened) => { if(opened) root.innerHTML = ""; });
+    });
+  }
+
   async function attemptJoinGame(gameId, opts){
     opts = opts || {};
     const game = GAMES_CATALOG[gameId];
     if(!game) return;
+
+    if(!IS_DESKTOP_APP){
+      // we're in a normal browser tab, not the real app - try to hand off
+      // to the installed app, and fall back to a download page if nothing
+      // answers within a beat
+      const opened = await tryOpenDesktopApp(gameId);
+      if(!opened) showAppDownloadPage(gameId);
+      return false;
+    }
+
     const keys = await getCurrentRoomPlayerKeys(gameId);
     const alreadyIn = fbUid && keys.includes(fbUid);
     if(!alreadyIn && keys.length >= SERVER_CAPACITY){
@@ -5407,6 +5589,38 @@
         if(v) localStorage.setItem(customStorageKey(), JSON.stringify(v));
       }).catch(()=>{});
     }catch(e){}
+
+    maybeAutoLaunchFromProtocol();
+  }
+
+  // when the desktop app is opened via a blockverse://play/<gameId> link
+  // (clicked from the website), main.js loads this page with
+  // ?launch=<gameId> appended - once the account's logged in, jump
+  // straight into that game instead of leaving them sitting on the home
+  // screen. Only runs inside the real app, and only once per page load.
+  let autoLaunchHandled = false;
+  function maybeAutoLaunchFromProtocol(){
+    if(autoLaunchHandled || !IS_DESKTOP_APP) return;
+    const params = new URLSearchParams(window.location.search);
+    const gameId = params.get("launch");
+    if(!gameId) return;
+    autoLaunchHandled = true;
+    if(GAMES_CATALOG[gameId]){
+      attemptJoinGame(gameId);
+    } else {
+      // published/community games load into GAMES_CATALOG asynchronously
+      // via watchPublishedGames() - give that a moment before giving up
+      let tries = 0;
+      const wait = setInterval(() => {
+        tries++;
+        if(GAMES_CATALOG[gameId]){
+          clearInterval(wait);
+          attemptJoinGame(gameId);
+        } else if(tries > 20){
+          clearInterval(wait);
+        }
+      }, 250);
+    }
   }
 
   function doLogout(){
@@ -6013,6 +6227,27 @@
       character.add(ownNameSprite);
     }
 
+    // rebuilds your own rig in place using whatever's currently saved via
+    // getMyCustom() - called from saveMyCustom() (outside this module) so
+    // changing your look while already in a game shows up immediately
+    // instead of only taking effect next time you rejoin
+    function refreshOwnCharacterAppearance(){
+      if(!running || !character) return;
+      const oldPos = character.position.clone(), oldRotY = character.rotation.y;
+      const rig = buildCharacterRig(getMyCustom());
+      rig.group.position.copy(oldPos);
+      rig.group.rotation.y = oldRotY;
+      scene.add(rig.group);
+      ownNameSprite.position.set(0, 2.9, 0);
+      rig.group.add(ownNameSprite);
+      scene.remove(character);
+      disposeObject3D(character);
+      character = rig.group;
+      head = rig.head; leftArm = rig.leftArm; rightArm = rig.rightArm;
+      leftLeg = rig.leftLeg; rightLeg = rig.rightLeg;
+      baseScaleX = character.scale.x; baseScaleY = character.scale.y; baseScaleZ = character.scale.z;
+    }
+
     // ---- remote players (other real people from Firebase) ----
     const REMOTE_COLORS = [0xd64a6a, 0x4ad6a0, 0xd6b34a, 0x8a4ad6, 0x4ab0d6];
     function colorForId(id){
@@ -6036,7 +6271,8 @@
     }
 
     function addRemotePlayer(id, data){
-      const rig = buildCharacterRig(customFromPlayerData(id, data));
+      const custom = customFromPlayerData(id, data);
+      const rig = buildCharacterRig(custom);
       rig.group.position.set(data.x||0, data.y||0, data.z||0);
       rig.group.rotation.y = data.ry||0;
       scene.add(rig.group);
@@ -6050,8 +6286,40 @@
         group: rig.group, head: rig.head, leftArm: rig.leftArm, rightArm: rig.rightArm,
         leftLeg: rig.leftLeg, rightLeg: rig.rightLeg,
         target: { x:data.x||0, y:data.y||0, z:data.z||0, ry:data.ry||0 },
-        walkT: 0, idleT: 0, lastPos: { x:data.x||0, z:data.z||0 }
+        walkT: 0, idleT: 0, lastPos: { x:data.x||0, z:data.z||0 },
+        customKey: customSignature(custom), nameSprite
       };
+    }
+
+    // small string fingerprint of the fields that change how a rig looks,
+    // so the live listener can cheaply tell "did their appearance actually
+    // change" apart from "just a position update" without deep-comparing
+    // objects every frame
+    function customSignature(c){
+      return [c.torso,c.leftArm,c.rightArm,c.leftLeg,c.rightLeg,c.heightScale,c.headScale].join("|");
+    }
+
+    // rebuilds an already-connected remote player's rig in place when their
+    // torso/arm/leg color, height, or head size changes mid-session - the
+    // old add/update split only ever refreshed position on updates, so a
+    // player who customized WHILE already in a room with someone never
+    // actually looked any different to them until they left and rejoined
+    function refreshRemotePlayerAppearance(id, data){
+      const rp = remotePlayers[id];
+      if(!rp) return;
+      const oldGroup = rp.group, oldPos = oldGroup.position.clone(), oldRotY = oldGroup.rotation.y;
+      const custom = customFromPlayerData(id, data);
+      const rig = buildCharacterRig(custom);
+      rig.group.position.copy(oldPos);
+      rig.group.rotation.y = oldRotY;
+      scene.add(rig.group);
+      rp.nameSprite.position.set(0, 2.9, 0);
+      rig.group.add(rp.nameSprite);
+      scene.remove(oldGroup);
+      disposeObject3D(oldGroup);
+      rp.group = rig.group; rp.head = rig.head; rp.leftArm = rig.leftArm;
+      rp.rightArm = rig.rightArm; rp.leftLeg = rig.leftLeg; rp.rightLeg = rig.rightLeg;
+      rp.customKey = customSignature(custom);
     }
 
     function makeNameSprite(text){
@@ -6351,6 +6619,8 @@
             const newEmote = data[id].emote || null;
             if(rp.emote === "dance" && newEmote !== "dance" && rp.group) rp.group.rotation.z = 0; // clear leftover hip sway
             rp.emote = newEmote;
+            const newKey = customSignature(customFromPlayerData(id, data[id]));
+            if(newKey !== rp.customKey) refreshRemotePlayerAppearance(id, data[id]);
           }
         });
         // remove players who left
@@ -6465,7 +6735,18 @@
       "а":"a", "в":"b", "с":"c", "е":"e", "н":"h", "і":"i", "ѕ":"s", "ԁ":"d",
       "к":"k", "м":"m", "о":"o", "р":"p", "т":"t", "х":"x", "у":"y", "ц":"u",
       "ѡ":"w", "ɡ":"g", "ⅼ":"l", "ⅰ":"i", "ο":"o", "α":"a", "ρ":"p", "τ":"t",
-      "υ":"u", "ν":"v", "κ":"k", "ѵ":"v", "ⅴ":"v", "ⅹ":"x"
+      "υ":"u", "ν":"v", "κ":"k", "ѵ":"v", "ⅴ":"v", "ⅹ":"x",
+      // non-decomposing Latin-extended letters ("letter changer" sites use
+      // these a lot because NFKD normalize() can't fold them the way it
+      // folds regular accented letters - they're distinct base letters in
+      // Unicode, not letter+accent, so stripDiacritics() alone never
+      // catches them
+      "đ":"d", "ð":"d", "ħ":"h", "ĸ":"k", "ł":"l", "ø":"o", "ø":"o",
+      "þ":"p", "ı":"i", "ĳ":"ij",
+      // capital I used as a lowercase L look-alike, and a multiplication
+      // sign used as an X look-alike - handled before lowercasing happens
+      // for I (since toLowerCase would otherwise turn I into i, not l)
+      "I":"l", "×":"x"
     };
     function foldHomoglyphs(s){
       let out = "";
@@ -6478,8 +6759,8 @@
     // hit the same regex as the plain word
     function normalizeForFilter(text){
       let s = (text || "").replace(INVISIBLE_CHARS_RE, "");
-      s = stripDiacritics(s.toLowerCase());
       s = foldHomoglyphs(s);
+      s = stripDiacritics(s.toLowerCase());
       s = s
         .replace(/[@]/g, "a").replace(/[4]/g, "a")
         .replace(/[3]/g, "e")
@@ -7747,6 +8028,26 @@
         if(document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
       }
     }
+
+    // matches the same first-person threshold the camera blend uses
+    // (blend < 0.35, see updateCamera) so this fires at the exact zoom
+    // level the view actually reads as first-person. autoShiftlockActive
+    // tracks whether WE turned it on (vs the player manually toggling it
+    // via the menu setting) so zooming back out only releases a lock this
+    // function put in place, not one the player set up on purpose.
+    let autoShiftlockActive = false;
+    const FIRST_PERSON_ENGAGE_DIST = CAM_DIST_MIN + 0.35 * 2.2;
+    const FIRST_PERSON_RELEASE_DIST = CAM_DIST_MIN + 0.5 * 2.2; // slightly further out than engage, so it doesn't flicker right at the boundary
+    function handleFirstPersonAutoShiftlock(){
+      if(menuOpen) return;
+      if(camDist <= FIRST_PERSON_ENGAGE_DIST && !shiftLocked){
+        autoShiftlockActive = true;
+        toggleShiftlock();
+      } else if(camDist > FIRST_PERSON_RELEASE_DIST && shiftLocked && autoShiftlockActive){
+        autoShiftlockActive = false;
+        toggleShiftlock();
+      }
+    }
     function wireShiftlockSetting(){
       const toggle = document.getElementById("shiftlockToggle");
       if(!toggle) return;
@@ -7834,6 +8135,7 @@
         e.preventDefault();
         // scroll toward the screen zooms in toward first person, the other way zooms back out
         camDist = Math.max(CAM_DIST_MIN, Math.min(CAM_DIST_MAX, camDist + e.deltaY * 0.01));
+        handleFirstPersonAutoShiftlock();
       }, { passive:false });
       canvas.addEventListener("touchstart", (e) => {
         if(menuOpen) return;
@@ -7854,6 +8156,7 @@
           // pinch to zoom: fingers spreading apart = zoom in, pinching together = zoom out
           const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
           camDist = Math.max(CAM_DIST_MIN, Math.min(CAM_DIST_MAX, pinchStartCamDist - (d - pinchStartDist) * 0.02));
+          handleFirstPersonAutoShiftlock();
           return;
         }
         if(!dragging) return;
@@ -8537,11 +8840,119 @@
       character.add(ownNameSprite);
     }
 
-    return { start, stop, forceDisconnect, isRunning: () => running, refreshOwnNameTag, looksLikeProfanity, buildCharacterRig, normalizeCustom, disposeObject3D };
+    return { start, stop, forceDisconnect, isRunning: () => running, refreshOwnNameTag, refreshOwnCharacterAppearance, looksLikeProfanity, buildCharacterRig, normalizeCustom, disposeObject3D };
   })();
 
   // playBaseplateBtn's click is now wired above via the generic
   // .game-card[data-game-id] handler, which opens the game info panel first
+
+  /* ============ connection lost overlay ============
+     Shows a full-screen "Connection Lost" page if the network drops while
+     the player is actually in-game (not during login/menus). Detection
+     uses a real connectivity probe (a tiny same-origin fetch) rather than
+     trusting navigator.onLine alone, since onLine can stay true even when
+     there's no real internet behind it - it only reflects whether the
+     network adapter itself is enabled.
+     The retry button is manual-only: clicking it re-checks connectivity;
+     if it's back, you're taken to the dashboard; if not, the button locks
+     for a cooldown that gets 5 seconds longer each failed attempt in a
+     row (5, 10, 15, 20, 25, 30...), so a dead connection can't be mashed
+     into spamming reconnect attempts. */
+  function probeConnectivity(timeoutMs){
+    return new Promise((resolve) => {
+      if(navigator.onLine === false){ resolve(false); return; } // fast path - OS already knows the adapter is down
+      const controller = new AbortController();
+      const timer = setTimeout(() => { controller.abort(); resolve(false); }, timeoutMs || 4000);
+      fetch("manifest.json?cb=" + Date.now(), { cache: "no-store", signal: controller.signal })
+        .then((res) => { clearTimeout(timer); resolve(!!(res && res.ok)); })
+        .catch(() => { clearTimeout(timer); resolve(false); });
+    });
+  }
+
+  let clShowing = false;
+  let clCooldownStep = 0; // 0 means "no cooldown yet" - first failed retry starts it at 5s
+
+  function hideConnectionLostOverlay(){
+    const root = document.getElementById("connectionLostRoot");
+    if(root) root.innerHTML = "";
+    clShowing = false;
+    clCooldownStep = 0;
+  }
+
+  function runClCooldown(seconds){
+    const btn = document.getElementById("clRetryBtn");
+    const note = document.getElementById("clCdNote");
+    if(!btn || !note) return;
+    let remaining = seconds;
+    btn.disabled = true;
+    const tick = () => {
+      note.textContent = "You can try again in " + remaining + "s";
+      if(remaining <= 0){
+        clearInterval(iv);
+        btn.disabled = false;
+        note.textContent = "";
+      }
+      remaining--;
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+  }
+
+  function showConnectionLostOverlay(){
+    if(clShowing) return;
+    clShowing = true;
+    clCooldownStep = 0;
+    const root = document.getElementById("connectionLostRoot");
+    if(!root) return;
+    root.innerHTML =
+      '<div class="adp-overlay">' +
+        '<div class="adp-bg"><div class="adp-orb adp-orb1"></div><div class="adp-orb adp-orb2"></div><div class="adp-orb adp-orb3"></div></div>' +
+        '<div class="adp-card">' +
+          '<div class="cl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg></div>' +
+          '<div class="adp-title">Connection Lost</div>' +
+          '<div class="adp-sub">You got disconnected because your WiFi or mobile data dropped. Check your connection, then try again.</div>' +
+          '<button class="cl-retry-btn" id="clRetryBtn">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>' +
+            '<span>Refresh</span>' +
+          '</button>' +
+          '<div class="cl-cd-note" id="clCdNote"></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("clRetryBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("clRetryBtn");
+      btn.disabled = true;
+      const ok = await probeConnectivity();
+      if(ok){
+        hideConnectionLostOverlay();
+        if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()){
+          BaseplateGame.forceDisconnect("Your connection is back - welcome back!", false);
+        }
+        return;
+      }
+      // still offline: escalating cooldown, 5s longer each failed attempt
+      clCooldownStep += 5;
+      runClCooldown(clCooldownStep);
+    });
+  }
+
+  // fires immediately when the OS reports the network adapter went down -
+  // faster than waiting for the next background poll
+  window.addEventListener("offline", () => {
+    if(typeof BaseplateGame !== "undefined" && BaseplateGame.isRunning()) showConnectionLostOverlay();
+  });
+
+  // background safety net: catches real internet loss even when the OS
+  // still reports the adapter as "online" (e.g. connected to a router with
+  // no actual internet upstream) - only does anything while actually in a
+  // game, and requires two consecutive failed probes before showing the
+  // overlay so a single dropped packet doesn't false-trigger it
+  let clConsecutiveFails = 0;
+  setInterval(async () => {
+    if(typeof BaseplateGame === "undefined" || !BaseplateGame.isRunning() || clShowing) return;
+    const ok = await probeConnectivity(4000);
+    clConsecutiveFails = ok ? 0 : clConsecutiveFails + 1;
+    if(clConsecutiveFails >= 2) showConnectionLostOverlay();
+  }, 4000);
 
   /* ============ init ============ */
   applyTheme();
