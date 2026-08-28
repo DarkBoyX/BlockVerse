@@ -397,6 +397,29 @@
   .cl-retry-btn svg{ width:16px; height:16px; }
   .cl-cd-note{ margin-top:14px; font-size:11.5px; color:#78787f; }
 
+  /* ---------- Switch account list ---------- */
+  .sa-list{ display:flex; flex-direction:column; gap:8px; padding:0 20px 20px; }
+  .sa-row{
+    display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px;
+    background:var(--surface-1); border:1px solid var(--grey-2); cursor:pointer; transition:border-color .15s, background .15s;
+  }
+  .sa-row:hover{ border-color:var(--grey-3); }
+  .sa-row.sa-current{ cursor:default; border-color:#4a6cf7; background:rgba(74,108,247,0.08); }
+  .sa-avatar{
+    flex:none; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:800; font-size:14px;
+  }
+  .sa-avatar.sa-plus{ background:var(--grey-2); color:var(--text-1); font-size:18px; }
+  .sa-info{ flex:1; min-width:0; }
+  .sa-name{ font-size:13.5px; font-weight:700; color:var(--text-0); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sa-tag{ font-size:11px; color:var(--text-2); margin-top:1px; }
+  .sa-remove{
+    flex:none; width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:var(--text-2);
+    font-size:16px; cursor:pointer; transition:background .15s, color .15s;
+  }
+  .sa-remove:hover{ background:rgba(255,60,60,0.12); color:#e5484d; }
+  .sa-row.sa-add{ border-style:dashed; }
+
   /* ---------- Experience page (full page, opens instead of the old side panel) ---------- */
   .gp-panel.gp-fullpage{
     width:100%; max-width:none; left:0; border-left:none; z-index:950;
@@ -1618,12 +1641,27 @@
           <div class="t-title" data-i18n="account">Account</div>
           <div class="t-sub" data-i18n="accountSub">Appearance and language</div>
         </div>
+        <div class="settings-tile" id="openSwitchAccount">
+          <div class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></div>
+          <div class="t-title">Switch account</div>
+          <div class="t-sub">Log in as someone else</div>
+        </div>
         <div class="settings-tile danger" id="openLogoutTile">
           <div class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></div>
           <div class="t-title" data-i18n="logout">Log out</div>
           <div class="t-sub" data-i18n="logoutSub">End your current session</div>
         </div>
       </div>
+    </div>
+
+    <!-- SWITCH ACCOUNT PAGE -->
+    <div id="pageSwitchAccount" class="hidden">
+      <div class="back-link" data-back="settingsHub">&#8592; <span data-i18n="backToSettings">Back to settings</span></div>
+      <div class="main-header">
+        <h2>Switch account</h2>
+        <p>Accounts that have logged in on this device.</p>
+      </div>
+      <div class="sa-list" id="switchAccountList"></div>
     </div>
 
     <!-- SECURITY PAGE -->
@@ -3788,6 +3826,7 @@
     }catch(err){ console.warn("BlockVerse: couldn't back up account credentials to Firebase:", err); }
     showMsg(signupMsg, "Account created. Logging you in...", "success");
     setSession(key);
+    rememberSavedAccount(key, username);
     setTimeout(enterApp, 550);
   });
 
@@ -3871,8 +3910,99 @@
     showMsg(loginMsg, "Welcome back, " + account.username + "!", "success");
     loginSubmitBtn.classList.add("loading");
     setSession(key);
+    rememberSavedAccount(key, account.username);
     publishUsernameToDirectory(key, account.username); // backfill directory for accounts made before this existed
     setTimeout(enterApp, 450);
+  }
+
+  /* ============ switch account ============
+     A lightweight "remember which accounts have logged in on this device"
+     list, so Settings can offer a quick switcher. This does NOT store
+     passwords - switching to a different saved account still requires
+     typing that account's password, it just saves you from having to
+     remember/retype the username too. Storing raw passwords so switching
+     could skip that step entirely would be a real security downgrade for
+     a feature that's mostly a convenience nicety, so it's intentionally
+     left out. */
+  const SAVED_ACCOUNTS_KEY = "blockverse_saved_accounts";
+  function getSavedAccounts(){
+    try{ return JSON.parse(localStorage.getItem(SAVED_ACCOUNTS_KEY)) || []; }
+    catch(e){ return []; }
+  }
+  function rememberSavedAccount(key, username){
+    const list = getSavedAccounts().filter(a => a.key !== key);
+    list.unshift({ key, username });
+    localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(list.slice(0, 8))); // cap at 8 remembered accounts
+  }
+  function forgetSavedAccount(key){
+    localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(getSavedAccounts().filter(a => a.key !== key)));
+    renderSwitchAccountPage();
+  }
+
+  function renderSwitchAccountPage(){
+    const root = document.getElementById("switchAccountList");
+    if(!root) return;
+    const currentKey = currentAccountKey();
+    const saved = getSavedAccounts();
+    root.innerHTML = saved.map(a => {
+      const isCurrent = a.key === currentKey;
+      return (
+        '<div class="sa-row' + (isCurrent ? " sa-current" : "") + '" data-key="' + escapeHtml(a.key) + '">' +
+          '<div class="sa-avatar" style="background:' + colorForKey(a.key) + '">' + escapeHtml(initialsAvatar(a.username)) + '</div>' +
+          '<div class="sa-info"><div class="sa-name">' + escapeHtml(a.username) + '</div>' +
+          '<div class="sa-tag">' + (isCurrent ? "Current account" : "Tap to switch") + '</div></div>' +
+          (isCurrent ? '' : '<button class="sa-remove" data-remove="' + escapeHtml(a.key) + '" title="Forget this account">&times;</button>') +
+        '</div>'
+      );
+    }).join("") +
+      '<div class="sa-row sa-add" id="saAddBtn">' +
+        '<div class="sa-avatar sa-plus">+</div>' +
+        '<div class="sa-info"><div class="sa-name">Add account</div><div class="sa-tag">Log in or create a new one</div></div>' +
+      '</div>';
+
+    root.querySelectorAll(".sa-row[data-key]").forEach(row => {
+      row.addEventListener("click", (e) => {
+        if(e.target.closest(".sa-remove")) return;
+        const key = row.getAttribute("data-key");
+        if(key === currentKey) return;
+        const acct = saved.find(a => a.key === key);
+        doLogout();
+        const usernameEl = document.getElementById("loginUsername");
+        if(usernameEl && acct){ usernameEl.value = acct.username; document.getElementById("loginPassword").focus(); }
+      });
+    });
+    root.querySelectorAll(".sa-remove").forEach(btn => {
+      btn.addEventListener("click", (e) => { e.stopPropagation(); forgetSavedAccount(btn.getAttribute("data-remove")); });
+    });
+    const addBtn = document.getElementById("saAddBtn");
+    if(addBtn) addBtn.addEventListener("click", showAddAccountChooser);
+  }
+
+  function showAddAccountChooser(){
+    const root = document.getElementById("appDownloadRoot"); // reuse the same free-floating overlay root used by the app-download page
+    if(!root) return;
+    root.innerHTML =
+      '<div class="adp-overlay">' +
+        '<div class="adp-bg"><div class="adp-orb adp-orb1"></div><div class="adp-orb adp-orb2"></div><div class="adp-orb adp-orb3"></div></div>' +
+        '<div class="adp-card">' +
+          '<div class="adp-close" id="aacCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>' +
+          '<div class="adp-title">Add an account</div>' +
+          '<div class="adp-sub">Log into an account you already have, or create a brand new one.</div>' +
+          '<button class="cl-retry-btn" id="aacExistingBtn" style="margin-bottom:10px;">Log into an existing account</button>' +
+          '<button class="cl-retry-btn" id="aacNewBtn">Create a new account</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("aacCloseBtn").addEventListener("click", () => { root.innerHTML = ""; });
+    document.getElementById("aacExistingBtn").addEventListener("click", () => {
+      root.innerHTML = "";
+      doLogout();
+      tabLogin.click();
+    });
+    document.getElementById("aacNewBtn").addEventListener("click", () => {
+      root.innerHTML = "";
+      doLogout();
+      tabSignup.click();
+    });
   }
 
   /* ============ friends system (Firebase Realtime Database) ============ */
@@ -5052,6 +5182,7 @@
     settingsHub: document.getElementById("pageSettingsHub"),
     security: document.getElementById("pageSecurity"),
     account: document.getElementById("pageAccount"),
+    switchAccount: document.getElementById("pageSwitchAccount"),
     friends: document.getElementById("pageFriends"),
     friendProfile: document.getElementById("pageFriendProfile"),
     customize: document.getElementById("pageCustomize")
@@ -5060,7 +5191,7 @@
     if(name !== "friendProfile" && profileViewer) stopProfileViewer(); // free the WebGL context when leaving the profile page
     if(name !== "customize" && typeof stopCustomizeViewer === "function") stopCustomizeViewer();
     Object.keys(pages).forEach(k => pages[k].classList.toggle("hidden", k !== name));
-    const settingsPages = ["settingsHub", "security", "account"];
+    const settingsPages = ["settingsHub", "security", "account", "switchAccount"];
     document.querySelectorAll(".sb-item").forEach(i => {
       const p = i.getAttribute("data-page");
       i.classList.toggle("active", p === name || (p === "settings" && settingsPages.includes(name)) || (p === "friends" && name === "friendProfile"));
@@ -5574,6 +5705,7 @@
   document.getElementById("hubUserRow").addEventListener("click", () => showPage("customize"));
   document.getElementById("openSecurity").addEventListener("click", () => showPage("security"));
   document.getElementById("openAccount").addEventListener("click", () => showPage("account"));
+  document.getElementById("openSwitchAccount").addEventListener("click", () => { showPage("switchAccount"); renderSwitchAccountPage(); });
   document.getElementById("openLogoutTile").addEventListener("click", () => doLogout());
   document.getElementById("openLangModal").addEventListener("click", openLangModal);
 
@@ -6734,6 +6866,8 @@
       "ass","asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
       "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
       "sex","porn","nude","nudes","rape",
+      "kys","kill yourself","kill urself","go die","go kill yourself","end yourself",
+      "neck yourself","unalive yourself",
       // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
       "كس","كسم","خرا","زبي","شرموطة","شرموط","قحبة","منيك","كلب ابن","ابن كلب","عرص","متناك",
       // Spanish
@@ -6756,9 +6890,9 @@
     const SENSITIVE_TERMS_LIST = [
       "predator","predators","preditor","preditors","predetor","predetors","pred","preds",
       "ped","peds","pedo","pedos","pedophile","pedophiles","paedophile","paedophiles",
-      "groomer","groomers","grooming","gooning",
+      "groomer","groomers","grooming",
       "discord","youtube","yt","tiktok","tik tok","twitter","x.com","instagram","insta",
-      "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game","nig","nigg"
+      "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game"
     ];
 
     // strips accents/diacritics (Latin AND Arabic), Arabic tatweel, and
