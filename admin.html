@@ -88,6 +88,7 @@
 
   .hidden{ display:none !important; }
   .note{ font-size:11px; color:var(--text-3); margin-top:16px; line-height:1.5; text-align:center; }
+  .empty-note{ font-size:12.5px; color:var(--text-2); text-align:center; padding:20px 0; }
 
   .role-badge{
     text-align:center; font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase;
@@ -212,6 +213,7 @@
       <div class="admin-tab" data-tab="accounts">Accounts<span class="tab-count" id="tabCountAccounts">-</span></div>
       <div class="admin-tab" data-tab="banned">Banned<span class="tab-count" id="tabCountBanned">-</span></div>
       <div class="admin-tab" data-tab="games">Games<span class="tab-count" id="tabCountGames">-</span></div>
+      <div class="admin-tab" data-tab="reports">Reports<span class="tab-count" id="tabCountReports">-</span></div>
     </div>
 
     <!-- Dashboard tab: quick stats + publish -->
@@ -279,6 +281,28 @@
       </p>
     </div>
 
+    <!-- Reports tab: player/chat reports AND per-game reports, both sorted newest first -->
+    <div class="tab-panel" data-panel="reports">
+      <div class="section-title">Player Reports <span class="count-pill" id="reportCountPill">-</span></div>
+      <div class="acct-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="reportSearch" class="acct-search" placeholder="Search by reporter or target...">
+      </div>
+      <div class="acct-list" id="reportsList"></div>
+      <p class="note">
+        These come from the "Report player" option in chat/in-game. Shows who reported
+        whom, when, and why - moderation action (kick/ban/etc) still happens from the
+        Accounts tab using the target's name.
+      </p>
+
+      <div class="section-title" style="margin-top:24px;">Game Reports <span class="count-pill" id="gameReportCountPill">-</span></div>
+      <div class="acct-list" id="gameReportsList"></div>
+      <p class="note">
+        These come from the "Report game" option on a game's info page. Grouped by
+        which game was reported, newest first within each.
+      </p>
+    </div>
+
   </div>
 
   </div>
@@ -337,6 +361,7 @@
     loadStatus();
     loadAccounts();
     loadGameRequests();
+    loadReports();
   });
   gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
 
@@ -535,6 +560,81 @@
 
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  /* ============ Reports ============ */
+  let allPlayerReports = [];
+  let allGameReports = {}; // { gameId: [report, ...] }
+
+  async function loadReports(){
+    try{
+      const [playerSnap, gameSnap] = await Promise.all([
+        db.ref("rooms/baseplate/reports").once("value"),
+        db.ref("game_reports").once("value")
+      ]);
+      const pv = playerSnap.val() || {};
+      allPlayerReports = Object.keys(pv).map(id => ({ id, ...pv[id] })).sort((a,b) => (b.ts||0) - (a.ts||0));
+      const gv = gameSnap.val() || {};
+      allGameReports = {};
+      Object.keys(gv).forEach(gameId => {
+        const reports = gv[gameId] || {};
+        allGameReports[gameId] = Object.keys(reports).map(id => ({ id, ...reports[id] })).sort((a,b) => (b.ts||0) - (a.ts||0));
+      });
+      renderPlayerReports();
+      renderGameReports();
+      const tabCount = document.getElementById("tabCountReports");
+      const totalGameReports = Object.values(allGameReports).reduce((sum, arr) => sum + arr.length, 0);
+      if(tabCount) tabCount.textContent = String(allPlayerReports.length + totalGameReports);
+    }catch(e){
+      console.warn("Couldn't load reports:", e);
+    }
+  }
+
+  function renderPlayerReports(){
+    const list = document.getElementById("reportsList");
+    const pill = document.getElementById("reportCountPill");
+    const q = (document.getElementById("reportSearch").value || "").toLowerCase().trim();
+    const filtered = allPlayerReports.filter(r =>
+      !q || (r.reporterName||"").toLowerCase().includes(q) || (r.targetName||"").toLowerCase().includes(q)
+    );
+    if(pill) pill.textContent = String(allPlayerReports.length);
+    if(!filtered.length){ list.innerHTML = '<div class="empty-note">No player reports' + (q ? " match that search." : " yet.") + '</div>'; return; }
+    list.innerHTML = filtered.map(r => (
+      '<div class="acct-row">' +
+        '<div>' +
+          '<div class="acct-name">' + escapeHtml(r.reporterName || "Unknown") + ' &rarr; ' + escapeHtml(r.targetName || "Unknown") + '</div>' +
+          '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + '</div>' +
+        '</div>' +
+        '<div class="acct-key" style="text-align:right; flex:none;">' + (r.ts ? new Date(r.ts).toLocaleString() : "-") + '</div>' +
+      '</div>'
+    )).join("");
+  }
+  document.getElementById("reportSearch").addEventListener("input", renderPlayerReports);
+
+  function renderGameReports(){
+    const list = document.getElementById("gameReportsList");
+    const pill = document.getElementById("gameReportCountPill");
+    const gameIds = Object.keys(allGameReports).filter(id => allGameReports[id].length > 0);
+    const total = gameIds.reduce((sum, id) => sum + allGameReports[id].length, 0);
+    if(pill) pill.textContent = String(total);
+    if(!gameIds.length){ list.innerHTML = '<div class="empty-note">No game reports yet.</div>'; return; }
+    list.innerHTML = gameIds.map(gameId => {
+      const reports = allGameReports[gameId];
+      const rows = reports.map(r => (
+        '<div class="acct-row" style="padding-left:16px;">' +
+          '<div>' +
+            '<div class="acct-name">' + escapeHtml(r.reporterName || "Unknown") + '</div>' +
+            '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + '</div>' +
+          '</div>' +
+          '<div class="acct-key" style="text-align:right; flex:none;">' + (r.ts ? new Date(r.ts).toLocaleString() : "-") + '</div>' +
+        '</div>'
+      )).join("");
+      return (
+        '<div class="section-title" style="font-size:12px; margin:10px 0 4px;">' +
+          escapeHtml(gameId) + ' <span class="count-pill">' + reports.length + '</span>' +
+        '</div>' + rows
+      );
+    }).join("");
   }
 
   // same logic as the self-service version in Index.html - deletes every
