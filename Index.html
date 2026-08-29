@@ -1180,6 +1180,20 @@
   .hf-dot.online{ background:#3ecf6e; box-shadow:0 0 6px rgba(62,207,110,0.6); }
   .hf-name{ font-size:10.5px; color:var(--text-2); text-align:center; max-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .home-friends-empty{ font-size:12px; color:var(--text-3); }
+  .home-friends-cta{
+    display:flex; align-items:center; gap:14px; padding:14px 18px; border-radius:14px;
+    background:var(--surface-1); border:1px dashed var(--grey-3); cursor:pointer;
+    transition:border-color .15s, background .15s, transform .1s; max-width:340px;
+  }
+  .home-friends-cta:hover{ border-color:#4a6cf7; background:rgba(74,108,247,0.06); }
+  .home-friends-cta:active{ transform:scale(0.99); }
+  .hfc-plus{
+    flex:none; width:44px; height:44px; border-radius:50%; background:#4a6cf7; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .hfc-plus svg{ width:20px; height:20px; }
+  .hfc-title{ font-size:13.5px; font-weight:700; color:var(--text-0); }
+  .hfc-sub{ font-size:11.5px; color:var(--text-2); margin-top:1px; }
 
   /* small "join their game" popover, anchored under the friend circle */
   .hf-popover{
@@ -1207,6 +1221,7 @@
   .profile-big-avatar svg{ width:100%; height:100%; display:block; }
   .profile-name{ font-size:19px; font-weight:700; color:var(--text-0); margin-top:6px; }
   .profile-status{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); }
+  .profile-joined{ font-size:11.5px; color:var(--text-3); margin-top:4px; }
   .profile-status .status-dot{ width:9px; height:9px; border-radius:50%; background:var(--text-3); }
   .profile-status .status-dot.online{ background:#3ecf6e; }
   .friend-profile-viewer{
@@ -1795,6 +1810,7 @@
           <div class="profile-big-avatar" id="friendProfileAvatar"></div>
           <div class="profile-name" id="friendProfileName">Player</div>
           <div class="profile-status" id="friendProfileStatus"><span class="status-dot"></span>Offline</div>
+          <div class="profile-joined" id="friendProfileJoined"></div>
           <div id="friendProfileActions" style="margin-top:14px; width:100%; max-width:260px;"></div>
         </div>
         <div class="friend-profile-viewer">
@@ -3842,6 +3858,13 @@
       const hash = await hashPassword(password);
       await fbDb.ref("blockverse_credentials/" + key).set({ passwordHash: hash, gender: selectedGender });
     }catch(err){ console.warn("BlockVerse: couldn't back up account credentials to Firebase:", err); }
+    // separate from credentials on purpose - that node is broadly readable
+    // by any signed-in user (needed for login self-heal), so it shouldn't
+    // carry any more fields than it has to. This is the actual field the
+    // friend profile page's "Joined" date reads from.
+    try{
+      await fbDb.ref("blockverse_users/" + key + "/createdAt").set(firebase.database.ServerValue.TIMESTAMP);
+    }catch(err){ console.warn("BlockVerse: couldn't record account creation date:", err); }
     showMsg(signupMsg, "Account created. Logging you in...", "success");
     setSession(key);
     rememberSavedAccount(key, username);
@@ -4600,7 +4623,16 @@
     if(!strip) return;
     const friends = fbFriendMirror.friends || [];
     if(friends.length === 0){
-      strip.innerHTML = '<div class="home-friends-empty">' + (t("noFriendsYet") || "No friends yet.") + '</div>';
+      strip.innerHTML =
+        '<div class="home-friends-cta" id="homeFriendsCta">' +
+          '<div class="hfc-plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></div>' +
+          '<div class="hfc-text">' +
+            '<div class="hfc-title">Play with your friends</div>' +
+            '<div class="hfc-sub">Start a new path together</div>' +
+          '</div>' +
+        '</div>';
+      const cta = document.getElementById("homeFriendsCta");
+      if(cta) cta.addEventListener("click", () => showPage("friends"));
       return;
     }
     strip.innerHTML = friends.map(k => {
@@ -4982,6 +5014,15 @@
     document.getElementById("friendProfileAvatar").innerHTML = avatarFaceSvg(key);
     const statusEl = document.getElementById("friendProfileStatus");
     statusEl.innerHTML = '<span class="status-dot' + (online ? " online" : "") + '"></span>' + (online ? t("online") : t("offline"));
+
+    const joinedEl = document.getElementById("friendProfileJoined");
+    joinedEl.textContent = "";
+    fbDb.ref("blockverse_users/" + key + "/createdAt").once("value").then(snap => {
+      const ts = snap.val();
+      // accounts made before this feature existed just won't have this
+      // field - say something honest instead of a fake/guessed date
+      joinedEl.textContent = ts ? "Joined " + new Date(ts).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
+    }).catch(() => {});
 
     showPage("friendProfile");
     renderFriendProfileActions(key);
