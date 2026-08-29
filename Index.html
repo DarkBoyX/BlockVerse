@@ -304,6 +304,19 @@
   }
   .gp-play-btn:hover{ background:#3d5ce0; }
   .gp-play-btn:active{ transform:scale(0.98); }
+  .gp-report-btn{
+    display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px;
+    background:var(--surface-1); border:1px solid var(--grey-2); border-radius:10px;
+    color:var(--text-1); font-size:13px; font-weight:600; cursor:pointer; transition:border-color .15s, color .15s;
+  }
+  .gp-report-btn:hover{ border-color:#e5484d; color:#e5484d; }
+  .gp-report-btn svg{ width:17px; height:17px; flex:none; }
+  .rg-textarea{
+    width:100%; margin-top:14px; padding:12px; border-radius:10px; resize:vertical;
+    background:#151517; border:1px solid rgba(255,255,255,0.1); color:#fff; font-size:13px;
+    font-family:inherit; line-height:1.5;
+  }
+  .rg-textarea:focus{ outline:none; border-color:#4a6cf7; }
 
   /* ---------- App download overlay (shown in a browser tab when the desktop app isn't detected) ---------- */
   .adp-overlay{
@@ -2035,6 +2048,11 @@
           <label><span>Shiftlock</span></label>
           <p class="s-desc" style="margin:0 0 8px;">Press Shift to lock the camera to the crosshair and look around without holding the mouse. Press Shift again to release. Turn this off if you don't want Shift to do anything.</p>
           <div class="g-switch" id="shiftlockToggle"><div class="g-switch-nub"></div></div>
+        </div>
+        <div class="game-settings-row game-toggle-row">
+          <label><span>Fullscreen</span></label>
+          <p class="s-desc" style="margin:0 0 8px;">Press F11 anytime to toggle fullscreen, or use this switch - they stay in sync with each other either way.</p>
+          <div class="g-switch" id="fullscreenToggle"><div class="g-switch-nub"></div></div>
         </div>
       </div>
     </div>
@@ -5455,8 +5473,16 @@
               '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>' +
             '</button>' +
           '</div>' +
+          '<div class="gp-section">' +
+            '<button class="gp-report-btn" id="gpReportBtn">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>' +
+              '<span>Report this game</span>' +
+            '</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
+
+    document.getElementById("gpReportBtn").addEventListener("click", () => openReportGameModal(gameId, game.title));
 
     document.getElementById("gpCloseBtn").addEventListener("click", closeGamePanel);
     document.getElementById("gpPlayBtn").addEventListener("click", () => attemptJoinGame(gameId));
@@ -5488,6 +5514,53 @@
     document.getElementById("gpLikeStat").classList.toggle("gp-active", stats.myReaction === "like");
     document.getElementById("gpDislikeStat").classList.toggle("gp-active", stats.myReaction === "dislike");
   }
+
+  // one submission per game per session, just to stop accidental double
+  // taps from creating duplicate reports - not meant as real abuse
+  // prevention, the Firebase rule below is what actually enforces
+  // one-report-per-reportId server-side
+  const reportedGamesThisSession = new Set();
+  function openReportGameModal(gameId, gameTitle){
+    if(reportedGamesThisSession.has(gameId)){
+      showIngameToast({ kind:"info", userKey:"system", html:"<b>Already reported</b><br>You've already reported this game this session." });
+      return;
+    }
+    const root = document.getElementById("appDownloadRoot"); // reuse the same free-floating overlay root
+    if(!root) return;
+    root.innerHTML =
+      '<div class="adp-overlay">' +
+        '<div class="adp-bg"><div class="adp-orb adp-orb1"></div><div class="adp-orb adp-orb2"></div><div class="adp-orb adp-orb3"></div></div>' +
+        '<div class="adp-card">' +
+          '<div class="adp-close" id="rgCloseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>' +
+          '<div class="adp-title">Report ' + escapeHtml(gameTitle) + '</div>' +
+          '<div class="adp-sub">Tell us what\'s wrong - broken content, rule-breaking, inappropriate stuff, etc. Staff review these in the admin panel.</div>' +
+          '<textarea id="rgReasonInput" class="rg-textarea" maxlength="500" placeholder="What happened?" rows="4"></textarea>' +
+          '<button class="cl-retry-btn" id="rgSubmitBtn" style="margin-top:12px;">Submit report</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("rgCloseBtn").addEventListener("click", () => { root.innerHTML = ""; });
+    document.getElementById("rgSubmitBtn").addEventListener("click", async () => {
+      const reasonEl = document.getElementById("rgReasonInput");
+      const reason = (reasonEl.value || "").trim();
+      if(!reason){ shakeField(reasonEl); return; }
+      const btn = document.getElementById("rgSubmitBtn");
+      btn.disabled = true;
+      try{
+        await fbDb.ref("game_reports/" + gameId).push({
+          reporterUid: fbUid, reporterName: currentUsername(),
+          reason: reason.slice(0, 500),
+          ts: firebase.database.ServerValue.TIMESTAMP
+        });
+        reportedGamesThisSession.add(gameId);
+        root.innerHTML = "";
+        showIngameToast({ kind:"info", userKey:"system", html:"<b>Report sent</b><br>Thanks - our team will take a look." });
+      }catch(e){
+        btn.disabled = false;
+        showIngameToast({ kind:"info", userKey:"system", html:"<b>Couldn't send report</b><br>Check your connection and try again." });
+      }
+    });
+  }
+
   function closeGamePanel(){
     gpCurrentGameId = null;
     document.getElementById("gamePanelRoot").innerHTML = "";
@@ -8249,6 +8322,35 @@
         sync();
       });
     }
+
+    // Fullscreen setting mirrors whatever the browser/OS actually reports
+    // as the fullscreen state, so it can never drift out of sync with F11 -
+    // there's a single source of truth (document.fullscreenElement) and
+    // the toggle just reflects it, rather than each keeping separate state
+    // that could disagree with each other.
+    function isFullscreenActive(){ return !!document.fullscreenElement; }
+    function requestFullscreenSafe(){
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+      if(req) req.call(el).catch(() => {});
+    }
+    function exitFullscreenSafe(){
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
+      if(exit && document.fullscreenElement) exit.call(document).catch(() => {});
+    }
+    function wireFullscreenSetting(){
+      const toggle = document.getElementById("fullscreenToggle");
+      if(!toggle) return;
+      const sync = () => toggle.classList.toggle("on", isFullscreenActive());
+      sync();
+      toggle.addEventListener("click", () => {
+        if(isFullscreenActive()) exitFullscreenSafe(); else requestFullscreenSafe();
+      });
+      // fires for BOTH the click above AND the browser's native F11
+      // handling - this is what keeps them in sync with no separate
+      // bookkeeping and no chance of the toggle showing a stale state
+      document.addEventListener("fullscreenchange", sync);
+    }
     function wireInput(){
       window.addEventListener("keydown", (e) => {
         if(e.key === "Escape"){
@@ -8921,6 +9023,7 @@
       wireChat();
       wireLeaderboard();
       wireShiftlockSetting();
+      wireFullscreenSetting();
 
       character.position.set(0,0,0);
       vy = 0; onGround = true; camYaw = Math.PI; camPitch = 0.28;
