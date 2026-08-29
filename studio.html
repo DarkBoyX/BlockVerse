@@ -1588,7 +1588,7 @@
 
     // movement relative to camera facing (forward = where camera looks, flattened)
     const flatForward = new THREE.Vector3(-Math.sin(playMode.camYaw), 0, -Math.cos(playMode.camYaw));
-    const flatRight = new THREE.Vector3(flatForward.z, 0, -flatForward.x);
+    const flatRight = new THREE.Vector3(-flatForward.z, 0, flatForward.x);
     const moveDir = new THREE.Vector3();
     if(keysDown["w"]) moveDir.add(flatForward);
     if(keysDown["s"]) moveDir.sub(flatForward);
@@ -1829,6 +1829,22 @@
 
   /* ---------------- Play button (spawns the player's real BlockVerse rig) ---------------- */
   let playRigGroup = null;
+  let studioFaceTexture = null;
+  function getStudioFaceTexture(){
+    if(studioFaceTexture) return studioFaceTexture;
+    const canvas = document.createElement("canvas");
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#f0c090";
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = "#2b2b2b";
+    ctx.beginPath(); ctx.arc(42, 52, 7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(86, 52, 7, 0, Math.PI*2); ctx.fill();
+    ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.strokeStyle = "#2b2b2b";
+    ctx.beginPath(); ctx.arc(64, 68, 26, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke();
+    studioFaceTexture = new THREE.CanvasTexture(canvas);
+    return studioFaceTexture;
+  }
 
   function initPlayButton(){
     document.getElementById("editorPlayBtn").addEventListener("click", async () => {
@@ -1857,7 +1873,12 @@
     torso.position.y = legH + torsoH/2;
     group.add(torso);
 
-    const head = new THREE.Mesh(new THREE.BoxGeometry(headSize,headSize,headSize), mkMat(headColor));
+    // face goes on the front (+Z) only, matching BoxGeometry's fixed face
+    // order [+X,-X,+Y,-Y,+Z,-Z] - the back of the head (-Z) stays plain
+    // skin so the smiley doesn't show through the back of your character
+    const headSkin = mkMat(headColor);
+    const headFace = new THREE.MeshLambertMaterial({ color: new THREE.Color(headColor), map: getStudioFaceTexture() });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(headSize,headSize,headSize), [headSkin, headSkin, headSkin, headSkin, headFace, headSkin]);
     head.position.y = legH + torsoH + headSize/2;
     group.add(head);
 
