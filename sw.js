@@ -4,7 +4,10 @@
 // the three.js CDN script - those need a live network anyway for
 // multiplayer to work, so caching them would just risk serving stale data.
 
-const CACHE_NAME = "blockverse-shell-v1";
+// bump this string every time you want to force-invalidate old cached
+// copies (e.g. if you notice updates aren't showing up) - the activate
+// handler below deletes any cache whose name doesn't match this one
+const CACHE_NAME = "blockverse-shell-v2";
 const SHELL_FILES = [
   "./Index.html",
   "./manifest.json"
@@ -36,20 +39,22 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // network-first, not stale-while-revalidate: try the live copy first so
+  // a fresh Index.html shows up on THIS load (not "next time"), and only
+  // fall back to the cached copy if the network request actually fails
+  // (offline). This is what stale-while-revalidate was getting wrong -
+  // it always served the OLD cached copy immediately regardless of
+  // whether a newer one was reachable, so every update needed an extra
+  // reopen before it became visible.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((response) => {
-          if(response && response.status === 200){
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached); // offline - fall back to whatever's cached
-      // stale-while-revalidate: show the cached shell instantly if we have
-      // one, but always fetch a fresh copy in the background too
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if(response && response.status === 200){
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request)) // offline - fall back to whatever's cached
   );
 });
