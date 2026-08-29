@@ -651,6 +651,24 @@
     .game-lb-panel{ top:52px; right:12px; width:60vw; max-width:240px; }
   }
 
+  /* ---------- Health bar (hidden until damage taken, left of the leaderboard button) ---------- */
+  .game-hp-bar{
+    position:absolute; top:16px; right:62px; z-index:20; width:90px; height:10px; border-radius:6px;
+    background:rgba(20,20,22,0.55); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(6px);
+    overflow:hidden; transition:opacity .2s;
+  }
+  .game-hp-bar.hidden{ display:none; }
+  .game-hp-fill{
+    height:100%; border-radius:5px; transition:width .25s ease, background-color .25s ease;
+    background:#3ecf6e; /* green - default/high health state */
+  }
+  .game-hp-fill.hp-yellow{ background:#e8b93e; }
+  .game-hp-fill.hp-red{ background:#e5484d; animation:hpPulseRed 1s ease-in-out infinite; }
+  @keyframes hpPulseRed{ 0%,100%{ opacity:1; } 50%{ opacity:0.55; } }
+  @media (max-width:720px){
+    .game-hp-bar{ top:12px; right:52px; width:70px; height:8px; }
+  }
+
   /* ---------- shiftlock reticle + toggle switch ---------- */
   .game-reticle{
     position:absolute; top:50%; left:50%; width:18px; height:18px; margin:-9px 0 0 -9px;
@@ -1222,6 +1240,25 @@
   .profile-name{ font-size:19px; font-weight:700; color:var(--text-0); margin-top:6px; }
   .profile-status{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); }
   .profile-joined{ font-size:11.5px; color:var(--text-3); margin-top:4px; }
+
+  /* ---------- Studio download page ---------- */
+  .sdp-hero{ max-width:440px; margin:40px auto 0; text-align:center; padding:0 20px; }
+  .sdp-icon{
+    width:64px; height:64px; margin:0 auto 18px; border-radius:16px; background:var(--surface-1);
+    border:1px solid var(--grey-2); display:flex; align-items:center; justify-content:center; color:#4a6cf7;
+  }
+  .sdp-icon svg{ width:28px; height:28px; }
+  .sdp-hero h2{ font-size:20px; font-weight:800; color:var(--text-0); margin-bottom:10px; }
+  .sdp-hero p{ font-size:13px; color:var(--text-2); line-height:1.6; margin-bottom:24px; }
+  .sdp-download-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    background:#4a6cf7; color:#fff; text-decoration:none; padding:13px; border-radius:12px;
+    font-size:14px; font-weight:700; transition:background .15s, transform .12s;
+  }
+  .sdp-download-btn:hover{ background:#3d5ce0; transform:translateY(-1px); }
+  .sdp-download-btn svg{ width:17px; height:17px; }
+  .sdp-note{ margin-top:14px; font-size:11.5px; color:var(--text-3); line-height:1.5; text-align:left; }
+  .sdp-note b{ color:var(--text-1); }
   .profile-status .status-dot{ width:9px; height:9px; border-radius:50%; background:var(--text-3); }
   .profile-status .status-dot.online{ background:#3ecf6e; }
   .friend-profile-viewer{
@@ -1581,6 +1618,10 @@
       <span class="sb-label-text" data-i18n="friends">Friends</span>
       <span class="sb-badge hidden" id="friendReqBadge">0</span>
     </div>
+    <div class="sb-item" data-page="studioDownload">
+      <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></span>
+      <span class="sb-label-text">Studio</span>
+    </div>
     <div class="sb-item" data-page="settings">
       <span class="sb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></span>
       <span class="sb-label-text" data-i18n="settings">Settings</span>
@@ -1690,6 +1731,21 @@
         <p>Accounts that have logged in on this device.</p>
       </div>
       <div class="sa-list" id="switchAccountList"></div>
+    </div>
+
+    <!-- STUDIO DOWNLOAD PAGE -->
+    <div id="pageStudioDownload" class="hidden">
+      <div class="back-link" data-back="home">&#8592; <span data-i18n="backToHome">Back to home</span></div>
+      <div class="sdp-hero">
+        <div class="sdp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+        <h2>BlockVerse Studio</h2>
+        <p>Build your own BlockVerse game with the same 3D editor the base game uses - parts, terrain, lighting, and publishing, all in a real desktop app.</p>
+        <a class="sdp-download-btn" id="studioDownloadBtn" href="downloads/BlockVerse-Studio-Setup.exe" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+          <span>Download for Windows</span>
+        </a>
+        <div class="sdp-note">After it downloads, open the file. If Windows shows a blue "Windows protected your PC" screen, click <b>More info</b> then <b>Run anyway</b> - that's normal for a new app and only shows up the first time.</div>
+      </div>
     </div>
 
     <!-- SECURITY PAGE -->
@@ -1928,6 +1984,13 @@
   </div>
   <div class="game-lb-panel hidden" id="gameLbPanel"></div>
 
+  <!-- Health bar: hidden by default, only appears once you've actually
+       taken damage. Sits just left of the leaderboard button so it
+       doesn't collide with it. -->
+  <div class="game-hp-bar hidden" id="gameHpBar">
+    <div class="game-hp-fill" id="gameHpFill"></div>
+  </div>
+
   <!-- shiftlock crosshair - only visible while shiftlock is active -->
   <div class="game-reticle hidden" id="gameReticle"></div>
   <!-- mobile: rotate-device prompt for portrait orientation -->
@@ -2131,9 +2194,9 @@
 <div class="invite-toast-stack" id="inviteToastStack"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
   /* ============ Firebase (multiplayer) ============ */
@@ -5242,6 +5305,7 @@
     security: document.getElementById("pageSecurity"),
     account: document.getElementById("pageAccount"),
     switchAccount: document.getElementById("pageSwitchAccount"),
+    studioDownload: document.getElementById("pageStudioDownload"),
     friends: document.getElementById("pageFriends"),
     friendProfile: document.getElementById("pageFriendProfile"),
     customize: document.getElementById("pageCustomize")
@@ -5960,6 +6024,21 @@
     let smPitch = 0.28;
     let vy = 0;                // vertical velocity for jump
     let onGround = true;
+    let fallStartY = 0;        // y position where the current fall began, for fall-damage calc
+
+    /* ============ health ============
+       Starts full (100) and hidden - the health bar only appears once
+       you've actually taken damage. Right now the only damage source is
+       falling from a height (there's no combat in Baseplate), calculated
+       from how far you fell, not how hard you hit - a step off a ledge
+       shouldn't hurt the same as a cliff.
+       Regens 1 HP every 15 seconds while alive and not at full health. */
+    let hp = 100;
+    let hpRegenAccum = 0; // ms accumulated toward the next +1 regen tick
+    const HP_REGEN_INTERVAL_MS = 15000;
+    const FALL_DAMAGE_SAFE_DISTANCE = 4.5;   // fall this far or less: no damage at all (normal platforming/step-offs)
+    const FALL_DAMAGE_LETHAL_DISTANCE = 22;  // fall this far or more: instant death
+
     let walkT = 0;
     let idleT = 0;
     let landSquashT = 0;       // 0..1, drives the landing squash/stretch pop
@@ -7983,14 +8062,19 @@
           vy = 0;
         } else {
           onGround = false; // stepped off an actual ledge - let real gravity take over below
+          fallStartY = character.position.y;
         }
       }
       if(!onGround){
+        if(wasOnGround) fallStartY = character.position.y; // jumped, or gravity just kicked in - mark the top of this fall
         vy += GRAVITY * FRAME_SCALE;
         character.position.y += vy * FRAME_SCALE;
         if(character.position.y <= groundHere){
           character.position.y = groundHere;
-          if(!wasOnGround){ landSquashT = 1; playLandSound(); } // just touched down - kick off the squash
+          if(!wasOnGround){
+            landSquashT = 1; playLandSound(); // just touched down - kick off the squash
+            applyFallDamage(fallStartY - character.position.y);
+          }
           vy = 0;
           onGround = true;
         }
@@ -8184,6 +8268,51 @@
       osc.start(); osc.stop(ctx.currentTime + 0.15);
       playNoiseThud(500, 0.035, 0.1, ctx);
     }
+
+    /* ============ health system ============ */
+    function updateHpBar(){
+      const bar = document.getElementById("gameHpBar");
+      const fill = document.getElementById("gameHpFill");
+      if(!bar || !fill) return;
+      bar.classList.toggle("hidden", hp >= 100); // only show once actually damaged
+      fill.style.width = Math.max(0, hp) + "%";
+      fill.classList.toggle("hp-yellow", hp <= 50 && hp > 15);
+      fill.classList.toggle("hp-red", hp <= 15);
+    }
+    function setHp(next){
+      const wasAlive = hp > 0;
+      hp = Math.max(0, Math.min(100, next));
+      updateHpBar();
+      if(wasAlive && hp <= 0) handleDeath();
+    }
+    function applyFallDamage(dropDistance){
+      if(dropDistance <= FALL_DAMAGE_SAFE_DISTANCE || hp <= 0) return;
+      let dmg;
+      if(dropDistance >= FALL_DAMAGE_LETHAL_DISTANCE){
+        dmg = hp; // instant death from a long enough fall
+      } else {
+        const t = (dropDistance - FALL_DAMAGE_SAFE_DISTANCE) / (FALL_DAMAGE_LETHAL_DISTANCE - FALL_DAMAGE_SAFE_DISTANCE);
+        dmg = Math.max(1, Math.round(t * 100)); // any fall past the safe distance does at least 1 damage
+      }
+      setHp(hp - dmg);
+    }
+    function tickHpRegen(dtMs){
+      if(hp <= 0 || hp >= 100) { hpRegenAccum = 0; return; }
+      hpRegenAccum += dtMs;
+      if(hpRegenAccum >= HP_REGEN_INTERVAL_MS){
+        hpRegenAccum -= HP_REGEN_INTERVAL_MS;
+        setHp(hp + 1);
+      }
+    }
+    function handleDeath(){
+      showIngameToast({ kind:"info", userKey:"system", html:"<b>You died</b><br>Respawning..." });
+      setTimeout(() => {
+        character.position.set(0, terrainHeightAt(0, 0), 0);
+        vy = 0; onGround = true; fallStartY = character.position.y;
+        hp = 100; hpRegenAccum = 0;
+        updateHpBar();
+      }, 900);
+    }
     // soft filtered noise loop for ambient outdoor "air"/wind - starts once and just fades in/out with gain
     function startAmbientAir(){
       const ctx = getAudioCtx(); if(!ctx || windNode) return;
@@ -8303,6 +8432,7 @@
       updateCamera();
       updateClouds(dt);
       updateDayNightCycle();
+      tickHpRegen(dt * 1000);
       renderer.render(scene, camera);
       animId = requestAnimationFrame(tick);
     }
@@ -9037,6 +9167,7 @@
     }
 
     function start(){
+      hp = 100; hpRegenAccum = 0;
       const screen = document.getElementById("gameScreen");
       const loading = document.getElementById("gameLoading");
       const bar = document.getElementById("gameLoadBar");
