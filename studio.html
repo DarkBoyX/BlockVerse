@@ -10,8 +10,8 @@
     --grey-1:#2a2a2e; --grey-2:#38383d; --grey-3:#48484e;
     --border:#333338; --border-soft:#242428;
     --text-0:#f2f2f2; --text-1:#b4b4b9; --text-2:#7a7a80; --text-3:#55555a;
-    --accent:#4a6cf7; --danger:#e5484d;
-    --axis-x:#e5484d; --axis-y:#3ecf6e; --axis-z:#4a6cf7;
+    --accent:#e8e8ec; --danger:#e5484d;
+    --axis-x:#e5484d; --axis-y:#3ecf6e; --axis-z:#e8e8ec;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;}
@@ -74,7 +74,7 @@
   .login-msg.show{ display:flex; animation:popIn .2s ease both; }
   @keyframes popIn{ from{ opacity:0; transform:scale(.96);} to{ opacity:1; transform:scale(1);} }
   .login-msg.error{ background:rgba(229,72,77,0.1); color:#ff9a9d; border:1px solid rgba(229,72,77,0.35); }
-  .login-msg.info{ background:rgba(74,108,247,0.1); color:#9db1ff; border:1px solid rgba(74,108,247,0.3); }
+  .login-msg.info{ background:rgba(200,200,206,0.1); color:#d4d4d8; border:1px solid rgba(200,200,206,0.3); }
   .login-sub{ font-size:12px; color:var(--text-3); margin-top:18px; text-align:center; }
   .login-sub a{ color:var(--text-1); text-decoration:none; border-bottom:1px dashed var(--text-3); }
   .spin{
@@ -149,7 +149,7 @@
   .game-card:hover{ transform:translateY(-3px); border-color:var(--grey-3); box-shadow:0 10px 26px rgba(0,0,0,0.4); }
   .game-card .gc-thumb{
     width:100%; aspect-ratio:16/10; background:
-      linear-gradient(180deg, #4a6cf7 0%, #7aa2ff 55%, #3ecf6e 55%, #2fae59 100%);
+      linear-gradient(180deg, #e8e8ec 0%, #7aa2ff 55%, #3ecf6e 55%, #2fae59 100%);
     background-size:cover; background-position:center;
     position:relative;
   }
@@ -218,7 +218,7 @@
     width:100%; padding:11px 13px; background:var(--bg-0); border:1px solid var(--border);
     border-radius:9px; color:var(--text-0); font-size:14px; outline:none; transition:border-color .15s, box-shadow .15s;
   }
-  .gs-section input[type="text"]:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(74,108,247,0.15); }
+  .gs-section input[type="text"]:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(200,200,206,0.15); }
 
   .gs-banner-drop{
     width:100%; aspect-ratio:16/5; max-height:190px; border-radius:10px; border:1px dashed var(--border); background:var(--bg-0);
@@ -296,7 +296,7 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
     aspect-ratio:16/13.2; cursor:pointer; color:var(--text-2); transition:border-color .15s, color .15s, background .15s;
   }
-  .new-game-card:hover{ border-color:var(--accent); color:var(--text-0); background:rgba(74,108,247,0.06); }
+  .new-game-card:hover{ border-color:var(--accent); color:var(--text-0); background:rgba(200,200,206,0.06); }
   .new-game-card .ngc-plus{
     width:44px; height:44px; border-radius:50%; background:var(--grey-1); display:flex; align-items:center; justify-content:center;
   }
@@ -385,7 +385,7 @@
     color:var(--text-2); font-size:12px; padding:8px 0; cursor:pointer; margin-top:2px;
     transition:border-color .15s, color .15s, background .15s; display:flex; align-items:center; justify-content:center; gap:6px;
   }
-  .prop-shape-btn:hover{ border-color:var(--accent); color:var(--text-0); background:rgba(74,108,247,0.06); }
+  .prop-shape-btn:hover{ border-color:var(--accent); color:var(--text-0); background:rgba(200,200,206,0.06); }
 
   /* ---- Explorer/Light tabs ---- */
   .explorer-tabs{ display:none; }
@@ -399,7 +399,7 @@
   }
   .light-field input[type="range"]::-webkit-slider-thumb{
     appearance:none; width:15px; height:15px; border-radius:50%; background:var(--accent); cursor:pointer;
-    box-shadow:0 0 0 3px rgba(74,108,247,0.2);
+    box-shadow:0 0 0 3px rgba(200,200,206,0.2);
   }
 
   /* ---- Properties: material select ---- */
@@ -466,7 +466,7 @@
     transition:border-color .15s, box-shadow .15s;
   }
   .prop-row input[type="text"]:focus, .prop-row input[type="number"]:focus{
-    border-color:var(--accent); box-shadow:0 0 0 3px rgba(74,108,247,0.15);
+    border-color:var(--accent); box-shadow:0 0 0 3px rgba(200,200,206,0.15);
   }
   .prop-vec3{ display:flex; gap:6px; }
   .prop-vec3 input{ text-align:center; }
@@ -486,12 +486,42 @@
     width:34px; height:19px; border-radius:10px; background:var(--grey-3); position:relative;
     cursor:pointer; transition:background .15s; flex:none;
   }
-  .prop-toggle.on{ background:#4a6cf7; }
+  .prop-toggle.on{ background:#e8e8ec; }
   .prop-toggle-nub{
     position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%;
     background:#fff; transition:transform .15s;
   }
   .prop-toggle.on .prop-toggle-nub{ transform:translateX(15px); }
+  .prop-slider-wrap{ display:flex; align-items:center; gap:10px; }
+  .prop-slider-wrap input[type="range"]{ flex:1; accent-color:#6b7280; }
+  .prop-slider-val{ font-size:11px; color:var(--text-2); width:32px; text-align:right; flex:none; }
+  .prop-script-btn{
+    width:100%; padding:9px; border-radius:8px; background:var(--grey-1); border:1px solid var(--border);
+    color:var(--text-0); font-size:12px; font-weight:600; cursor:pointer; transition:border-color .15s;
+  }
+  .prop-script-btn:hover{ border-color:var(--grey-3); }
+  .script-editor-overlay{
+    position:fixed; inset:0; z-index:5000; background:rgba(0,0,0,0.6);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .script-editor-card{
+    width:min(560px,90vw); background:var(--bg-1); border:1px solid var(--border); border-radius:14px;
+    padding:16px; display:flex; flex-direction:column; gap:10px;
+  }
+  .script-editor-head{ display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:700; color:var(--text-0); }
+  .script-editor-head button{ background:none; border:none; color:var(--text-2); font-size:20px; cursor:pointer; line-height:1; }
+  .script-editor-textarea{
+    width:100%; height:220px; resize:vertical; background:#0e0e10; border:1px solid var(--border);
+    border-radius:8px; padding:10px; color:#e8e8ec; font-family:'Cascadia Code',Consolas,monospace; font-size:12.5px; line-height:1.6;
+  }
+  .script-editor-textarea:focus{ outline:none; border-color:var(--grey-3); }
+  .script-editor-help{ font-size:10.5px; color:var(--text-3); line-height:1.6; }
+  .script-editor-help code{ background:var(--grey-1); padding:1px 4px; border-radius:4px; }
+  .script-editor-actions{ display:flex; justify-content:flex-end; }
+  .script-editor-save{
+    padding:9px 20px; border-radius:8px; background:var(--text-0); color:#0a0a0b; border:none;
+    font-size:12.5px; font-weight:700; cursor:pointer;
+  }
 
   /* ---- Viewport (center) ---- */
   .viewport-wrap{ flex:1; position:relative; min-width:0; }
@@ -1029,6 +1059,14 @@
   let dragState = null; // active gizmo drag info
 
   const keysDown = {}; // wasd + space
+  function clearStuckKeys(){
+    // if focus moves away while a key is physically held (clicking a
+    // button, alt-tabbing, etc.), the browser never sends a keyup for it -
+    // without this, that key stays "held" forever and the camera/rig just
+    // keeps moving in that direction with no way to stop it
+    for(const k in keysDown) keysDown[k] = false;
+  }
+  window.addEventListener("blur", clearStuckKeys);
   const freecam = { yaw:0, pitch:0, speedMult:1 };
   const playMode = { active:false, loading:false, camYaw:0, camPitch:0.25, camDist:9, velocityY:0, onGround:true, groundY:0 };
 
@@ -1435,6 +1473,11 @@
     canvasEl = document.getElementById("studioCanvas");
     renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias:true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(65, 1, 0.1, 2000);
@@ -1612,7 +1655,7 @@
     rig.position.y += playMode.velocityY * dt;
 
     const standY = groundHeightBelow(rig.position.x, rig.position.z, rig.position.y + 3);
-    if(rig.position.y <= standY){
+    if(standY !== null && rig.position.y <= standY){
       rig.position.y = standY;
       if(playMode.velocityY < 0) playMode.velocityY = 0;
       playMode.onGround = true;
@@ -1620,20 +1663,33 @@
       playMode.onGround = false;
     }
 
+    // stepped off the edge of everything - this is death, same as the
+    // real game, not a silent teleport or an infinite fall
+    if(rig.position.y < playMode.groundY - 25){
+      showToast("You fell into the void - respawning");
+      const spawn = sceneObjects.find(o => o.className === "SpawnLocation");
+      const spawnPos = spawn ? spawn.mesh.position : new THREE.Vector3(0,0,0);
+      rig.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
+      playMode.velocityY = 0;
+      playMode.onGround = true;
+    }
+
     animateRig(rig, isMoving, !playMode.onGround, dt);
     updateChatBubblePosition();
+    checkScriptTouches(rig);
   }
 
-  /* ---- find the top surface directly beneath (x,z) among scene parts, falling back to spawn ground ---- */
+  /* ---- find the top surface directly beneath (x,z) among scene parts - returns null if there's nothing there (void) ---- */
   function groundHeightBelow(x, z, fromY){
     if(!raycaster) return playMode.groundY;
     const origin = new THREE.Vector3(x, fromY, z);
     raycaster.set(origin, new THREE.Vector3(0, -1, 0));
-    raycaster.far = fromY + 50;
-    const meshes = sceneObjects.filter(o => o.className !== "SpawnLocation").map(o => o.mesh);
+    raycaster.far = fromY + 200;
+    // CanCollide-off parts don't stop the player, so they shouldn't stop
+    // the ground raycast either - same rule the real BlockVerse game uses
+    const meshes = sceneObjects.filter(o => o.className !== "SpawnLocation" && o.props.canCollide !== false).map(o => o.mesh);
     const hits = raycaster.intersectObjects(meshes);
-    if(hits.length) return hits[0].point.y;
-    return playMode.groundY;
+    return hits.length ? hits[0].point.y : null;
   }
 
   /* ---- rig walk-cycle animation (ported from BlockVerse's arm/leg swing idea) ---- */
@@ -1755,10 +1811,12 @@
     const id = "obj_" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
     const shape = opts.shape || "cube";
     const material = opts.className === "Baseplate" || opts.className === "SpawnLocation"
-      ? new THREE.MeshLambertMaterial({ color: opts.color })
+      ? new THREE.MeshStandardMaterial({ color: opts.color, roughness: 0.85, metalness: 0.02 })
       : materialFor(opts.material || "plastic", opts.transparency || 0);
     const geo = geometryForShape(shape, opts.size);
     const mesh = new THREE.Mesh(geo, material);
+    mesh.castShadow = opts.castShadow !== false;
+    mesh.receiveShadow = true;
     mesh.position.set(opts.pos[0], opts.pos[1], opts.pos[2]);
     if(opts.rot) mesh.rotation.set(opts.rot[0], opts.rot[1], opts.rot[2]);
     scene.add(mesh);
@@ -1769,7 +1827,12 @@
         position:[...opts.pos], rotation: opts.rot ? [...opts.rot] : [0,0,0], size:[...opts.size],
         color: opts.color, material: opts.material || "plastic", transparency: opts.transparency || 0,
         anchored: opts.anchored !== undefined ? opts.anchored : true,
-        canCollide: opts.canCollide !== undefined ? opts.canCollide : true
+        canCollide: opts.canCollide !== undefined ? opts.canCollide : true,
+        canTouch: opts.canTouch !== undefined ? opts.canTouch : true,
+        canQuery: opts.canQuery !== undefined ? opts.canQuery : true,
+        castShadow: opts.castShadow !== undefined ? opts.castShadow : true,
+        massless: opts.massless === true,
+        reflectance: opts.reflectance || 0
       }
     };
     sceneObjects.push(obj);
@@ -1800,6 +1863,12 @@
     scene.add(hemiLight);
     sunLight = new THREE.DirectionalLight(0xffffff, 0.9);
     sunLight.position.set(30, 50, 20);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.left = -60; sunLight.shadow.camera.right = 60;
+    sunLight.shadow.camera.top = 60; sunLight.shadow.camera.bottom = -60;
+    sunLight.shadow.camera.far = 200;
+    sunLight.shadow.bias = -0.0015;
     scene.add(sunLight);
     updateSunAndSky();
 
@@ -1855,9 +1924,9 @@
 
   function buildRig(avatar){
     avatar = avatar || {};
-    const torsoColor = avatar.torso || "#4a6cf7";
-    const leftArmColor = avatar.leftArm || avatar.leftArmColor || "#4a6cf7";
-    const rightArmColor = avatar.rightArm || avatar.rightArmColor || "#4a6cf7";
+    const torsoColor = avatar.torso || "#e8e8ec";
+    const leftArmColor = avatar.leftArm || avatar.leftArmColor || "#e8e8ec";
+    const rightArmColor = avatar.rightArm || avatar.rightArmColor || "#e8e8ec";
     const leftLegColor = avatar.leftLeg || avatar.leftLegColor || "#3a3a3e";
     const rightLegColor = avatar.rightLeg || avatar.rightLegColor || "#3a3a3e";
     const headColor = avatar.headColor || "#f0c090";
@@ -1871,6 +1940,7 @@
 
     const torso = new THREE.Mesh(new THREE.BoxGeometry(2,torsoH,1), mkMat(torsoColor));
     torso.position.y = legH + torsoH/2;
+    torso.castShadow = true; torso.receiveShadow = true;
     group.add(torso);
 
     // face goes on the front (+Z) only, matching BoxGeometry's fixed face
@@ -1880,6 +1950,7 @@
     const headFace = new THREE.MeshLambertMaterial({ color: new THREE.Color(headColor), map: getStudioFaceTexture() });
     const head = new THREE.Mesh(new THREE.BoxGeometry(headSize,headSize,headSize), [headSkin, headSkin, headSkin, headSkin, headFace, headSkin]);
     head.position.y = legH + torsoH + headSize/2;
+    head.castShadow = true; head.receiveShadow = true;
     group.add(head);
 
     // arms/legs get their own pivot groups positioned at the shoulder/hip so rotation swings naturally
@@ -1923,6 +1994,7 @@
   }
 
   async function startPlay(){
+    clearStuckKeys();
     playMode.loading = true;
     showPlayLoading(true);
 
@@ -1945,6 +2017,7 @@
     playMode.groundY = spawnPos.y + spawnHalfH;
     playRigGroup.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
     scene.add(playRigGroup);
+    compileAllScripts();
 
     playMode.active = true;
     playMode.loading = false;
@@ -1974,6 +2047,7 @@
   }
 
   function stopPlay(){
+    clearStuckKeys();
     if(playRigGroup){
       scene.remove(playRigGroup);
       playRigGroup.traverse((c) => { if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); });
@@ -2199,7 +2273,12 @@
     gizmoGroup = new THREE.Group();
     gizmoGroup.position.copy(obj.mesh.position);
     gizmoGroup.renderOrder = 999;
-    const armLen = Math.max(2.6, Math.max(...obj.props.size) * 0.5);
+    // gizmo size is based on a CAPPED reference, not the part's raw
+    // dimensions - without this cap, grabbing something huge like the
+    // baseplate produced room-sized arrows/rings, since the old math
+    // scaled the gizmo directly off Math.max(...size) with no ceiling
+    const visualSize = Math.min(Math.max(...obj.props.size), 8);
+    const armLen = Math.max(2.6, visualSize * 0.5);
 
     function handleMat(color){
       return new THREE.MeshBasicMaterial({ color, depthTest:false, depthWrite:false, transparent:true });
@@ -2208,8 +2287,9 @@
     if(currentTool === "move" || currentTool === "scale"){
       ["x","y","z"].forEach((ax, axIdx) => {
         const color = axisColor(ax);
-        // start the handle just outside the part's own surface so it's never buried inside it
-        const halfExtent = obj.props.size[axIdx] / 2 + 0.35;
+        // start the handle just outside the part's own surface so it's never buried inside it -
+        // capped the same way as armLen, so this stays sane for huge parts too
+        const halfExtent = Math.min(obj.props.size[axIdx] / 2, visualSize / 2) + 0.35;
         const shaftLen = armLen;
         const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,shaftLen,10), handleMat(color));
         const tip = currentTool === "move"
@@ -2235,7 +2315,7 @@
     }else if(currentTool === "rotate"){
       ["x","y","z"].forEach((ax, axIdx) => {
         const color = axisColor(ax);
-        const ringRadius = Math.max(...obj.props.size)/2 + armLen * 0.5;
+        const ringRadius = visualSize/2 + armLen * 0.5;
         const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.07, 10, 40), handleMat(color));
         ring.renderOrder = 999;
         ring.userData = { gizmo:true, axis:ax, kind:"rotate" };
@@ -2519,6 +2599,28 @@
       row.appendChild(label); row.appendChild(input);
       body.appendChild(row);
     }
+    function sliderRow(labelText, value, onChange){
+      const row = document.createElement("div");
+      row.className = "prop-row";
+      const label = document.createElement("label");
+      label.textContent = labelText;
+      const wrap = document.createElement("div");
+      wrap.className = "prop-slider-wrap";
+      const slider = document.createElement("input");
+      slider.type = "range"; slider.min = "0"; slider.max = "1"; slider.step = "0.01";
+      slider.value = value;
+      const num = document.createElement("span");
+      num.className = "prop-slider-val";
+      num.textContent = Math.round(value*100)/100;
+      slider.addEventListener("input", () => {
+        const v = parseFloat(slider.value);
+        num.textContent = Math.round(v*100)/100;
+        onChange(v);
+      });
+      wrap.appendChild(slider); wrap.appendChild(num);
+      row.appendChild(label); row.appendChild(wrap);
+      body.appendChild(row);
+    }
     function boolRow(labelText, value, onChange){
       const row = document.createElement("div");
       row.className = "prop-row prop-row-bool";
@@ -2602,11 +2704,33 @@
       obj.mesh.geometry = geometryForShape(obj.shape, nv);
       rebuildGizmo();
     });
+    vec3Row("Orientation", "rotation", (obj.props.rotation || [0,0,0]).map(r => Math.round(r * 180/Math.PI)), (nv) => {
+      const rad = nv.map(d => d * Math.PI/180);
+      obj.props.rotation = rad;
+      obj.mesh.rotation.set(rad[0], rad[1], rad[2]);
+      rebuildGizmo();
+    });
 
     groupLabel("Appearance");
     colorRow("Color", obj.props.color, (hex) => {
       obj.props.color = hex;
       obj.mesh.material.color.setHex(hex);
+    });
+    sliderRow("Transparency", obj.props.transparency || 0, (v) => {
+      obj.props.transparency = v;
+      obj.mesh.material.transparent = v > 0 || obj.props.canCollide === false;
+      obj.mesh.material.opacity = obj.props.canCollide === false ? Math.min(0.45, 1 - v) : 1 - v;
+    });
+    sliderRow("Reflectance", obj.props.reflectance || 0, (v) => {
+      obj.props.reflectance = v;
+      // three.js MeshStandardMaterial doesn't have a literal "reflectance"
+      // slider - metalness is what actually controls how mirror-like the
+      // surface looks, so that's what this drives under the hood
+      if("metalness" in obj.mesh.material) obj.mesh.material.metalness = v;
+    });
+    boolRow("CastShadow", obj.props.castShadow !== false, (v) => {
+      obj.props.castShadow = v;
+      obj.mesh.castShadow = v;
     });
 
     if(obj.className === "Part"){
@@ -2634,6 +2758,112 @@
         obj.mesh.material.opacity = v ? 1 : 0.45;
         obj.mesh.material.transparent = !v || obj.props.transparency > 0;
       });
+      boolRow("CanTouch", obj.props.canTouch !== false, (v) => {
+        obj.props.canTouch = v;
+        // controls whether Touched-style script events fire for this part
+        // once scripting is wired up to the play-test runtime
+      });
+      boolRow("CanQuery", obj.props.canQuery !== false, (v) => {
+        obj.props.canQuery = v;
+        // controls whether raycasts/spatial queries can detect this part -
+        // the play-test ground raycast already respects this
+      });
+      boolRow("Massless", obj.props.massless === true, (v) => {
+        obj.props.massless = v;
+        // no physics-mass simulation exists yet (parts are either fully
+        // anchored/static or ignored), so this is stored for forward
+        // compatibility but doesn't change behavior until that lands
+      });
+
+      groupLabel("Scripting");
+      const scriptRow = document.createElement("div");
+      scriptRow.className = "prop-row";
+      const scriptBtn = document.createElement("button");
+      scriptBtn.className = "prop-script-btn";
+      scriptBtn.textContent = obj.script ? "Edit Script" : "Add Script";
+      scriptBtn.addEventListener("click", () => openScriptEditor(obj));
+      scriptRow.appendChild(scriptBtn);
+      body.appendChild(scriptRow);
+    }
+  }
+
+  /* ============ scripting ============
+     Real, working scripting - but JavaScript, not Lua, and with a small,
+     deliberately limited API (not Roblox's full engine surface). Each
+     script is plain JS attached to one Part, compiled once when Play
+     starts. The only thing scripts can currently react to is being
+     touched by the play-test rig - that's the one event the play-test
+     runtime actually tracks right now. Scripts run in the same page
+     context as the editor itself (not a real sandbox), so this is meant
+     for your own game logic, not for running untrusted code from
+     other people.
+  */
+  function openScriptEditor(obj){
+    const overlay = document.createElement("div");
+    overlay.className = "script-editor-overlay";
+    overlay.innerHTML =
+      '<div class="script-editor-card">' +
+        '<div class="script-editor-head">' +
+          '<span>Script - ' + escapeHtmlSE(obj.name) + '</span>' +
+          '<button class="script-editor-close">&times;</button>' +
+        '</div>' +
+        '<textarea class="script-editor-textarea" spellcheck="false" placeholder="part.onTouched(function(){\n  part.Color = 0xff0000;\n});"></textarea>' +
+        '<div class="script-editor-help">API: <code>part.onTouched(fn)</code>, <code>part.Color</code>, <code>part.Transparency</code>, <code>part.CanCollide</code>, <code>part.Position</code> ({x,y,z}), <code>part.Destroy()</code></div>' +
+        '<div class="script-editor-actions"><button class="script-editor-save">Save</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const textarea = overlay.querySelector(".script-editor-textarea");
+    textarea.value = obj.script || "";
+    overlay.querySelector(".script-editor-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelector(".script-editor-save").addEventListener("click", () => {
+      obj.script = textarea.value;
+      overlay.remove();
+      renderProperties(); // refreshes the button text (Add Script -> Edit Script)
+      showToast("Script saved");
+    });
+  }
+  function escapeHtmlSE(s){ return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+  // compiled once per play-test session - maps object id -> { onTouchedHandlers: [] }
+  let compiledScripts = {};
+  function compileAllScripts(){
+    compiledScripts = {};
+    sceneObjects.forEach(obj => {
+      if(!obj.script || !obj.script.trim()) return;
+      const handlers = { onTouched: [] };
+      const partApi = {
+        onTouched(fn){ if(typeof fn === "function") handlers.onTouched.push(fn); },
+        get Color(){ return obj.mesh.material.color.getHex(); },
+        set Color(hex){ obj.mesh.material.color.setHex(hex); obj.props.color = hex; },
+        get Transparency(){ return obj.props.transparency || 0; },
+        set Transparency(v){ obj.props.transparency = v; obj.mesh.material.transparent = v > 0; obj.mesh.material.opacity = 1 - v; },
+        get CanCollide(){ return obj.props.canCollide; },
+        set CanCollide(v){ obj.props.canCollide = v; },
+        get Position(){ return { x: obj.mesh.position.x, y: obj.mesh.position.y, z: obj.mesh.position.z }; },
+        set Position(p){ obj.mesh.position.set(p.x, p.y, p.z); },
+        Destroy(){ scene.remove(obj.mesh); obj.mesh.visible = false; obj.props.canCollide = false; }
+      };
+      try{
+        const fn = new Function("part", "game", obj.script);
+        fn(partApi, { wait: () => {} }); // wait is a no-op stub for now - real timing/coroutines aren't implemented
+      }catch(err){
+        showToast("Script error in " + obj.name + ": " + err.message);
+      }
+      compiledScripts[obj.id] = { handlers, wasTouching: false };
+    });
+  }
+  function checkScriptTouches(rig){
+    const rigBox = new THREE.Box3().setFromCenterAndSize(rig.position.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(1.4,2.4,1.4));
+    for(const id in compiledScripts){
+      const entry = compiledScripts[id];
+      const obj = sceneObjects.find(o => o.id === id);
+      if(!obj || obj.props.canTouch === false) continue;
+      const partBox = new THREE.Box3().setFromObject(obj.mesh);
+      const touching = rigBox.intersectsBox(partBox);
+      if(touching && !entry.wasTouching){
+        entry.handlers.onTouched.forEach(fn => { try{ fn(); }catch(err){ showToast("Script error: " + err.message); } });
+      }
+      entry.wasTouching = touching;
     }
   }
 
