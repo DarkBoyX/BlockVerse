@@ -480,6 +480,18 @@
     padding:2px; cursor:pointer;
   }
   .prop-row.readonly input{ color:var(--text-3); cursor:default; }
+  .prop-row-bool{ display:flex; align-items:center; justify-content:space-between; }
+  .prop-row-bool label{ margin-bottom:0; }
+  .prop-toggle{
+    width:34px; height:19px; border-radius:10px; background:var(--grey-3); position:relative;
+    cursor:pointer; transition:background .15s; flex:none;
+  }
+  .prop-toggle.on{ background:#4a6cf7; }
+  .prop-toggle-nub{
+    position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%;
+    background:#fff; transition:transform .15s;
+  }
+  .prop-toggle.on .prop-toggle-nub{ transform:translateX(15px); }
 
   /* ---- Viewport (center) ---- */
   .viewport-wrap{ flex:1; position:relative; min-width:0; }
@@ -738,9 +750,9 @@
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-database-compat.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1755,7 +1767,9 @@
       mesh,
       props: {
         position:[...opts.pos], rotation: opts.rot ? [...opts.rot] : [0,0,0], size:[...opts.size],
-        color: opts.color, material: opts.material || "plastic", transparency: opts.transparency || 0
+        color: opts.color, material: opts.material || "plastic", transparency: opts.transparency || 0,
+        anchored: opts.anchored !== undefined ? opts.anchored : true,
+        canCollide: opts.canCollide !== undefined ? opts.canCollide : true
       }
     };
     sceneObjects.push(obj);
@@ -2484,6 +2498,24 @@
       row.appendChild(label); row.appendChild(input);
       body.appendChild(row);
     }
+    function boolRow(labelText, value, onChange){
+      const row = document.createElement("div");
+      row.className = "prop-row prop-row-bool";
+      const label = document.createElement("label");
+      label.textContent = labelText;
+      const toggle = document.createElement("div");
+      toggle.className = "prop-toggle" + (value ? " on" : "");
+      const nub = document.createElement("div");
+      nub.className = "prop-toggle-nub";
+      toggle.appendChild(nub);
+      toggle.addEventListener("click", () => {
+        const next = !toggle.classList.contains("on");
+        toggle.classList.toggle("on", next);
+        onChange(next);
+      });
+      row.appendChild(label); row.appendChild(toggle);
+      body.appendChild(row);
+    }
     function selectRow(labelText, options, value, onChange){
       const row = document.createElement("div");
       row.className = "prop-row";
@@ -2565,6 +2597,21 @@
         if(selectedId === obj.id && matKey !== "neon"){
           obj.mesh.material.emissive = new THREE.Color(0x24407a);
         }
+      });
+
+      groupLabel("Behavior");
+      boolRow("Anchored", obj.props.anchored, (v) => {
+        obj.props.anchored = v;
+        // unanchored parts fall/react to gravity once the game actually
+        // runs (handled by the player experience, not the editor itself -
+        // the editor stays static so builds are easy to position)
+      });
+      boolRow("CanCollide", obj.props.canCollide, (v) => {
+        obj.props.canCollide = v;
+        // dim it in the editor as a visual reminder this part won't stop
+        // players when the game runs - same convention Roblox Studio uses
+        obj.mesh.material.opacity = v ? 1 : 0.45;
+        obj.mesh.material.transparent = !v || obj.props.transparency > 0;
       });
     }
   }
