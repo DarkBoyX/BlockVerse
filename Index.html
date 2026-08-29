@@ -8081,10 +8081,11 @@
       }
 
       // fell off the world (off the edge of a mountain, out past the
-      // playable area, etc) - send them back to spawn instead of falling forever
-      if(character.position.y < -25){
-        character.position.set(0, terrainHeightAt(0, 0), 0);
-        vy = 0; onGround = true;
+      // playable area, etc) - this is a real death now, not a free
+      // teleport-back: goes through the same death/respawn flow fall
+      // damage uses, just triggered by depth instead of drop distance
+      if(character.position.y < -25 && hp > 0){
+        setHp(0);
       }
 
       // distinct jump pose: rising = arms/legs pull up and in, falling = legs
