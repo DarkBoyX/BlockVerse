@@ -91,7 +91,7 @@
     padding:20px 16px; display:flex; flex-direction:column;
   }
   .studio-brand{ display:flex; align-items:center; gap:10px; padding:0 4px 22px; font-weight:800; font-size:15px; }
-  .studio-brand .lb-mark{ width:26px; height:26px; border-radius:7px; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff; }
+  .studio-brand .lb-mark{ width:26px; height:26px; border-radius:7px; background:linear-gradient(135deg,#e8e8ec,#a8a8b0); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#0a0a0b; }
   .studio-user{
     display:flex; align-items:center; gap:10px; padding:10px; border-radius:10px;
     border:1px solid var(--border-soft); background:var(--bg-2); margin-bottom:18px;
@@ -111,15 +111,33 @@
   .studio-logout:hover{ color:var(--text-0); border-color:var(--grey-3); background:var(--grey-1); }
 
   .dash-main{ flex:1; overflow-y:auto; padding:32px 40px; }
-  .dash-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
-  .dash-header h1{ margin:0; font-size:21px; }
-  .dash-header p{ margin:4px 0 0; font-size:13px; color:var(--text-2); }
+  .dash-header{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:26px;
+    position:relative; padding:26px 28px; border-radius:18px; overflow:hidden;
+    background:linear-gradient(135deg, #16161a, #0d0d0f); border:1px solid var(--border-soft);
+  }
+  .dash-header::before{
+    content:""; position:absolute; top:-60px; right:-60px; width:220px; height:220px; border-radius:50%;
+    background:radial-gradient(circle, rgba(232,232,236,0.08), transparent 70%); pointer-events:none;
+  }
+  .dash-header h1{ margin:0; font-size:22px; position:relative; }
+  .dash-header p{ margin:5px 0 0; font-size:13px; color:var(--text-2); position:relative; }
 
   .dash-stats{ display:flex; gap:12px; margin-bottom:22px; }
   .dash-stat{
     flex:1; background:var(--bg-1); border:1px solid var(--border-soft); border-radius:13px;
-    padding:14px 16px; min-width:0;
+    padding:14px 16px; min-width:0; position:relative; overflow:hidden;
+    transition:border-color .15s, transform .12s;
   }
+  .dash-stat:hover{ border-color:var(--grey-3); transform:translateY(-1px); }
+  .dash-stat::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:2px; background:var(--grey-3);
+  }
+  .dash-stat.ds-published::before{ background:#6be29a; }
+  .dash-stat.ds-pending::before{ background:#ffd98a; }
+  .ds-icon{ width:16px; height:16px; color:var(--text-3); margin-bottom:8px; }
+  .dash-stat.ds-published .ds-icon{ color:#6be29a; }
+  .dash-stat.ds-pending .ds-icon{ color:#ffd98a; }
   .dash-stat .ds-num{ font-size:22px; font-weight:800; line-height:1.1; }
   .dash-stat .ds-label{ font-size:11px; color:var(--text-2); margin-top:4px; text-transform:uppercase; letter-spacing:0.4px; }
   .dash-stat.ds-published .ds-num{ color:#6be29a; }
@@ -315,8 +333,9 @@
   #editorScreen.show{ display:flex; flex-direction:column; }
 
   .editor-topbar{
-    height:48px; flex-shrink:0; background:var(--bg-1); border-bottom:1px solid var(--border-soft);
-    display:flex; align-items:center; padding:0 14px; gap:14px;
+    height:48px; flex-shrink:0; background:linear-gradient(180deg, #17171a, #131315);
+    border-bottom:1px solid var(--border-soft); box-shadow:0 3px 10px rgba(0,0,0,0.25);
+    display:flex; align-items:center; padding:0 14px; gap:14px; position:relative; z-index:5;
   }
   .editor-back-btn{
     width:32px; height:32px; border-radius:8px; background:var(--bg-2); border:1px solid var(--border-soft);
@@ -331,17 +350,19 @@
   .editor-topbar-spacer{ flex:1; }
   .editor-tool-btn{
     display:flex; align-items:center; gap:6px; background:var(--bg-2); border:1px solid var(--border-soft);
-    color:var(--text-1); font-size:12px; border-radius:8px; padding:7px 12px; cursor:pointer;
-    transition:background .15s, color .15s, border-color .15s;
+    color:var(--text-1); font-size:12px; border-radius:7px; padding:7px 12px; cursor:pointer;
+    transition:background .12s, color .12s, border-color .12s, transform .08s, box-shadow .12s;
   }
-  .editor-tool-btn:hover{ background:var(--grey-1); color:var(--text-0); }
-  .editor-tool-btn.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .editor-tool-btn:hover{ background:var(--grey-1); color:var(--text-0); box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+  .editor-tool-btn:active{ transform:translateY(1px); }
+  .editor-tool-btn.active{ background:var(--accent); color:#0a0a0b; border-color:var(--accent); box-shadow:0 1px 6px rgba(255,255,255,0.15); }
   .editor-tool-btn svg{ width:14px; height:14px; }
   .editor-save-btn{
-    background:var(--accent); border:none; color:#fff; font-size:12.5px; font-weight:700;
-    border-radius:8px; padding:8px 14px; cursor:pointer; transition:filter .15s;
+    background:linear-gradient(180deg, var(--accent), var(--accent-hover)); border:1px solid rgba(0,0,0,0.15); color:#0a0a0b; font-size:12.5px; font-weight:700;
+    border-radius:7px; padding:8px 14px; cursor:pointer; transition:filter .12s, transform .08s; box-shadow:0 2px 6px rgba(0,0,0,0.25);
   }
   .editor-save-btn:hover{ filter:brightness(1.08); }
+  .editor-save-btn:active{ transform:translateY(1px); }
   .editor-save-note{ font-size:11px; color:var(--text-3); margin-right:4px; transition:opacity .3s; }
 
   .editor-body{ flex:1; display:flex; min-height:0; position:relative; }
@@ -437,11 +458,12 @@
 
   /* ---- Play button ---- */
   .editor-play-btn{
-    display:flex; align-items:center; gap:6px; background:#2fae59; border:none; color:#fff;
-    font-size:12.5px; font-weight:700; border-radius:8px; padding:8px 14px; cursor:pointer; transition:filter .15s;
+    display:flex; align-items:center; gap:6px; background:linear-gradient(180deg,#33bd63,#279c50); border:1px solid rgba(0,0,0,0.2); color:#fff;
+    font-size:12.5px; font-weight:700; border-radius:7px; padding:8px 14px; cursor:pointer; transition:filter .12s, transform .08s; box-shadow:0 2px 6px rgba(0,0,0,0.25);
   }
   .editor-play-btn:hover{ filter:brightness(1.1); }
-  .editor-play-btn.playing{ background:var(--grey-2); }
+  .editor-play-btn:active{ transform:translateY(1px); }
+  .editor-play-btn.playing{ background:linear-gradient(180deg,var(--grey-2),var(--grey-1)); }
   .editor-play-btn svg{ width:13px; height:13px; }
 
   /* ---- Properties (left) ---- */
@@ -611,10 +633,22 @@
       </div>
     </div>
     <div class="dash-stats" id="dashStats">
-      <div class="dash-stat"><div class="ds-num" id="dsTotal">0</div><div class="ds-label">Total games</div></div>
-      <div class="dash-stat ds-published"><div class="ds-num" id="dsPublished">0</div><div class="ds-label">Published</div></div>
-      <div class="dash-stat ds-pending"><div class="ds-num" id="dsPending">0</div><div class="ds-label">In review</div></div>
-      <div class="dash-stat"><div class="ds-num" id="dsDraft">0</div><div class="ds-label">Drafts</div></div>
+      <div class="dash-stat">
+        <svg class="ds-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <div class="ds-num" id="dsTotal">0</div><div class="ds-label">Total games</div>
+      </div>
+      <div class="dash-stat ds-published">
+        <svg class="ds-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+        <div class="ds-num" id="dsPublished">0</div><div class="ds-label">Published</div>
+      </div>
+      <div class="dash-stat ds-pending">
+        <svg class="ds-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <div class="ds-num" id="dsPending">0</div><div class="ds-label">In review</div>
+      </div>
+      <div class="dash-stat">
+        <svg class="ds-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <div class="ds-num" id="dsDraft">0</div><div class="ds-label">Drafts</div>
+      </div>
     </div>
     <div class="dash-search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -825,6 +859,16 @@
   /* ---------------- Session state ---------------- */
   let currentUserKey = null;
   let currentUsername = null;
+  const STUDIO_SESSION_KEY = "blockverse_studio_session";
+  function saveStudioSession(key, username){
+    try{ localStorage.setItem(STUDIO_SESSION_KEY, JSON.stringify({ key, username })); }catch(e){}
+  }
+  function getStudioSession(){
+    try{ return JSON.parse(localStorage.getItem(STUDIO_SESSION_KEY)); }catch(e){ return null; }
+  }
+  function clearStudioSession(){
+    try{ localStorage.removeItem(STUDIO_SESSION_KEY); }catch(e){}
+  }
 
   const loginForm = document.getElementById("loginForm");
   const loginMsg = document.getElementById("stLoginMsg");
@@ -881,6 +925,7 @@
 
       currentUserKey = key;
       currentUsername = (dir && dir.username) || username;
+      saveStudioSession(currentUserKey, currentUsername);
       enterDashboard();
     }catch(err){
       console.error("Studio login failed:", err);
@@ -893,6 +938,7 @@
 
   document.getElementById("studioLogoutBtn").addEventListener("click", () => {
     currentUserKey = null; currentUsername = null;
+    clearStudioSession();
     document.getElementById("dashScreen").classList.remove("show");
     document.getElementById("editorScreen").classList.remove("show");
     document.getElementById("loginScreen").style.display = "flex";
@@ -1181,11 +1227,33 @@
     return _matTextureCache[matKey];
   }
 
-  function openEditor(game){
+  function showEditorLoading(show, label){
+    let el = document.getElementById("editorLoadingScreen");
+    if(show){
+      if(!el){
+        el = document.createElement("div");
+        el.id = "editorLoadingScreen";
+        el.style.cssText = "position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0a0a0b;";
+        document.body.appendChild(el);
+      }
+      el.innerHTML = '<div class="spin" style="width:28px;height:28px;border-width:3px;"></div><div style="font-size:13px;color:#c8c8cc;font-weight:600;">' + (label || "Loading&hellip;") + '</div>';
+      el.style.display = "flex";
+    }else if(el){
+      el.remove();
+    }
+  }
+
+  async function openEditor(game){
     currentGame = game;
+    showEditorLoading(true, "Opening " + escapeHtmlSE(game.name) + "&hellip;");
     document.getElementById("dashScreen").classList.remove("show");
     document.getElementById("editorScreen").classList.add("show");
     document.getElementById("editorTitle").textContent = game.name;
+
+    // small artificial floor so the loading screen is visible even when
+    // everything below resolves instantly - same reasoning as the
+    // play-test loading screen having one, avoids an unpleasant flash
+    await new Promise(res => setTimeout(res, 400));
 
     if(!editorInited){
       initThree();
@@ -1202,6 +1270,7 @@
     freecam.pitch = -0.5;
     updateFreecamQuaternion();
     onResize();
+    showEditorLoading(false);
   }
 
   document.getElementById("editorBackBtn").addEventListener("click", () => {
@@ -1917,6 +1986,7 @@
 
   function initPlayButton(){
     document.getElementById("editorPlayBtn").addEventListener("click", async () => {
+      if(playMode.loading) return; // a startPlay() is already mid-flight - clicking again here is exactly what caused Leave to silently get overridden once that pending call finished
       if(playMode.active){ stopPlay(); return; }
       await startPlay();
     });
@@ -1977,16 +2047,16 @@
     return group;
   }
 
-  function showPlayLoading(show){
+  function showPlayLoading(show, label){
     let el = document.getElementById("playLoadingScreen");
     if(show){
       if(!el){
         el = document.createElement("div");
         el.id = "playLoadingScreen";
         el.style.cssText = "position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(10,10,11,0.92);backdrop-filter:blur(3px);";
-        el.innerHTML = '<div class="spin" style="width:26px;height:26px;border-width:3px;"></div><div style="font-size:13px;color:#c8c8cc;font-weight:600;">Loading play test&hellip;</div>';
         document.querySelector(".viewport-wrap").appendChild(el);
       }
+      el.innerHTML = '<div class="spin" style="width:26px;height:26px;border-width:3px;"></div><div style="font-size:13px;color:#c8c8cc;font-weight:600;">' + (label || "Loading play test&hellip;") + '</div>';
       el.style.display = "flex";
     }else if(el){
       el.remove();
@@ -1994,6 +2064,7 @@
   }
 
   async function startPlay(){
+    if(playMode.loading || playMode.active) return; // never allow a second startPlay() to run while one's already in flight
     clearStuckKeys();
     playMode.loading = true;
     showPlayLoading(true);
@@ -2046,7 +2117,10 @@
     showToast(avatar ? "Playing with your BlockVerse rig" : "Playing (no saved avatar found, using defaults)");
   }
 
-  function stopPlay(){
+  async function stopPlay(){
+    playMode.loading = true;
+    showPlayLoading(true, "Leaving play test&hellip;");
+    await new Promise(res => setTimeout(res, 300)); // brief and intentional, not a real load - just avoids an instant jarring snap back into the editor
     clearStuckKeys();
     if(playRigGroup){
       scene.remove(playRigGroup);
@@ -2869,7 +2943,16 @@
 
 
   /* ---------------- Boot ---------------- */
-  window.addEventListener("load", () => { document.getElementById("stUsername").focus(); });
+  window.addEventListener("load", () => {
+    const saved = getStudioSession();
+    if(saved && saved.key && saved.username){
+      currentUserKey = saved.key;
+      currentUsername = saved.username;
+      enterDashboard();
+    } else {
+      document.getElementById("stUsername").focus();
+    }
+  });
 })();
 </script>
 </body>
