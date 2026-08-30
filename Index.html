@@ -43,10 +43,10 @@
      Warm amber instead of the website's blue, applied via a class the JS
      sets once it detects it's running inside the real app. */
   html.is-app-shell{
-    --accent:#e0a838;
-    --accent-hover:#c4941f;
+    --accent:#8a8a92;
+    --accent-hover:#6e6e76;
   }
-  html.is-app-shell ::selection{ background:rgba(224,168,56,0.35); color:#fff; }
+  html.is-app-shell ::selection{ background:rgba(138,138,146,0.35); color:#fff; }
   html.is-app-shell button:focus-visible, html.is-app-shell input:focus-visible, html.is-app-shell textarea:focus-visible{
     outline-color:#e0a838;
   }
@@ -234,28 +234,10 @@
   .sb-icon{ width:18px; text-align:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
   .sb-icon svg{ width:16px; height:16px; }
 
-  /* App-shell sidebar: compact icon-only rail, not a website nav list.
-     This is the actual structural difference the website version doesn't
-     have - labels disappear, the rail narrows way down, and everything
-     centers on the icon, closer to how a native desktop app (Discord,
-     Spotify, VS Code's activity bar) lays out its side nav than how a
-     website sidebar does. */
-  html.is-app-shell .sidebar{
-    width:64px; padding:18px 8px; align-items:center;
-    background:linear-gradient(180deg, var(--bg-1), var(--bg-0));
-  }
-  html.is-app-shell .sb-brand{ padding:0 0 20px; justify-content:center; }
-  html.is-app-shell .sb-brand span:not(.sb-cube){ display:none; }
-  html.is-app-shell .sb-section-label{ display:none; }
-  html.is-app-shell .sb-item{
-    justify-content:center; padding:11px; width:44px; margin:0 auto 6px; gap:0;
-  }
-  html.is-app-shell .sb-item::before{ left:-8px; }
-  html.is-app-shell .sb-label-text{ display:none; }
-  html.is-app-shell .sb-badge{ position:absolute; top:2px; right:2px; }
-  /* a thin top accent strip is the one thing a real desktop window has
-     that a browser tab doesn't - the window chrome itself, so this stands
-     in for that instead of just being decoration */
+  /* App-shell gets one subtle signal it's the real app, not a full
+     redesign - a thin top accent strip standing in for the window chrome
+     a browser tab doesn't have. Everything else (sidebar, layout) matches
+     the website exactly. */
   html.is-app-shell body::before{
     content:""; position:fixed; top:0; left:0; right:0; height:3px; z-index:9999;
     background:linear-gradient(90deg, var(--accent), transparent 70%);
