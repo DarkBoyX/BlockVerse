@@ -5696,10 +5696,13 @@
         showIngameToast({ kind:"info", userKey:"system", html:"<b>Report sent</b><br>Thanks - our team will take a look." });
       }catch(e){
         btn.disabled = false;
+        console.error("BlockVerse: game report failed -", e);
         // give an accurate message instead of always blaming "connection" -
-        // a rules rejection and a dropped network request are different
-        // problems and look different in the console, so surface that
-        const msg = (e && e.code === "PERMISSION_DENIED")
+        // check both .code and the message text since different Firebase
+        // SDK versions/paths don't always surface PERMISSION_DENIED the
+        // same way
+        const isPermissionIssue = (e && (e.code === "PERMISSION_DENIED" || /permission_denied/i.test(e.message || "")));
+        const msg = isPermissionIssue
           ? "<b>Couldn't send report</b><br>You may need to log in again."
           : "<b>Couldn't send report</b><br>Check your connection and try again.";
         showIngameToast({ kind:"info", userKey:"system", html: msg });
