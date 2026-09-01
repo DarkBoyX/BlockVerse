@@ -367,23 +367,36 @@
 
   .editor-body{ flex:1; display:flex; min-height:0; position:relative; }
 
-  /* ---- Top-center tool tab bar ---- */
-  .tool-tabbar{
-    position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:20;
-    display:flex; gap:3px; background:var(--bg-2); border:1px solid var(--border-soft);
-    border-radius:11px; padding:4px; box-shadow:0 10px 26px rgba(0,0,0,0.4);
+  /* ---- Ribbon toolbar: grouped, labeled sections docked under the topbar ---- */
+  .ribbon{
+    display:flex; align-items:stretch; gap:0; background:linear-gradient(180deg, #151517, #101012);
+    border-bottom:1px solid var(--border-soft); padding:6px 10px; flex-shrink:0; overflow-x:auto;
   }
-  .tool-tab{
-    display:flex; flex-direction:column; align-items:center; gap:3px; width:54px; padding:7px 0 6px;
-    border-radius:8px; cursor:pointer; color:var(--text-2); transition:background .15s, color .15s; user-select:none;
+  .ribbon-group{ display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:0 10px; }
+  .ribbon-divider{ width:1px; background:var(--border-soft); margin:2px 4px; flex-shrink:0; }
+  .ribbon-row{ display:flex; align-items:center; gap:4px; }
+  .ribbon-label{ font-size:9.5px; color:var(--text-3); text-transform:uppercase; letter-spacing:.4px; margin-top:4px; font-weight:600; }
+  .ribbon-btn{
+    display:flex; flex-direction:column; align-items:center; gap:3px; width:52px; padding:6px 0 5px;
+    border-radius:7px; cursor:pointer; color:var(--text-2); background:none; border:1px solid transparent;
+    transition:background .12s, color .12s, border-color .12s; user-select:none;
   }
-  .tool-tab:hover{ background:var(--grey-1); color:var(--text-1); }
-  .tool-tab.active{ background:var(--accent); color:#fff; }
-  .tool-tab svg{ width:16px; height:16px; }
-  .tool-tab span{ font-size:9.5px; font-weight:700; letter-spacing:.2px; }
+  .ribbon-btn:hover{ background:var(--grey-1); color:var(--text-1); }
+  .ribbon-btn.active{ background:var(--accent); color:#0a0a0b; border-color:var(--accent); }
+  .ribbon-btn svg{ width:16px; height:16px; }
+  .ribbon-btn span{ font-size:9.5px; font-weight:700; letter-spacing:.2px; }
+  .ribbon-btn-play{ background:linear-gradient(180deg,#33bd63,#279c50); color:#fff; }
+  .ribbon-btn-play:hover{ background:linear-gradient(180deg,#3bd070,#2bab59); color:#fff; }
+  .ribbon-row-snap{ flex-direction:column; align-items:flex-start; gap:4px; padding:2px 0; }
+  .ribbon-check{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-1); cursor:pointer; white-space:nowrap; }
+  .ribbon-check input{ accent-color:var(--accent); }
+  .ribbon-num{
+    width:44px; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:5px;
+    color:var(--text-0); font-size:11px; padding:2px 5px; margin-left:4px;
+  }
 
   .parts-picker{
-    position:absolute; top:64px; left:50%; transform:translateX(-50%); z-index:21;
+    position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:21;
     background:var(--bg-2); border:1px solid var(--border-soft); border-radius:12px; padding:10px;
     box-shadow:0 14px 34px rgba(0,0,0,0.45); display:none; gap:8px;
   }
@@ -398,6 +411,32 @@
     background:var(--bg-1); border:1px solid var(--border-soft); border-radius:8px;
   }
   .pp-item .pp-icon svg{ width:20px; height:20px; }
+
+  /* ---- Output console (bottom panel) ---- */
+  .output-panel{
+    height:130px; flex-shrink:0; background:#101012; border-top:1px solid var(--border-soft);
+    display:flex; flex-direction:column;
+  }
+  .output-head{
+    display:flex; align-items:center; justify-content:space-between; padding:6px 12px;
+    font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px;
+    border-bottom:1px solid var(--border-soft); flex-shrink:0;
+  }
+  .output-head button{
+    background:none; border:1px solid var(--border-soft); color:var(--text-2); font-size:10.5px;
+    border-radius:5px; padding:3px 9px; cursor:pointer; text-transform:none; letter-spacing:0; font-weight:600;
+  }
+  .output-head button:hover{ color:var(--text-0); border-color:var(--grey-3); }
+  .output-body{ flex:1; overflow-y:auto; padding:6px 12px; font-family:'Cascadia Code',Consolas,monospace; font-size:11.5px; }
+  .output-line{ color:var(--text-2); padding:1px 0; white-space:pre-wrap; word-break:break-word; }
+  .output-error{ color:#f28b8b; }
+  .output-warn{ color:#e8c589; }
+
+  /* ---- Status bar ---- */
+  .status-bar{
+    height:22px; flex-shrink:0; background:#0d0d0f; border-top:1px solid var(--border-soft);
+    display:flex; align-items:center; gap:16px; padding:0 12px; font-size:10.5px; color:var(--text-3);
+  }
   .pp-item span{ font-size:10.5px; font-weight:600; }
 
   /* ---- Properties: shape-change trigger below Name ---- */
@@ -463,7 +502,7 @@
   }
   .editor-play-btn:hover{ filter:brightness(1.1); }
   .editor-play-btn:active{ transform:translateY(1px); }
-  .editor-play-btn.playing{ background:linear-gradient(180deg,var(--grey-2),var(--grey-1)); }
+  .ribbon-btn-play.playing{ background:linear-gradient(180deg,var(--grey-2),var(--grey-1)); color:var(--text-0); }
   .editor-play-btn svg{ width:13px; height:13px; }
 
   /* ---- Properties (left) ---- */
@@ -571,6 +610,8 @@
   .exp-row .exp-icon{ width:14px; height:14px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
   .exp-row .exp-icon svg{ width:13px; height:13px; }
   .exp-children{ margin-left:16px; border-left:1px solid var(--border-soft); padding-left:4px; }
+  .exp-service{ color:var(--text-3); cursor:default; }
+  .exp-service:hover{ background:none; color:var(--text-2); }
 
   .toast-wrap{ position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:50; display:flex; flex-direction:column; gap:8px; }
   .toast{
@@ -752,16 +793,93 @@
     </div>
     <div class="editor-topbar-spacer"></div>
     <span class="editor-save-note" id="editorSaveNote"></span>
-    <button class="editor-tool-btn" id="addPartBtn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      Part
-    </button>
-    <button class="editor-play-btn" id="editorPlayBtn">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-      <span>Play</span>
-    </button>
     <button class="editor-save-btn" id="editorSaveBtn">Save</button>
   </div>
+
+  <div class="ribbon">
+    <div class="ribbon-group">
+      <div class="ribbon-row">
+        <button class="ribbon-btn" data-tool="select" title="Select">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 3l7 17 2.5-7.5L21 10 4 3z"/></svg>
+          <span>Select</span>
+        </button>
+        <button class="ribbon-btn" data-tool="move" title="Move">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 9l-3 3 3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3"/></svg>
+          <span>Move</span>
+        </button>
+        <button class="ribbon-btn" data-tool="rotate" title="Rotate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 3 6.2"/><path d="M4 18v-4h4"/></svg>
+          <span>Rotate</span>
+        </button>
+        <button class="ribbon-btn" data-tool="scale" title="Scale">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4h16"/><path d="M8 16h8v-8"/></svg>
+          <span>Scale</span>
+        </button>
+      </div>
+      <div class="ribbon-label">Tools</div>
+    </div>
+
+    <div class="ribbon-divider"></div>
+
+    <div class="ribbon-group">
+      <div class="ribbon-row ribbon-row-snap">
+        <label class="ribbon-check"><input type="checkbox" id="snapMoveCheck" checked><span>Move</span></label>
+        <input type="number" id="snapMoveValue" class="ribbon-num" value="1" step="0.5" min="0.1">
+        <label class="ribbon-check"><input type="checkbox" id="snapRotateCheck" checked><span>Rotate</span></label>
+        <input type="number" id="snapRotateValue" class="ribbon-num" value="15" step="1" min="1">
+      </div>
+      <div class="ribbon-label">Snap</div>
+    </div>
+
+    <div class="ribbon-divider"></div>
+
+    <div class="ribbon-group">
+      <div class="ribbon-row">
+        <button class="ribbon-btn" id="addPartBtn" title="Insert a Part">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          <span>Part</span>
+        </button>
+        <button class="ribbon-btn" id="insertSpawnBtn" title="Insert a SpawnLocation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          <span>Spawn</span>
+        </button>
+      </div>
+      <div class="ribbon-label">Insert</div>
+    </div>
+
+    <div class="ribbon-divider"></div>
+
+    <div class="ribbon-group">
+      <div class="ribbon-row">
+        <button class="ribbon-btn" id="copyBtn" title="Copy (Ctrl+C)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+          <span>Copy</span>
+        </button>
+        <button class="ribbon-btn" id="pasteBtn" title="Paste (Ctrl+V)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/></svg>
+          <span>Paste</span>
+        </button>
+        <button class="ribbon-btn" id="duplicateBtn" title="Duplicate (Ctrl+D)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><rect x="3" y="3" width="12" height="12" rx="2"/></svg>
+          <span>Duplicate</span>
+        </button>
+      </div>
+      <div class="ribbon-label">Edit</div>
+    </div>
+
+    <div class="ribbon-divider"></div>
+
+    <div class="ribbon-group">
+      <div class="ribbon-row">
+        <button class="ribbon-btn ribbon-btn-play" id="editorPlayBtn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span>Play</span>
+        </button>
+      </div>
+      <div class="ribbon-label">Test</div>
+    </div>
+  </div>
+
   <div class="editor-body">
     <div class="props-panel">
       <div class="panel-head">
@@ -774,28 +892,6 @@
     </div>
 
     <div class="viewport-wrap">
-      <div class="tool-tabbar" id="toolTabbar">
-        <div class="tool-tab active" data-tool="select" title="Select">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 3l7 17 2.5-7.5L21 10 4 3z"/></svg>
-          <span>Select</span>
-        </div>
-        <div class="tool-tab" data-tool="move" title="Move">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 9l-3 3 3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3"/></svg>
-          <span>Move</span>
-        </div>
-        <div class="tool-tab" data-tool="rotate" title="Rotate">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 3 6.2"/><path d="M4 18v-4h4"/></svg>
-          <span>Rotate</span>
-        </div>
-        <div class="tool-tab" data-tool="scale" title="Scale">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4h16"/><path d="M8 16h8v-8"/></svg>
-          <span>Scale</span>
-        </div>
-        <div class="tool-tab" data-tool="parts" title="Parts">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 9h14M5 15h14"/></svg>
-          <span>Parts</span>
-        </div>
-      </div>
       <div class="parts-picker" id="partsPicker"></div>
       <canvas id="studioCanvas"></canvas>
       <div class="viewport-hint" id="viewportHint">Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan</div>
@@ -808,6 +904,20 @@
       </div>
       <div class="explorer-body show" id="explorerBody"></div>
     </div>
+  </div>
+
+  <div class="output-panel">
+    <div class="output-head">
+      <span>Output</span>
+      <button id="outputClearBtn">Clear</button>
+    </div>
+    <div class="output-body" id="outputBody"></div>
+  </div>
+
+  <div class="status-bar">
+    <span id="statusFps">FPS: --</span>
+    <span id="statusParts">Parts: 0</span>
+    <span id="statusTool">Select</span>
   </div>
 </div>
 
@@ -854,6 +964,19 @@
     t.textContent = text;
     wrap.appendChild(t);
     setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .3s"; setTimeout(() => t.remove(), 300); }, 2200);
+  }
+
+  function logOutput(text, kind){
+    const body = document.getElementById("outputBody");
+    if(!body) return;
+    const line = document.createElement("div");
+    line.className = "output-line" + (kind === "error" ? " output-error" : kind === "warn" ? " output-warn" : "");
+    const time = new Date().toLocaleTimeString([], { hour12:false });
+    line.textContent = time + "  " + text;
+    body.appendChild(line);
+    body.scrollTop = body.scrollHeight;
+    // cap the log so a runaway script spamming errors doesn't grow the DOM forever
+    while(body.children.length > 300) body.removeChild(body.firstChild);
   }
 
   /* ---------------- Session state ---------------- */
@@ -1259,8 +1382,12 @@
       initThree();
       initToolbar();
       initPlayButton();
+      document.getElementById("outputClearBtn").addEventListener("click", () => {
+        document.getElementById("outputBody").innerHTML = "";
+      });
       editorInited = true;
     }
+    logOutput("BlockVerse Studio ready - " + game.name);
     buildDefaultScene();
     renderExplorer();
     selectObject(null);
@@ -1641,6 +1768,9 @@
       if(k === "f" && selectedId){
         focusCameraOnObject(selectedId);
       }
+      if((e.ctrlKey || e.metaKey) && k === "c"){ e.preventDefault(); copySelected(); }
+      if((e.ctrlKey || e.metaKey) && k === "v"){ e.preventDefault(); pasteFromClipboard(); }
+      if((e.ctrlKey || e.metaKey) && k === "d"){ e.preventDefault(); duplicateSelected(); }
     });
     window.addEventListener("keyup", (e) => {
       const k = e.key.toLowerCase();
@@ -1660,8 +1790,24 @@
         updateFreecam(dt);
       }
       renderer.render(scene, camera);
+      updateStatusBar(dt);
     }
     animate();
+  }
+
+  // throttled to twice a second - a live-updating FPS number every frame
+  // just flickers and is harder to read, not more accurate
+  let statusBarAccum = 0, statusBarFrames = 0;
+  function updateStatusBar(dt){
+    statusBarAccum += dt; statusBarFrames++;
+    if(statusBarAccum >= 0.5){
+      const fps = Math.round(statusBarFrames / statusBarAccum);
+      const fpsEl = document.getElementById("statusFps");
+      if(fpsEl) fpsEl.textContent = "FPS: " + fps;
+      statusBarAccum = 0; statusBarFrames = 0;
+    }
+    const partsEl = document.getElementById("statusParts");
+    if(partsEl) partsEl.textContent = "Parts: " + sceneObjects.filter(o => o.className === "Part").length;
   }
 
   /* ---- freecam helpers ---- */
@@ -1945,17 +2091,12 @@
     addSceneObject({ name:"SpawnLocation", className:"SpawnLocation", shape:"cube", pos:[0,0.15,0], size:[6,0.3,6], color:0xc23b3b });
   }
 
-  /* ---------------- Toolbar (Select / Move / Rotate / Scale / Parts) ---------------- */
+  /* ---------------- Toolbar (Select / Move / Rotate / Scale) ---------------- */
   function initToolbar(){
-    document.querySelectorAll(".tool-tab").forEach(tab => {
+    document.querySelectorAll(".ribbon-btn[data-tool]").forEach(tab => {
       tab.addEventListener("click", () => {
         if(playMode.active) return; // tools are studio-mode only
-        const tool = tab.dataset.tool;
-        if(tool === "parts"){
-          togglePartsPicker();
-          return;
-        }
-        setTool(tool);
+        setTool(tab.dataset.tool);
         hidePartsPicker();
       });
     });
@@ -2068,81 +2209,100 @@
     clearStuckKeys();
     playMode.loading = true;
     showPlayLoading(true);
-
-    const spawn = sceneObjects.find(o => o.className === "SpawnLocation");
-    const spawnPos = spawn ? spawn.mesh.position : new THREE.Vector3(0,0,0);
-    const spawnHalfH = spawn ? spawn.props.size[1]/2 : 0;
-
-    let avatar = null;
     try{
-      const snap = await fbDb.ref("blockverse_users/" + currentUserKey + "/avatar").once("value");
-      avatar = snap.val();
+      const spawn = sceneObjects.find(o => o.className === "SpawnLocation");
+      const spawnPos = spawn ? spawn.mesh.position : new THREE.Vector3(0,0,0);
+      const spawnHalfH = spawn ? spawn.props.size[1]/2 : 0;
+
+      let avatar = null;
+      try{
+        const snap = await fbDb.ref("blockverse_users/" + currentUserKey + "/avatar").once("value");
+        avatar = snap.val();
+      }catch(err){
+        console.error("Studio: couldn't load avatar for play test:", err);
+      }
+
+      // small artificial delay so the loading screen is visible even on a fast connection
+      await new Promise(res => setTimeout(res, 550));
+
+      playRigGroup = buildRig(avatar);
+      playMode.groundY = spawnPos.y + spawnHalfH;
+      playRigGroup.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
+      scene.add(playRigGroup);
+      compileAllScripts();
+
+      playMode.active = true;
+      playMode.velocityY = 0;
+      playMode.onGround = true;
+      playMode.camYaw = playRigGroup.rotation.y;
+      playMode.camPitch = 0.25;
+      playMode.camDist = 9;
+
+      // lock studio editing entirely while play-testing: no gizmos, no add/select tools, no context menus
+      if(gizmoGroup){ scene.remove(gizmoGroup); gizmoGroup = null; }
+      closeObjCtxMenu();
+      hidePartsPicker();
+      selectObject(null);
+      const tabbar = document.querySelector(".ribbon");
+      if(tabbar) tabbar.style.display = "none";
+      document.getElementById("addPartBtn").disabled = true;
+
+      const btn = document.getElementById("editorPlayBtn");
+      btn.classList.add("playing");
+      btn.querySelector("span").textContent = "Leave";
+      btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat &middot; F5 to stop";
+      showToast(avatar ? "Playing with your BlockVerse rig" : "Playing (no saved avatar found, using defaults)");
+      logOutput("Play test started");
     }catch(err){
-      console.error("Studio: couldn't load avatar for play test:", err);
+      console.error("Studio: error while starting play test (recovered, not stuck):", err);
+      showToast("Couldn't start play test - try again");
+      playMode.active = false;
+    }finally{
+      playMode.loading = false;
+      showPlayLoading(false);
     }
-
-    // small artificial delay so the loading screen is visible even on a fast connection
-    await new Promise(res => setTimeout(res, 550));
-
-    playRigGroup = buildRig(avatar);
-    playMode.groundY = spawnPos.y + spawnHalfH;
-    playRigGroup.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
-    scene.add(playRigGroup);
-    compileAllScripts();
-
-    playMode.active = true;
-    playMode.loading = false;
-    playMode.velocityY = 0;
-    playMode.onGround = true;
-    playMode.camYaw = playRigGroup.rotation.y;
-    playMode.camPitch = 0.25;
-    playMode.camDist = 9;
-
-    showPlayLoading(false);
-
-    // lock studio editing entirely while play-testing: no gizmos, no add/select tools, no context menus
-    if(gizmoGroup){ scene.remove(gizmoGroup); gizmoGroup = null; }
-    closeObjCtxMenu();
-    hidePartsPicker();
-    selectObject(null);
-    const tabbar = document.getElementById("toolTabbar");
-    if(tabbar) tabbar.style.display = "none";
-    document.getElementById("addPartBtn").disabled = true;
-
-    const btn = document.getElementById("editorPlayBtn");
-    btn.classList.add("playing");
-    btn.querySelector("span").textContent = "Leave";
-    btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat &middot; F5 to stop";
-    showToast(avatar ? "Playing with your BlockVerse rig" : "Playing (no saved avatar found, using defaults)");
   }
 
   async function stopPlay(){
     playMode.loading = true;
     showPlayLoading(true, "Leaving play test&hellip;");
-    await new Promise(res => setTimeout(res, 300)); // brief and intentional, not a real load - just avoids an instant jarring snap back into the editor
-    clearStuckKeys();
-    if(playRigGroup){
-      scene.remove(playRigGroup);
-      playRigGroup.traverse((c) => { if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); });
-      playRigGroup = null;
+    try{
+      await new Promise(res => setTimeout(res, 300)); // brief and intentional, not a real load - just avoids an instant jarring snap back into the editor
+      clearStuckKeys();
+      if(playRigGroup){
+        scene.remove(playRigGroup);
+        playRigGroup.traverse((c) => { if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); });
+        playRigGroup = null;
+      }
+      closeChatInput();
+      removeChatBubble();
+
+      // restore studio editing controls
+      const tabbar = document.querySelector(".ribbon");
+      if(tabbar) tabbar.style.display = "";
+      document.getElementById("addPartBtn").disabled = false;
+      const panel = document.getElementById("propsBody");
+      if(panel) panel.closest(".props-panel").style.pointerEvents = "";
+
+      const btn = document.getElementById("editorPlayBtn");
+      btn.classList.remove("playing");
+      btn.querySelector("span").textContent = "Play";
+      btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+      setTool(currentTool); // refreshes the viewport hint back to edit-mode text
+      logOutput("Play test stopped");
+    }catch(err){
+      console.error("Studio: error while leaving play test (recovered, not stuck):", err);
+      showToast("Something went wrong leaving play test - editor unlocked anyway");
+    }finally{
+      // THIS is what actually guarantees you can never get stuck - no
+      // matter what throws above, loading always clears and the overlay
+      // always comes down, so the Play/Leave button can never permanently
+      // lock up again the way it could before
+      playMode.active = false;
+      playMode.loading = false;
+      showPlayLoading(false);
     }
-    closeChatInput();
-    removeChatBubble();
-    playMode.active = false;
-    playMode.loading = false;
-    showPlayLoading(false);
-
-    // restore studio editing controls
-    const tabbar = document.getElementById("toolTabbar");
-    if(tabbar) tabbar.style.display = "";
-    document.getElementById("addPartBtn").disabled = false;
-
-    const btn = document.getElementById("editorPlayBtn");
-    btn.classList.remove("playing");
-    btn.querySelector("span").textContent = "Play";
-    btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
-    setTool(currentTool); // refreshes the viewport hint back to edit-mode text
   }
 
   /* ---- in-play chat: Enter opens a box, Enter again sends a floating bubble over the rig ---- */
@@ -2201,7 +2361,9 @@
 
   function setTool(tool){
     currentTool = tool;
-    document.querySelectorAll(".tool-tab").forEach(t => t.classList.toggle("active", t.dataset.tool === tool));
+    document.querySelectorAll(".ribbon-btn[data-tool]").forEach(t => t.classList.toggle("active", t.dataset.tool === tool));
+    const statusTool = document.getElementById("statusTool");
+    if(statusTool) statusTool.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
     const hint = document.getElementById("viewportHint");
     const hints = {
       select:"Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan &middot; Click a part to select it",
@@ -2236,6 +2398,16 @@
     if(playMode.active) return; // adding parts is studio-mode only
     addPartOfShape("cube");
   });
+  document.getElementById("insertSpawnBtn").addEventListener("click", () => {
+    if(playMode.active) return;
+    const obj = addSceneObject({ name:"SpawnLocation", className:"SpawnLocation", shape:"cube", pos:[0,0.15,0], size:[6,0.3,6], color:0xc23b3b });
+    renderExplorer();
+    selectObject(obj.id);
+    showToast("Added SpawnLocation");
+  });
+  document.getElementById("copyBtn").addEventListener("click", () => { if(!playMode.active) copySelected(); });
+  document.getElementById("pasteBtn").addEventListener("click", () => { if(!playMode.active) pasteFromClipboard(); });
+  document.getElementById("duplicateBtn").addEventListener("click", () => { if(!playMode.active) duplicateSelected(); });
 
   /* ---------------- Object context menu (left-click Rename / Delete) ---------------- */
   function closeObjCtxMenu(){
@@ -2331,6 +2503,44 @@
     renderExplorer();
     selectObject(obj.id);
     showToast("Added " + obj.name);
+  }
+
+  /* ---------------- Copy / Paste / Duplicate ---------------- */
+  let clipboardObj = null;
+  function currentSelectedObj(){
+    return sceneObjects.find(o => o.id === selectedId) || null;
+  }
+  function copySelected(){
+    const obj = currentSelectedObj();
+    if(!obj){ showToast("Nothing selected to copy"); return; }
+    // deep-clone the spec, not the live object - mesh/material get rebuilt fresh on paste
+    clipboardObj = JSON.parse(JSON.stringify({
+      name: obj.name, className: obj.className, shape: obj.shape, props: obj.props
+    }));
+    showToast("Copied " + obj.name);
+  }
+  function pasteFromClipboard(){
+    if(!clipboardObj){ showToast("Nothing to paste - copy something first"); return; }
+    spawnClone(clipboardObj, 1.5);
+  }
+  function duplicateSelected(){
+    const obj = currentSelectedObj();
+    if(!obj){ showToast("Nothing selected to duplicate"); return; }
+    spawnClone({ name: obj.name, className: obj.className, shape: obj.shape, props: obj.props }, 1.5);
+  }
+  function spawnClone(spec, offset){
+    const p = spec.props;
+    const newObj = addSceneObject({
+      name: spec.name + " copy", className: spec.className, shape: spec.shape,
+      pos: [p.position[0] + offset, p.position[1], p.position[2] + offset],
+      rot: p.rotation, size: p.size, color: p.color,
+      material: p.material, transparency: p.transparency,
+      anchored: p.anchored, canCollide: p.canCollide, canTouch: p.canTouch, canQuery: p.canQuery,
+      castShadow: p.castShadow, massless: p.massless, reflectance: p.reflectance
+    });
+    renderExplorer();
+    selectObject(newObj.id);
+    showToast("Pasted " + newObj.name);
   }
 
   /* ---------------- Gizmo (Move / Rotate / Scale handles) ---------------- */
@@ -2443,20 +2653,36 @@
       lastX: e.clientX, lastY: e.clientY
     };
   }
+  function getSnapSettings(){
+    return {
+      move: document.getElementById("snapMoveCheck").checked ? (parseFloat(document.getElementById("snapMoveValue").value) || 1) : 0,
+      rotate: document.getElementById("snapRotateCheck").checked ? (parseFloat(document.getElementById("snapRotateValue").value) || 15) : 0
+    };
+  }
+  function snapTo(value, step){
+    if(!step) return value;
+    return Math.round(value / step) * step;
+  }
+
   function updateGizmoDrag(e){
     if(!dragState) return;
     const { axis, kind, obj } = dragState;
+    const snap = getSnapSettings();
 
     if(kind === "move"){
       const pt = raycastPlane(e, dragState.plane);
       if(!pt) return;
       if(axis === "center"){
         const delta = pt.clone().sub(dragState.startPt);
-        obj.mesh.position.set(dragState.startPos.x + delta.x, dragState.startPos.y, dragState.startPos.z + delta.z);
+        obj.mesh.position.set(
+          snapTo(dragState.startPos.x + delta.x, snap.move),
+          dragState.startPos.y,
+          snapTo(dragState.startPos.z + delta.z, snap.move)
+        );
       }else{
         const dir = axisVec(axis);
         const delta = pt.clone().sub(dragState.startPt);
-        const t = delta.dot(dir);
+        const t = snapTo(delta.dot(dir), snap.move);
         obj.mesh.position.copy(dragState.startPos.clone().addScaledVector(dir, t));
       }
       obj.props.position = [obj.mesh.position.x, obj.mesh.position.y, obj.mesh.position.z];
@@ -2486,8 +2712,12 @@
     }else if(kind === "rotate"){
       const dx = e.clientX - dragState.lastX;
       dragState.lastX = e.clientX; dragState.lastY = e.clientY;
-      const angle = dx * 0.012;
-      obj.mesh.rotateOnWorldAxis(axisVec(axis), angle);
+      if(!dragState.accumDeg) dragState.accumDeg = 0;
+      dragState.accumDeg += dx * (0.012 * 180 / Math.PI);
+      const snappedDeg = snap.rotate ? snapTo(dragState.accumDeg, snap.rotate) : dragState.accumDeg;
+      const appliedDeg = snappedDeg - (dragState.lastAppliedDeg || 0);
+      dragState.lastAppliedDeg = snappedDeg;
+      obj.mesh.rotateOnWorldAxis(axisVec(axis), appliedDeg * Math.PI / 180);
       obj.props.rotation = [obj.mesh.rotation.x, obj.mesh.rotation.y, obj.mesh.rotation.z];
     }
   }
@@ -2530,7 +2760,7 @@
     const lightRow = document.createElement("div");
     lightRow.className = "exp-row" + (selectedId === "__light__" ? " selected" : "");
     lightRow.innerHTML = '<span class="exp-icon">' + iconSvg("Lighting") + '</span><span>Lighting</span>';
-    lightRow.addEventListener("click", () => selectObject("__light__"));
+    lightRow.addEventListener("click", () => { if(!playMode.active) selectObject("__light__"); });
     children.appendChild(lightRow);
 
     sceneObjects.forEach(o => {
@@ -2538,7 +2768,7 @@
       row.className = "exp-row" + (o.id === selectedId ? " selected" : "");
       row.innerHTML = '<span class="exp-icon">' + iconSvg(o.className) + '</span><span></span>';
       row.querySelector("span:last-child").textContent = o.name;
-      row.addEventListener("click", () => selectObject(o.id));
+      row.addEventListener("click", () => { if(!playMode.active) selectObject(o.id); });
       row.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         if(playMode.active) return;
@@ -2548,10 +2778,32 @@
       children.appendChild(row);
     });
     body.appendChild(children);
+
+    // These match Roblox's DataModel service names/icons so the Explorer
+    // reads correctly to anyone who's used Studio before - honest caveat:
+    // they're structural placeholders right now, not wired to real
+    // separate-scope behavior yet (BlockVerse Studio's scripts don't
+    // currently distinguish server/client/replicated scope the way
+    // Roblox's actual services do).
+    const services = [
+      { name: "ReplicatedStorage", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>' },
+      { name: "StarterPlayerScripts", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>' },
+      { name: "ServerScriptService", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/></svg>' }
+    ];
+    services.forEach(s => {
+      const row = document.createElement("div");
+      row.className = "exp-row exp-service";
+      row.innerHTML = '<span class="exp-icon">' + s.icon + '</span><span>' + s.name + '</span>';
+      body.appendChild(row);
+    });
   }
 
   /* ---------------- Selection & Properties ---------------- */
   function selectObject(id){
+    // hard block, not just a UI nicety - this is what actually stops
+    // properties from being editable mid-playtest regardless of which
+    // panel/entry point someone clicks through
+    if(playMode.active || playMode.loading){ id = null; }
     selectedId = id;
     renderExplorer();
     renderProperties();
@@ -2561,6 +2813,8 @@
       else if(o.props.material !== "neon") o.mesh.material.emissive.setHex(0x000000);
     });
     rebuildGizmo();
+    const panel = document.getElementById("propsBody");
+    if(panel) panel.closest(".props-panel").style.pointerEvents = (playMode.active || playMode.loading) ? "none" : "";
   }
 
   function renderProperties(){
@@ -2922,6 +3176,7 @@
         fn(partApi, { wait: () => {} }); // wait is a no-op stub for now - real timing/coroutines aren't implemented
       }catch(err){
         showToast("Script error in " + obj.name + ": " + err.message);
+        logOutput(obj.name + " script error: " + err.message, "error");
       }
       compiledScripts[obj.id] = { handlers, wasTouching: false };
     });
@@ -2935,7 +3190,7 @@
       const partBox = new THREE.Box3().setFromObject(obj.mesh);
       const touching = rigBox.intersectsBox(partBox);
       if(touching && !entry.wasTouching){
-        entry.handlers.onTouched.forEach(fn => { try{ fn(); }catch(err){ showToast("Script error: " + err.message); } });
+        entry.handlers.onTouched.forEach(fn => { try{ fn(); }catch(err){ showToast("Script error: " + err.message); logOutput("Touched handler error: " + err.message, "error"); } });
       }
       entry.wasTouching = touching;
     }
