@@ -3,7 +3,7 @@
 // cache Firebase traffic or the three.js CDN script (live network needed).
 
 // bump this string to force-invalidate old cached copies
-const CACHE_NAME = "blockverse-shell-v3";
+const CACHE_NAME = "blockverse-shell-v4";
 const SHELL_FILES = [
   "./Index.html",
   "./manifest.json",
@@ -99,4 +99,18 @@ self.addEventListener("notificationclick", (event) => {
       return self.clients.openWindow(target);
     })
   );
+});
+
+// Widgets (Windows 11 widgets board)
+async function updateWidget(widget){
+  try{
+    const tpl = await (await fetch("widgets/quick.json")).text();
+    const data = await (await fetch("widgets/quick-data.json")).text();
+    await self.widgets.updateByTag(widget.definition.tag, { template: tpl, data: data });
+  }catch(e){}
+}
+self.addEventListener("widgetinstall", (event) => { if(self.widgets) event.waitUntil(updateWidget(event.widget)); });
+self.addEventListener("widgetresume", (event) => { if(self.widgets) event.waitUntil(updateWidget(event.widget)); });
+self.addEventListener("widgetclick", (event) => {
+  if(event.action === "open") event.waitUntil(self.clients.openWindow("./Index.html"));
 });
