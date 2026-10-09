@@ -1,21 +1,22 @@
-// BlockVerse service worker - caches just the app shell (this file + the
-// page itself) so the app can still launch instantly on a flaky
-// connection. It deliberately does NOT try to cache Firebase traffic or
-// the three.js CDN script - those need a live network anyway for
-// multiplayer to work, so caching them would just risk serving stale data.
+// BlockVerse service worker - caches the app shell, and handles periodic
+// sync, background sync and push notifications. It deliberately does NOT
+// cache Firebase traffic or the three.js CDN script (live network needed).
 
-// bump this string every time you want to force-invalidate old cached
-// copies (e.g. if you notice updates aren't showing up) - the activate
-// handler below deletes any cache whose name doesn't match this one
-const CACHE_NAME = "blockverse-shell-v2";
+// bump this string to force-invalidate old cached copies
+const CACHE_NAME = "blockverse-shell-v3";
 const SHELL_FILES = [
   "./Index.html",
-  "./manifest.json"
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
+    caches.open(CACHE_NAME).then((cache) =>
+      // add one by one so a single missing file can't fail the whole install
+      Promise.all(SHELL_FILES.map((f) => cache.add(f).catch(() => {})))
+    )
   );
   self.skipWaiting();
 });
@@ -29,23 +30,12 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// network-first: fresh copy when online, cached copy when offline
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-
-  // only handle same-origin GET requests for the shell files themselves -
-  // everything else (Firebase, three.js CDN, etc.) goes straight to the
-  // network untouched
   if(event.request.method !== "GET" || url.origin !== self.location.origin){
     return;
   }
-
-  // network-first, not stale-while-revalidate: try the live copy first so
-  // a fresh Index.html shows up on THIS load (not "next time"), and only
-  // fall back to the cached copy if the network request actually fails
-  // (offline). This is what stale-while-revalidate was getting wrong -
-  // it always served the OLD cached copy immediately regardless of
-  // whether a newer one was reachable, so every update needed an extra
-  // reopen before it became visible.
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -55,6 +45,58 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request)) // offline - fall back to whatever's cached
+      .catch(() => caches.match(event.request).then((hit) => hit || caches.match("./Index.html")))
+  );
+});
+
+// re-download the shell files so the offline copy stays fresh
+async function refreshShell(){
+  const cache = await caches.open(CACHE_NAME);
+  await Promise.all(SHELL_FILES.map((f) =>
+    fetch(f, { cache: "no-store" })
+      .then((r) => { if(r && r.status === 200) return cache.put(f, r); })
+      .catch(() => {})
+  ));
+}
+
+// Periodic Background Sync
+self.addEventListener("periodicsync", (event) => {
+  if(event.tag === "blockverse-refresh"){
+    event.waitUntil(refreshShell());
+  }
+});
+
+// Background Sync - runs once the connection comes back
+self.addEventListener("sync", (event) => {
+  if(event.tag === "blockverse-sync"){
+    event.waitUntil(refreshShell());
+  }
+});
+
+// Push Notifications
+self.addEventListener("push", (event) => {
+  let data = {};
+  try{ data = event.data ? event.data.json() : {}; }catch(e){ data = { body: event.data ? event.data.text() : "" }; }
+  const title = data.title || "BlockVerse";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "You have a new notification",
+      icon: "icon-192.png",
+      badge: "icon-192.png",
+      data: { url: data.url || "./Index.html" }
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "./Index.html";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for(const c of list){
+        if("focus" in c) return c.focus();
+      }
+      return self.clients.openWindow(target);
+    })
   );
 });
