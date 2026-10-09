@@ -2,34 +2,63 @@
   "id": "/BlockVerse/",
   "name": "BlockVerse",
   "short_name": "BlockVerse",
-  "description": "BlockVerse is a blocky multiplayer sandbox world — build, chat, customize your character and hang out with friends on Baseplate in real time.",
+  "description": "BlockVerse is a blocky multiplayer sandbox world \u2014 build, chat, customize your character and hang out with friends on Baseplate in real time.",
   "start_url": "./Index.html",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "tabbed",
+    "browser"
+  ],
   "orientation": "any",
   "lang": "en",
   "dir": "ltr",
   "background_color": "#0a0a0b",
   "theme_color": "#0a0a0b",
-  "categories": ["games", "entertainment", "social"],
+  "categories": [
+    "games",
+    "entertainment",
+    "social"
+  ],
   "handle_links": "preferred",
-  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
   "prefer_related_applications": false,
   "related_applications": [
-    { "platform": "play", "id": "com.blockverse.app" }
+    {
+      "platform": "play",
+      "id": "com.blockverse.app"
+    }
   ],
   "scope_extensions": [
-    { "type": "origin", "origin": "https://darkboyx.github.io" }
+    {
+      "type": "origin",
+      "origin": "https://darkboyx.github.io"
+    }
   ],
-  "edge_side_panel": { "preferred_width": 420 },
+  "edge_side_panel": {
+    "preferred_width": 420
+  },
   "protocol_handlers": [
-    { "protocol": "web+blockverse", "url": "./Index.html?launch=%s" }
+    {
+      "protocol": "web+blockverse",
+      "url": "./Index.html?launch=%s"
+    }
   ],
   "share_target": {
     "action": "./Index.html",
     "method": "GET",
-    "params": { "title": "title", "text": "text", "url": "url" }
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
   },
   "shortcuts": [
     {
@@ -37,24 +66,123 @@
       "short_name": "Home",
       "description": "Open the BlockVerse home screen",
       "url": "./Index.html",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "BlockVerse Studio",
       "short_name": "Studio",
       "description": "Create and publish your own games",
       "url": "./studio.html",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "screenshots": [
-    { "src": "screenshot-wide.png", "sizes": "1280x720", "type": "image/png", "form_factor": "wide", "label": "BlockVerse on desktop" },
-    { "src": "screenshot-narrow.png", "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "BlockVerse on mobile" }
+    {
+      "src": "screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "BlockVerse on desktop"
+    },
+    {
+      "src": "screenshot-narrow.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "BlockVerse on mobile"
+    }
+  ],
+  "tab_strip": {
+    "home_tab": "auto",
+    "new_tab_button": {
+      "url": "./Index.html"
+    }
+  },
+  "note_taking": {
+    "new_note_url": "./Index.html"
+  },
+  "file_handlers": [
+    {
+      "action": "./studio.html",
+      "name": "BlockVerse Studio image",
+      "accept": {
+        "image/png": [
+          ".png"
+        ],
+        "image/jpeg": [
+          ".jpg",
+          ".jpeg"
+        ],
+        "image/webp": [
+          ".webp"
+        ]
+      },
+      "launch_type": "single-client"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "BlockVerse Quick Play",
+      "short_name": "BlockVerse",
+      "tag": "blockverse-quick",
+      "description": "One-tap shortcut into BlockVerse",
+      "template": "blockverse-quick",
+      "ms_ac_template": "widgets/quick.json",
+      "data": "widgets/quick-data.json",
+      "type": "application/json",
+      "auth": false,
+      "update": 86400,
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "screenshots": [
+        {
+          "src": "screenshot-narrow.png",
+          "sizes": "720x1280",
+          "label": "BlockVerse quick play widget"
+        }
+      ]
+    }
   ]
 }
