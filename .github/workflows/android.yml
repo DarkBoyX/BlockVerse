@@ -1,0 +1,142 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Keep the same signing key between builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: blockverse-keystore-v1
+
+      - name: Create Capacitor project
+        run: |
+          npm init -y
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          mkdir -p www
+          echo '<!doctype html><meta http-equiv="refresh" content="0;url=https://darkboyx.github.io/BlockVerse/Index.html">' > www/index.html
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.blockverse.app",
+            "appName": "BlockVerse",
+            "webDir": "www",
+            "server": {
+              "url": "https://darkboyx.github.io/BlockVerse/Index.html",
+              "androidScheme": "https",
+              "allowNavigation": ["darkboyx.github.io"]
+            },
+            "android": { "appendUserAgent": "BlockVerseAndroid/1.0" }
+          }
+          EOF
+          npx cap add android
+
+      - name: App icon
+        run: |
+          sudo apt-get install -y imagemagick > /dev/null
+          RES=android/app/src/main/res
+          for d in mdpi:48:108 hdpi:72:162 xhdpi:96:216 xxhdpi:144:324 xxxhdpi:192:432; do
+            IFS=: read n l f <<< "$d"
+            convert icon-512.png -resize ${l}x${l} $RES/mipmap-$n/ic_launcher.png
+            convert icon-512.png -resize ${l}x${l} $RES/mipmap-$n/ic_launcher_round.png
+            convert icon-512.png -resize 66% -background black -gravity center -extent 512x512 -resize ${f}x${f} $RES/mipmap-$n/ic_launcher_foreground.png
+          done
+          echo '<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#000000</color></resources>' > $RES/values/ic_launcher_background.xml
+
+      - name: blockverse:// deep links
+        run: |
+          python3 - <<'PY'
+          p='android/app/src/main/AndroidManifest.xml'
+          s=open(p).read()
+          f='''</intent-filter>
+              <intent-filter>
+                  <action android:name="android.intent.action.VIEW" />
+                  <category android:name="android.intent.category.DEFAULT" />
+                  <category android:name="android.intent.category.BROWSABLE" />
+                  <data android:scheme="blockverse" />
+              </intent-filter>'''
+          open(p,'w').write(s.replace('</intent-filter>',f,1))
+          PY
+          cat > android/app/src/main/java/com/blockverse/app/MainActivity.java <<'EOF'
+          package com.blockverse.app;
+
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            private static final String BASE = "https://darkboyx.github.io/BlockVerse/Index.html";
+
+            private String gameIdFrom(Intent intent) {
+              if (intent == null) return null;
+              Uri u = intent.getData();
+              if (u == null || !"blockverse".equals(u.getScheme())) return null;
+              if ("play".equals(u.getHost())) return u.getLastPathSegment();
+              return null;
+            }
+
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              String id = gameIdFrom(getIntent());
+              if (id != null && bridge != null) {
+                bridge.getWebView().loadUrl(BASE + "?launch=" + Uri.encode(id));
+              }
+            }
+
+            @Override
+            protected void onNewIntent(Intent intent) {
+              super.onNewIntent(intent);
+              String id = gameIdFrom(intent);
+              if (id != null && bridge != null) {
+                final String js = "window.blockverseDeepLink && window.blockverseDeepLink(" + org.json.JSONObject.quote(id) + ")";
+                bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(js, null));
+              }
+            }
+          }
+          EOF
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Collect APK
+        run: |
+          mkdir -p downloads
+          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/BlockVerse.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlockVerse-apk
+          path: downloads/BlockVerse.apk
+
+      - name: Publish APK to the site
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -f downloads/BlockVerse.apk
+          git commit -m "Update BlockVerse.apk [skip ci]" || exit 0
+          git push
