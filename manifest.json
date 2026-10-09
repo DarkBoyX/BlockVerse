@@ -13,26 +13,48 @@
   "background_color": "#0a0a0b",
   "theme_color": "#0a0a0b",
   "categories": ["games", "entertainment", "social"],
-  "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  "handle_links": "preferred",
+  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "prefer_related_applications": false,
+  "related_applications": [
+    { "platform": "play", "id": "com.blockverse.app" }
   ],
-  "screenshots": [
+  "scope_extensions": [
+    { "type": "origin", "origin": "https://darkboyx.github.io" }
+  ],
+  "edge_side_panel": { "preferred_width": 420 },
+  "protocol_handlers": [
+    { "protocol": "web+blockverse", "url": "./Index.html?launch=%s" }
+  ],
+  "share_target": {
+    "action": "./Index.html",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  },
+  "shortcuts": [
     {
-      "src": "screenshot-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "BlockVerse"
+      "name": "BlockVerse Home",
+      "short_name": "Home",
+      "description": "Open the BlockVerse home screen",
+      "url": "./Index.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "src": "screenshot-narrow.png",
-      "sizes": "720x1280",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "BlockVerse"
+      "name": "BlockVerse Studio",
+      "short_name": "Studio",
+      "description": "Create and publish your own games",
+      "url": "./studio.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
+  ],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "screenshot-wide.png", "sizes": "1280x720", "type": "image/png", "form_factor": "wide", "label": "BlockVerse on desktop" },
+    { "src": "screenshot-narrow.png", "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "BlockVerse on mobile" }
   ]
 }
