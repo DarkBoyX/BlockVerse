@@ -64,7 +64,7 @@ jobs:
           done
           echo '<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#000000</color></resources>' > $RES/values/ic_launcher_background.xml
 
-      - name: blockverse:// deep links, black window, fullscreen, camera cutout
+      - name: Theme, deep links, fullscreen, camera cutout, version
         run: |
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
@@ -77,7 +77,22 @@ jobs:
                   <data android:scheme="blockverse" />
               </intent-filter>'''
           open(p,'w').write(s.replace('</intent-filter>',f,1))
+
+          # black window from the very first frame (the gray was the default dark theme colour)
+          p='android/app/src/main/res/values/styles.xml'
+          s=open(p).read()
+          old='<item name="android:background">@null</item>'
+          add='''<item name="android:background">@null</item>
+                  <item name="android:windowBackground">@android:color/black</item>
+                  <item name="android:colorBackground">@android:color/black</item>
+                  <item name="android:statusBarColor">@android:color/black</item>
+                  <item name="android:navigationBarColor">@android:color/black</item>
+                  <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>'''
+          print("styles patched:", old in s)
+          open(p,'w').write(s.replace(old,add))
           PY
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
           cat > android/app/src/main/java/com/blockverse/app/MainActivity.java <<'EOF'
           package com.blockverse.app;
 
@@ -116,7 +131,6 @@ jobs:
 
             @Override
             public void onCreate(Bundle savedInstanceState) {
-              // draw into the camera-cutout area too, so there is no gray/black strip beside the notch
               if (Build.VERSION.SDK_INT >= 28) {
                 try {
                   WindowManager.LayoutParams lp = getWindow().getAttributes();
