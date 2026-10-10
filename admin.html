@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlockVerse - Admin</title>
+<style>
+  :root{
+    --bg-0:#0a0a0b; --bg-1:#141416; --bg-2:#1b1b1e;
+    --border:#2a2a2e; --border-soft:#232326;
+    --text-0:#f2f2f3; --text-1:#c4c4c9; --text-2:#8a8a90; --text-3:#5c5c62;
+    --grey-1:#232326; --grey-2:#2c2c30; --grey-3:#3a3a40;
+    --danger:#e5484d; --success:#3ecf6e;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    background:
+      radial-gradient(circle at 15% -5%, rgba(74,108,247,0.10) 0%, transparent 45%),
+      radial-gradient(circle at 85% 105%, rgba(138,74,214,0.10) 0%, transparent 45%),
+      radial-gradient(circle at 20% 0%, #19191c 0%, transparent 45%),
+      radial-gradient(circle at 80% 100%, #16161a 0%, transparent 45%),
+      var(--bg-0);
+    color:var(--text-0); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  .card{
+    width:100%; max-width:760px; background:var(--bg-2); border:1px solid var(--border-soft);
+    border-radius:18px; padding:0; box-shadow:0 24px 70px rgba(0,0,0,0.65);
+    animation:fadeUp .4s ease both; overflow:hidden;
+  }
+  @keyframes fadeUp{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+  .card-inner{ padding:30px 28px 28px; }
+  .logo{
+    text-align:center; padding:26px 28px 22px; background:linear-gradient(180deg, rgba(74,108,247,0.08), transparent);
+    border-bottom:1px solid var(--border-soft);
+  }
+  .logo .cube{
+    display:inline-block; width:38px; height:38px;
+    background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
+    border:1px solid var(--border); border-radius:9px; margin-bottom:10px; transform:rotate(45deg);
+    box-shadow:0 0 0 rgba(74,108,247,0); animation:cubeGlow 4s ease-in-out infinite;
+  }
+  @keyframes cubeGlow{ 0%,100%{ box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ box-shadow:0 0 22px rgba(120,145,255,0.35); } }
+  .logo h1{ margin:0; font-size:20px; letter-spacing:0.3px; font-weight:800; }
+  .logo p{ margin:5px 0 0; font-size:11.5px; color:var(--text-2); }
+
+  /* ---------- quick stats strip ---------- */
+  .stats-strip{ display:flex; gap:10px; margin:0 0 20px; }
+  .stat-box{
+    flex:1; background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px;
+    padding:13px 14px; text-align:center;
+  }
+  .stat-box .stat-num{ font-size:20px; font-weight:800; color:var(--text-0); line-height:1.1; }
+  .stat-box .stat-label{ font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; }
+  .stat-box.stat-danger .stat-num{ color:#ff9d9f; }
+
+  label{ display:block; font-size:12px; color:var(--text-1); margin:14px 0 6px; }
+  input[type="password"], input[type="text"]{
+    width:100%; padding:12px 13px; background:var(--bg-1); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:14px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{ border-color:var(--grey-3); box-shadow:0 0 0 3px rgba(255,255,255,0.06); }
+
+  .btn{
+    width:100%; margin-top:18px; padding:12px; background:var(--grey-2); border:1px solid var(--border);
+    border-radius:9px; color:var(--text-0); font-size:14px; font-weight:600; cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  .btn:hover{ background:var(--grey-3); }
+  .btn:active{ transform:scale(0.98); }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn.danger{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  .btn.danger:hover{ background:#4a2224; }
+
+  .status-block{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px;
+    padding:16px; margin-bottom:6px;
+  }
+  .status-row{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; }
+  .status-row span:first-child{ color:var(--text-2); }
+  .status-row span:last-child{ color:var(--text-0); font-weight:600; }
+
+  .msg{ min-height:18px; font-size:12.5px; margin-top:10px; text-align:center; }
+  .msg.error{ color:var(--danger); }
+  .msg.success{ color:var(--success); }
+
+  .hidden{ display:none !important; }
+  .note{ font-size:11px; color:var(--text-3); margin-top:16px; line-height:1.5; text-align:center; }
+  .empty-note{ font-size:12.5px; color:var(--text-2); text-align:center; padding:20px 0; }
+
+  .role-badge{
+    text-align:center; font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase;
+    padding:8px 0; margin-bottom:18px; color:var(--text-1); background:var(--grey-1);
+    border:1px solid var(--border-soft); border-radius:9px; display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .role-badge .role-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 6px rgba(62,207,110,0.7); }
+  body.role-admin .owner-only{ display:none !important; }
+
+  /* ---------- Accounts panel ---------- */
+  .section-title{ font-size:13px; font-weight:700; margin:24px 0 12px; padding-top:20px; border-top:1px solid var(--border-soft); display:flex; align-items:center; gap:7px; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-1); }
+  .section-title .count-pill{ background:var(--grey-2); color:var(--text-2); font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; text-transform:none; letter-spacing:0; }
+  .acct-search-wrap{ position:relative; margin-bottom:12px; }
+  .acct-search-wrap svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+  .acct-search{ padding-left:34px !important; }
+  .acct-list{ max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .acct-row{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:11px;
+    padding:12px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    transition:border-color .15s, background .15s, transform .1s;
+  }
+  .acct-row:hover{ border-color:var(--grey-3); background:#17171a; transform:translateX(1px); }
+  .acct-name{ font-size:13.5px; font-weight:600; }
+  .acct-key{ font-size:11px; color:var(--text-3); }
+  .acct-badges{ display:flex; gap:5px; }
+  .acct-badge{ font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:6px; text-transform:uppercase; letter-spacing:0.3px; }
+  .acct-badge.banned{ background:#3a1c1d; color:#ff9d9f; }
+  .acct-actions{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+  .mini-btn{
+    padding:7px 11px; background:var(--grey-2); border:1px solid var(--border); border-radius:7px;
+    color:var(--text-0); font-size:11.5px; font-weight:600; cursor:pointer; transition:background .15s;
+  }
+  .mini-btn:hover{ background:var(--grey-3); }
+  .mini-btn.warn{ background:#3a3320; border-color:#5c4f26; color:#ffd98a; }
+  .mini-btn.warn:hover{ background:#4a4128; }
+  .mini-btn.ban{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  .mini-btn.ban:hover{ background:#4a2224; }
+  .mini-btn.terminate{ background:#e5484d; border-color:#e5484d; color:#fff; }
+  .mini-btn.terminate:hover{ background:#c93c41; }
+  .mini-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  /* ---------- Requested Games panel ---------- */
+  .game-req-list{ display:flex; flex-direction:column; gap:10px; }
+  .game-req-card{
+    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px; overflow:hidden;
+  }
+  .grc-banner{
+    width:100%; height:84px; background:linear-gradient(135deg,var(--grey-2),var(--grey-1)); background-size:cover; background-position:center;
+  }
+  .grc-body{ padding:12px 14px; display:flex; gap:12px; align-items:flex-start; }
+  .grc-icon{
+    width:48px; height:48px; border-radius:10px; background:var(--grey-2) center/cover no-repeat; flex-shrink:0;
+    border:1px solid var(--border-soft);
+  }
+  .grc-info{ flex:1; min-width:0; }
+  .grc-name{ font-size:14px; font-weight:700; }
+  .grc-meta{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
+  .grc-actions{ display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  .mini-btn.accept{ background:#173b26; border-color:#245c39; color:#6be29a; }
+  .mini-btn.accept:hover{ background:#1e4c31; }
+  .mini-btn.deny{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  .mini-btn.deny:hover{ background:#4a2224; }
+  .mini-btn.shutdown{ background:#3a3320; border-color:#5c4f26; color:#ffd98a; }
+  .mini-btn.shutdown:hover{ background:#4a4128; }
+  .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); display:inline-block; margin-right:5px; box-shadow:0 0 6px rgba(62,207,110,0.7); }
+
+  /* ---------- Tabs ---------- */
+  .admin-tabs{
+    display:flex; gap:4px; margin:0 0 20px; background:var(--bg-1); border:1px solid var(--border-soft);
+    border-radius:11px; padding:4px; overflow-x:auto;
+  }
+  .admin-tab{
+    flex:1; white-space:nowrap; text-align:center; padding:9px 10px; border-radius:8px; cursor:pointer;
+    font-size:12.5px; font-weight:600; color:var(--text-2); transition:background .15s, color .15s; user-select:none;
+  }
+  .admin-tab:hover{ color:var(--text-1); }
+  .admin-tab.active{ background:var(--grey-2); color:var(--text-0); }
+  .admin-tab .tab-count{
+    display:inline-block; margin-left:5px; background:var(--grey-1); color:var(--text-2); font-size:10px;
+    padding:1px 6px; border-radius:9px;
+  }
+  .admin-tab.active .tab-count{ background:var(--grey-3); color:var(--text-0); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+  .tab-panel .section-title:first-child{ margin-top:0; padding-top:0; border-top:none; }
+
+  /* ---------- Banned tab ---------- */
+  .ban-reason{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
+  .ban-meta{ font-size:10px; color:var(--text-3); margin-top:2px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="cube"></div>
+    <h1>BlockVerse Admin</h1>
+    <p>Publish updates &middot; disconnect live players</p>
+  </div>
+
+  <div class="card-inner">
+
+  <!-- gate screen -->
+  <div id="gateScreen">
+    <label for="gateEmail">Admin email</label>
+    <input type="text" id="gateEmail" placeholder="owner@blockverse.app" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label for="gateInput" style="margin-top:10px;display:block;">Password</label>
+    <input type="password" id="gateInput" placeholder="Password" autocomplete="current-password">
+    <button class="btn" id="gateBtn">Sign in</button>
+    <div class="msg" id="gateMsg"></div>
+    <p class="note">
+      Sign in with your admin account. What each account is allowed to do is enforced by
+      the Firebase database rules, not by this page.
+    </p>
+  </div>
+
+  <!-- publish screen -->
+  <div id="publishScreen" class="hidden">
+    <div class="role-badge" id="roleBadge"><span class="role-dot"></span><span id="roleBadgeText"></span></div>
+    <div style="text-align:right;margin:-4px 0 8px;"><a href="#" id="signOutLink" class="note" style="text-decoration:underline;">Sign out</a></div>
+
+    <div class="admin-tabs" id="adminTabs">
+      <div class="admin-tab active" data-tab="dashboard">Dashboard</div>
+      <div class="admin-tab" data-tab="accounts">Accounts<span class="tab-count" id="tabCountAccounts">-</span></div>
+      <div class="admin-tab" data-tab="banned">Banned<span class="tab-count" id="tabCountBanned">-</span></div>
+      <div class="admin-tab" data-tab="games">Games<span class="tab-count" id="tabCountGames">-</span></div>
+      <div class="admin-tab" data-tab="reports">Reports<span class="tab-count" id="tabCountReports">-</span></div>
+    </div>
+
+    <!-- Dashboard tab: quick stats + publish -->
+    <div class="tab-panel active" data-panel="dashboard">
+      <div class="stats-strip">
+        <div class="stat-box"><div class="stat-num" id="statTotal">-</div><div class="stat-label">Accounts</div></div>
+        <div class="stat-box stat-danger"><div class="stat-num" id="statBanned">-</div><div class="stat-label">Banned</div></div>
+        <div class="stat-box owner-only"><div class="stat-num" id="statVersion">-</div><div class="stat-label">Live version</div></div>
+      </div>
+
+      <div class="status-block owner-only">
+        <div class="status-row"><span>Current version</span><span id="curVersion">-</span></div>
+        <div class="status-row"><span>Last published</span><span id="curTs">-</span></div>
+      </div>
+      <button class="btn danger owner-only" id="publishBtn">Publish update &amp; disconnect players</button>
+      <div class="msg owner-only" id="publishMsg"></div>
+      <p class="note owner-only">
+        Publishing bumps the live version. Anyone currently in the game gets pulled
+        out immediately with a "please refresh" message; anyone just browsing the
+        site gets the same notice next time they interact with it.
+      </p>
+    </div>
+
+    <!-- Accounts tab: everyone, search + moderate -->
+    <div class="tab-panel" data-panel="accounts">
+      <div class="section-title">Accounts <span class="count-pill" id="acctCountPill">-</span></div>
+      <div class="acct-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="acctSearch" class="acct-search" placeholder="Search by username...">
+      </div>
+      <div class="acct-list" id="acctList"></div>
+      <p class="note">
+        Kick pulls someone out of Baseplate only. Ban blocks login and logs them
+        out everywhere immediately. Terminate permanently deletes the account and
+        unfriends it from everyone. None of this is undoable except Ban (you can unban
+        from here or from the dedicated Banned tab).
+      </p>
+    </div>
+
+    <!-- Banned tab: just banned accounts, fast unban -->
+    <div class="tab-panel" data-panel="banned">
+      <div class="section-title">Banned accounts <span class="count-pill" id="banCountPill">-</span></div>
+      <div class="acct-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="banSearch" class="acct-search" placeholder="Search banned users...">
+      </div>
+      <div class="acct-list" id="banList"></div>
+      <p class="note">Unban clears the ban immediately and lets them log back in right away.</p>
+    </div>
+
+    <!-- Games tab: requested + published -->
+    <div class="tab-panel" data-panel="games">
+      <div class="section-title">Requested Games <span class="count-pill" id="reqCountPill">-</span></div>
+      <div class="game-req-list" id="reqGamesList"></div>
+      <p class="note">
+        Accept publishes the game (icon + banner) to the home page for everyone.
+        Deny sends the reason back to the creator so they can fix it up and resubmit.
+      </p>
+
+      <div class="section-title">Published Games <span class="count-pill" id="pubCountPill">-</span></div>
+      <div class="game-req-list" id="pubGamesList"></div>
+      <p class="note">
+        Shutdown pulls a live game off the home page immediately - the creator can
+        resubmit it any time from Studio.
+      </p>
+    </div>
+
+    <!-- Reports tab: player/chat reports AND per-game reports, both sorted newest first -->
+    <div class="tab-panel" data-panel="reports">
+      <div class="section-title">Player Reports <span class="count-pill" id="reportCountPill">-</span></div>
+      <div class="acct-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="reportSearch" class="acct-search" placeholder="Search by reporter or target...">
+      </div>
+      <div class="acct-list" id="reportsList"></div>
+      <p class="note">
+        These come from the "Report player" option in chat/in-game. Shows who reported
+        whom, when, and why - moderation action (kick/ban/etc) still happens from the
+        Accounts tab using the target's name.
+      </p>
+
+      <div class="section-title" style="margin-top:24px;">Game Reports <span class="count-pill" id="gameReportCountPill">-</span></div>
+      <div class="acct-list" id="gameReportsList"></div>
+      <p class="note">
+        These come from the "Report game" option on a game's info page. Grouped by
+        which game was reported, newest first within each.
+      </p>
+    </div>
+
+  </div>
+
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+  // same project as Index.html - this page just writes one small value there
+  const firebaseConfig = {
+    apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
+    authDomain: "blockverse-3526c.firebaseapp.com",
+    databaseURL: "https://blockverse-3526c-default-rtdb.firebaseio.com",
+    projectId: "blockverse-3526c",
+    storageBucket: "blockverse-3526c.firebasestorage.app",
+    messagingSenderId: "782192628812",
+    appId: "1:782192628812:web:79d50d2c34cd8ac969d0e9"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const auth = firebase.auth();
+
+  // Admin access = real Firebase email + password sign-in. The database rules check these
+  // same two emails, so what each account may do is enforced by Firebase itself.
+  const OWNER_EMAIL = "owner@blockverse.app"; // full access: publish, kick, warn, ban, terminate
+  const MOD_EMAIL = "mod@blockverse.app";     // limited access: kick + warn only
+  // the account key (lowercase username) that's protected from admin-role
+  // moderation - an admin trying to kick/warn this account gets blocked and
+  // you get notified in-game instead. CHANGE THIS to your own username.
+  const OWNER_ACCOUNT_KEY = "yourownerusername";
+
+  let currentRole = null; // "owner" | "admin"
+
+  const gateScreen = document.getElementById("gateScreen");
+  const publishScreen = document.getElementById("publishScreen");
+  const gateEmail = document.getElementById("gateEmail");
+  const gateInput = document.getElementById("gateInput");
+  const gateBtn = document.getElementById("gateBtn");
+  const gateMsg = document.getElementById("gateMsg");
+  const publishBtn = document.getElementById("publishBtn");
+  const publishMsg = document.getElementById("publishMsg");
+  const curVersion = document.getElementById("curVersion");
+  const curTs = document.getElementById("curTs");
+
+  function showMsg(el, text, kind){ el.textContent = text; el.className = "msg " + kind; }
+
+  function roleForEmail(email){
+    email = (email || "").toLowerCase();
+    if(email === OWNER_EMAIL) return "owner";
+    if(email === MOD_EMAIL) return "admin";
+    return null;
+  }
+
+  function enterAdmin(role){
+    if(currentRole) return;
+    currentRole = role;
+    gateScreen.classList.add("hidden");
+    publishScreen.classList.remove("hidden");
+    document.body.classList.toggle("role-admin", currentRole === "admin");
+    document.getElementById("roleBadgeText").textContent = currentRole === "owner" ? "Owner access" : "Admin access (kick/warn only)";
+    loadStatus();
+    loadAccounts();
+    loadGameRequests();
+    loadReports();
+  }
+
+  gateBtn.addEventListener("click", async () => {
+    const email = gateEmail.value.trim().toLowerCase();
+    if(!email || !gateInput.value){ showMsg(gateMsg, "Enter your email and password.", "error"); return; }
+    gateBtn.disabled = true; showMsg(gateMsg, "", "");
+    try{
+      const cred = await auth.signInWithEmailAndPassword(email, gateInput.value);
+      const role = roleForEmail(cred.user.email);
+      if(!role){
+        await auth.signOut();
+        showMsg(gateMsg, "That account isn't an admin account.", "error");
+      }else{
+        gateInput.value = "";
+        enterAdmin(role);
+      }
+    }catch(e){
+      showMsg(gateMsg, "Wrong email or password.", "error");
+    }
+    gateBtn.disabled = false;
+  });
+  gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
+  gateEmail.addEventListener("keydown", e => { if(e.key === "Enter") gateInput.focus(); });
+
+  // already signed in from last time -> go straight in
+  auth.onAuthStateChanged((u) => {
+    if(u && !currentRole){ const r = roleForEmail(u.email); if(r) enterAdmin(r); }
+  });
+  document.getElementById("signOutLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    auth.signOut().then(() => location.reload());
+  });
+
+  /* ============ Tabs ============ */
+  document.getElementById("adminTabs").addEventListener("click", (e) => {
+    const tabEl = e.target.closest(".admin-tab");
+    if(!tabEl) return;
+    const name = tabEl.getAttribute("data-tab");
+    document.querySelectorAll(".admin-tab").forEach(t => t.classList.toggle("active", t === tabEl));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.getAttribute("data-panel") === name));
+  });
+
+  function loadStatus(){
+    db.ref("blockverse_version").once("value").then(snap => {
+      const v = snap.val();
+      const versionText = v && v.version != null ? String(v.version) : "0";
+      curVersion.textContent = versionText;
+      curTs.textContent = v && v.ts ? new Date(v.ts).toLocaleString() : "Never";
+      const statVersion = document.getElementById("statVersion");
+      if(statVersion) statVersion.textContent = versionText;
+    }).catch(() => {
+      curVersion.textContent = "?"; curTs.textContent = "?";
+    });
+  }
+
+  publishBtn.addEventListener("click", async () => {
+    publishBtn.disabled = true;
+    showMsg(publishMsg, "", "");
+    try{
+      if(!auth.currentUser) await auth.signInAnonymously();
+      await db.ref("blockverse_version").transaction(current => {
+        const next = (current && current.version ? current.version : 0) + 1;
+        return { version: next, ts: firebase.database.ServerValue.TIMESTAMP };
+      });
+      showMsg(publishMsg, "Published! Live players are being disconnected now.", "success");
+      loadStatus();
+    }catch(e){
+      showMsg(publishMsg, "Couldn't publish - check your connection and try again.", "error");
+    }
+    publishBtn.disabled = false;
+  });
+
+  /* ============ Accounts ============ */
+  const acctList = document.getElementById("acctList");
+  const acctSearch = document.getElementById("acctSearch");
+  const banList = document.getElementById("banList");
+  const banSearch = document.getElementById("banSearch");
+  let allAccounts = []; // [{key, username}]
+  let banStatus = {};   // key -> ban record or null
+
+  async function loadAccounts(){
+    acctList.innerHTML = '<p class="note">Loading...</p>';
+    if(!auth.currentUser) await auth.signInAnonymously().catch(()=>{});
+    try{
+      const [namesSnap, bansSnap] = await Promise.all([
+        db.ref("blockverse_usernames").once("value"),
+        db.ref("blockverse_account_bans").once("value")
+      ]);
+      const names = namesSnap.val() || {};
+      banStatus = bansSnap.val() || {};
+      allAccounts = Object.keys(names).map(key => ({ key, username: (names[key] && names[key].username) || key }))
+        .sort((a,b) => a.username.localeCompare(b.username));
+      renderAccounts();
+      renderBanned();
+    }catch(e){
+      acctList.innerHTML = '<p class="note">Couldn\'t load accounts.</p>';
+    }
+  }
+
+  // shared by both the Accounts tab and the Banned tab's ban/unban buttons
+  function setBan(key, username){
+    const banned = !!banStatus[key];
+    if(banned){
+      return db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
+    }
+    const reason = prompt("Ban reason for " + username + " (shown to them):") || "";
+    return db.ref("blockverse_account_bans/" + key).set({ reason, by: currentRole, ts: firebase.database.ServerValue.TIMESTAMP }).then(loadAccounts);
+  }
+
+  function unban(key){
+    return db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
+  }
+
+  function renderAccounts(){
+    const q = (acctSearch.value || "").trim().toLowerCase();
+    const rows = allAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
+    document.getElementById("acctCountPill").textContent = rows.length + " / " + allAccounts.length;
+    const tabCountAccounts = document.getElementById("tabCountAccounts");
+    if(tabCountAccounts) tabCountAccounts.textContent = allAccounts.length;
+
+    const statTotal = document.getElementById("statTotal");
+    const statBanned = document.getElementById("statBanned");
+    if(statTotal) statTotal.textContent = allAccounts.length;
+    if(statBanned) statBanned.textContent = Object.keys(banStatus).length;
+    if(rows.length === 0){ acctList.innerHTML = '<p class="note">No accounts found.</p>'; return; }
+    const isAdminRole = currentRole === "admin";
+    acctList.innerHTML = rows.map(a => {
+      const banned = !!banStatus[a.key];
+      return '<div class="acct-row" data-key="' + a.key + '">' +
+        '<div><div class="acct-name">' + escapeHtml(a.username) + '</div><div class="acct-key">' + escapeHtml(a.key) + '</div></div>' +
+        '<div class="acct-badges">' + (banned ? '<span class="acct-badge banned">Banned</span>' : '') + '</div>' +
+        '<div class="acct-actions">' +
+          '<button class="mini-btn kick-btn">Kick</button>' +
+          '<button class="mini-btn warn warn-btn">Warn</button>' +
+          (isAdminRole ? '' :
+            '<button class="mini-btn ban ban-btn">' + (banned ? 'Unban' : 'Ban') + '</button>' +
+            '<button class="mini-btn terminate terminate-btn">Terminate</button>') +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    // notifies the protected owner account in-game (reuses the existing
+    // warning-toast channel) that an admin-role login just tried to use a
+    // moderation command on them, instead of letting the action go through
+    function alertOwnerOfAttempt(action){
+      db.ref("blockverse_warnings/" + OWNER_ACCOUNT_KEY).set({
+        message: "An admin login just tried to " + action + " your account. It was blocked.",
+        ts: firebase.database.ServerValue.TIMESTAMP
+      }).catch(()=>{});
+    }
+
+    acctList.querySelectorAll(".acct-row").forEach(row => {
+      const key = row.getAttribute("data-key");
+      const username = row.querySelector(".acct-name").textContent;
+      const isOwnerTarget = key === OWNER_ACCOUNT_KEY;
+
+      row.querySelector(".kick-btn").addEventListener("click", () => {
+        if(isAdminRole && isOwnerTarget){ alertOwnerOfAttempt("kick"); alert("This account is protected - the owner has been notified."); return; }
+        db.ref("blockverse_kicks/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP, by: currentRole });
+      });
+
+      row.querySelector(".warn-btn").addEventListener("click", () => {
+        if(isAdminRole && isOwnerTarget){ alertOwnerOfAttempt("warn"); alert("This account is protected - the owner has been notified."); return; }
+        const message = prompt("Warning message for " + username + ":");
+        if(!message) return;
+        db.ref("blockverse_warnings/" + key).set({ message, ts: firebase.database.ServerValue.TIMESTAMP });
+      });
+
+      const banBtn = row.querySelector(".ban-btn");
+      if(banBtn) banBtn.addEventListener("click", () => setBan(key, username));
+
+      const termBtn = row.querySelector(".terminate-btn");
+      if(termBtn) termBtn.addEventListener("click", async () => {
+        if(!confirm("Permanently terminate " + username + "'s account? This deletes it and unfriends it from everyone. This cannot be undone.")) return;
+        termBtn.disabled = true; termBtn.textContent = "...";
+        await terminateAccount(key);
+        loadAccounts();
+      });
+    });
+  }
+
+  /* ============ Banned tab ============ */
+  function renderBanned(){
+    if(!banList) return;
+    const q = (banSearch && banSearch.value || "").trim().toLowerCase();
+    const bannedKeys = Object.keys(banStatus);
+    const bannedAccounts = allAccounts.filter(a => bannedKeys.includes(a.key));
+    const rows = bannedAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
+
+    document.getElementById("banCountPill").textContent = rows.length + " / " + bannedAccounts.length;
+    const tabCountBanned = document.getElementById("tabCountBanned");
+    if(tabCountBanned) tabCountBanned.textContent = bannedAccounts.length;
+
+    if(bannedAccounts.length === 0){ banList.innerHTML = '<p class="note">No banned accounts right now.</p>'; return; }
+    if(rows.length === 0){ banList.innerHTML = '<p class="note">No banned accounts match that search.</p>'; return; }
+
+    const isAdminRole = currentRole === "admin";
+    banList.innerHTML = rows.map(a => {
+      const b = banStatus[a.key] || {};
+      const reason = b.reason ? escapeHtml(b.reason) : "No reason given";
+      const meta = (b.by ? "Banned by " + escapeHtml(b.by) : "") + (b.ts ? " &middot; " + new Date(b.ts).toLocaleString() : "");
+      return '<div class="acct-row" data-key="' + a.key + '">' +
+        '<div>' +
+          '<div class="acct-name">' + escapeHtml(a.username) + '</div>' +
+          '<div class="acct-key">' + escapeHtml(a.key) + '</div>' +
+          '<div class="ban-reason">' + reason + '</div>' +
+          (meta ? '<div class="ban-meta">' + meta + '</div>' : '') +
+        '</div>' +
+        '<div class="acct-actions">' +
+          (isAdminRole ? '' : '<button class="mini-btn ban unban-btn">Unban</button>') +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    banList.querySelectorAll(".unban-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const row = btn.closest(".acct-row");
+        const key = row.getAttribute("data-key");
+        btn.disabled = true; btn.textContent = "...";
+        unban(key);
+      });
+    });
+  }
+  if(banSearch) banSearch.addEventListener("input", renderBanned);
+  acctSearch.addEventListener("input", renderAccounts);
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  /* ============ Reports ============ */
+  let allPlayerReports = [];
+  let allGameReports = {}; // { gameId: [report, ...] }
+
+  async function loadReports(){
+    try{
+      const [playerSnap, gameSnap] = await Promise.all([
+        db.ref("rooms/baseplate/reports").once("value"),
+        db.ref("game_reports").once("value")
+      ]);
+      const pv = playerSnap.val() || {};
+      allPlayerReports = Object.keys(pv).map(id => ({ id, ...pv[id] })).sort((a,b) => (b.ts||0) - (a.ts||0));
+      const gv = gameSnap.val() || {};
+      allGameReports = {};
+      Object.keys(gv).forEach(gameId => {
+        const reports = gv[gameId] || {};
+        allGameReports[gameId] = Object.keys(reports).map(id => ({ id, ...reports[id] })).sort((a,b) => (b.ts||0) - (a.ts||0));
+      });
+      renderPlayerReports();
+      renderGameReports();
+      const tabCount = document.getElementById("tabCountReports");
+      const totalGameReports = Object.values(allGameReports).reduce((sum, arr) => sum + arr.length, 0);
+      if(tabCount) tabCount.textContent = String(allPlayerReports.length + totalGameReports);
+    }catch(e){
+      console.warn("Couldn't load reports:", e);
+    }
+  }
+
+  function renderPlayerReports(){
+    const list = document.getElementById("reportsList");
+    const pill = document.getElementById("reportCountPill");
+    const q = (document.getElementById("reportSearch").value || "").toLowerCase().trim();
+    const filtered = allPlayerReports.filter(r =>
+      !q || (r.reporterName||"").toLowerCase().includes(q) || (r.targetName||"").toLowerCase().includes(q)
+    );
+    if(pill) pill.textContent = String(allPlayerReports.length);
+    if(!filtered.length){ list.innerHTML = '<div class="empty-note">No player reports' + (q ? " match that search." : " yet.") + '</div>'; return; }
+    list.innerHTML = filtered.map(r => (
+      '<div class="acct-row">' +
+        '<div>' +
+          '<div class="acct-name">' + escapeHtml(r.reporterName || "Unknown") + ' &rarr; ' + escapeHtml(r.targetName || "Unknown") + '</div>' +
+          '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + '</div>' +
+        '</div>' +
+        '<div class="acct-key" style="text-align:right; flex:none;">' + (r.ts ? new Date(r.ts).toLocaleString() : "-") + '</div>' +
+      '</div>'
+    )).join("");
+  }
+  document.getElementById("reportSearch").addEventListener("input", renderPlayerReports);
+
+  function renderGameReports(){
+    const list = document.getElementById("gameReportsList");
+    const pill = document.getElementById("gameReportCountPill");
+    const gameIds = Object.keys(allGameReports).filter(id => allGameReports[id].length > 0);
+    const total = gameIds.reduce((sum, id) => sum + allGameReports[id].length, 0);
+    if(pill) pill.textContent = String(total);
+    if(!gameIds.length){ list.innerHTML = '<div class="empty-note">No game reports yet.</div>'; return; }
+    list.innerHTML = gameIds.map(gameId => {
+      const reports = allGameReports[gameId];
+      const rows = reports.map(r => (
+        '<div class="acct-row" style="padding-left:16px;">' +
+          '<div>' +
+            '<div class="acct-name">' + escapeHtml(r.reporterName || "Unknown") + '</div>' +
+            '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + '</div>' +
+          '</div>' +
+          '<div class="acct-key" style="text-align:right; flex:none;">' + (r.ts ? new Date(r.ts).toLocaleString() : "-") + '</div>' +
+        '</div>'
+      )).join("");
+      return (
+        '<div class="section-title" style="font-size:12px; margin:10px 0 4px;">' +
+          escapeHtml(gameId) + ' <span class="count-pill">' + reports.length + '</span>' +
+        '</div>' + rows
+      );
+    }).join("");
+  }
+
+  // same logic as the self-service version in Index.html - deletes every
+  // per-account node and removes the reverse-friend edge on anyone who had
+  // this account as a friend. Deleting blockverse_sessions also force-logs
+  // them out immediately if they're online right now.
+  async function terminateAccount(key){
+    try{
+      const friendsSnap = await db.ref("blockverse_users/" + key + "/friends").once("value");
+      const friends = friendsSnap.val() || {};
+      await Promise.all(Object.keys(friends).map(fKey =>
+        db.ref("blockverse_users/" + fKey + "/friends/" + key).remove().catch(()=>{})
+      ));
+    }catch(e){}
+    // tombstone set FIRST - anyone online right now sees a clear "terminated"
+    // message via their own listener, and any future login attempt on this
+    // username shows the same message instead of a generic "not found"
+    await db.ref("blockverse_terminated/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP }).catch(()=>{});
+    const paths = [
+      "blockverse_credentials/" + key,
+      "blockverse_usernames/" + key,
+      "blockverse_users/" + key,
+      "blockverse_security/" + key,
+      "blockverse_active_claim/" + key,
+      "blockverse_login_codes/" + key,
+      "blockverse_account_bans/" + key,
+      "blockverse_kicks/" + key,
+      "blockverse_warnings/" + key,
+      "blockverse_sessions/" + key
+    ];
+    await Promise.all(paths.map(p => db.ref(p).remove().catch(()=>{})));
+  }
+
+  /* ============ Requested / Published Games ============ */
+  function escapeAttr(s){
+    return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  function updateGamesTabCount(){
+    const req = parseInt(document.getElementById("reqCountPill").textContent, 10) || 0;
+    const pub = parseInt(document.getElementById("pubCountPill").textContent, 10) || 0;
+    const tabCountGames = document.getElementById("tabCountGames");
+    if(tabCountGames) tabCountGames.textContent = req + pub;
+  }
+
+  async function loadGameRequests(){
+    if(!auth.currentUser) await auth.signInAnonymously().catch(()=>{});
+    db.ref("game_requests").orderByChild("ts").on("value", (snap) => {
+      const val = snap.val() || {};
+      const list = Object.keys(val).map(id => Object.assign({ id }, val[id])).filter(r => r.status === "pending");
+      list.sort((a,b) => (a.ts||0) - (b.ts||0));
+      renderGameRequests(list);
+    });
+    db.ref("published_games").on("value", (snap) => {
+      const val = snap.val() || {};
+      const list = Object.keys(val).map(id => Object.assign({ id }, val[id]));
+      list.sort((a,b) => (b.publishedAt||0) - (a.publishedAt||0));
+      renderPublishedGames(list);
+    });
+  }
+
+  function renderGameRequests(list){
+    document.getElementById("reqCountPill").textContent = list.length;
+    updateGamesTabCount();
+    const wrap = document.getElementById("reqGamesList");
+    if(list.length === 0){ wrap.innerHTML = '<p class="note">No games waiting for review.</p>'; return; }
+    wrap.innerHTML = list.map(r => {
+      const bannerStyle = r.banner ? ' style="background-image:url(\'' + escapeAttr(r.banner) + '\')"' : "";
+      const iconStyle = r.icon ? ' style="background-image:url(\'' + escapeAttr(r.icon) + '\')"' : "";
+      return '<div class="game-req-card" data-id="' + escapeAttr(r.id) + '">' +
+        '<div class="grc-banner"' + bannerStyle + '></div>' +
+        '<div class="grc-body">' +
+          '<div class="grc-icon"' + iconStyle + '></div>' +
+          '<div class="grc-info">' +
+            '<div class="grc-name">' + escapeAttr(r.name) + '</div>' +
+            '<div class="grc-meta">by ' + escapeAttr(r.ownerName) + ' &middot; up to ' + escapeAttr(r.maxPlayers) + ' players</div>' +
+            '<div class="grc-actions">' +
+              '<button class="mini-btn accept accept-btn">Accept &amp; Publish</button>' +
+              '<button class="mini-btn deny deny-btn">Deny</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    wrap.querySelectorAll(".game-req-card").forEach(card => {
+      const r = list.find(x => x.id === card.getAttribute("data-id"));
+      card.querySelector(".accept-btn").addEventListener("click", async (e) => {
+        e.target.disabled = true; e.target.textContent = "Publishing...";
+        try{
+          await db.ref("published_games/" + r.id).set({
+            gameId: r.id,
+            ownerKey: r.ownerKey,
+            ownerName: r.ownerName,
+            name: r.name,
+            icon: r.icon || "",
+            banner: r.banner || "",
+            maxPlayers: r.maxPlayers || 20,
+            publishedAt: firebase.database.ServerValue.TIMESTAMP,
+            publishedBy: currentRole
+          });
+          await db.ref("game_requests/" + r.id).remove();
+        }catch(err){
+          alert("Couldn't publish that game - check your connection and try again.");
+          e.target.disabled = false; e.target.textContent = "Accept & Publish";
+        }
+      });
+      card.querySelector(".deny-btn").addEventListener("click", async () => {
+        const reason = prompt("Reason for denying \"" + r.name + "\" (shown to the creator):") || "";
+        try{
+          await db.ref("game_requests/" + r.id).update({ status: "denied", denyReason: reason });
+          // clear the request node shortly after so it doesn't linger in the pending queue,
+          // once the creator's studio page has had a chance to pick up the denial
+          setTimeout(() => db.ref("game_requests/" + r.id).remove().catch(()=>{}), 4000);
+        }catch(err){
+          alert("Couldn't deny that game - check your connection and try again.");
+        }
+      });
+    });
+  }
+
+  function renderPublishedGames(list){
+    document.getElementById("pubCountPill").textContent = list.length;
+    updateGamesTabCount();
+    const wrap = document.getElementById("pubGamesList");
+    if(list.length === 0){ wrap.innerHTML = '<p class="note">No published games yet.</p>'; return; }
+    wrap.innerHTML = list.map(g => {
+      const bannerStyle = g.banner ? ' style="background-image:url(\'' + escapeAttr(g.banner) + '\')"' : "";
+      const iconStyle = g.icon ? ' style="background-image:url(\'' + escapeAttr(g.icon) + '\')"' : "";
+      return '<div class="game-req-card" data-id="' + escapeAttr(g.id) + '">' +
+        '<div class="grc-banner"' + bannerStyle + '></div>' +
+        '<div class="grc-body">' +
+          '<div class="grc-icon"' + iconStyle + '></div>' +
+          '<div class="grc-info">' +
+            '<div class="grc-name"><span class="live-dot"></span>' + escapeAttr(g.name) + '</div>' +
+            '<div class="grc-meta">by ' + escapeAttr(g.ownerName) + ' &middot; up to ' + escapeAttr(g.maxPlayers) + ' players</div>' +
+            '<div class="grc-actions">' +
+              '<button class="mini-btn shutdown shutdown-btn">Shutdown</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+
+    wrap.querySelectorAll(".game-req-card").forEach(card => {
+      const g = list.find(x => x.id === card.getAttribute("data-id"));
+      card.querySelector(".shutdown-btn").addEventListener("click", async (e) => {
+        if(!confirm('Shut down "' + g.name + '"? It will be pulled off the home page immediately.')) return;
+        e.target.disabled = true; e.target.textContent = "...";
+        try{
+          await db.ref("published_games/" + g.id).remove();
+        }catch(err){
+          alert("Couldn't shut that game down - check your connection and try again.");
+          e.target.disabled = false; e.target.textContent = "Shutdown";
+        }
+      });
+    });
+  }
+</script>
+</body>
+</html>
