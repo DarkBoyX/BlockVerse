@@ -3,7 +3,7 @@
 // cache Firebase traffic or the three.js CDN script (live network needed).
 
 // bump this string to force-invalidate old cached copies
-const CACHE_NAME = "blockverse-shell-v4";
+const CACHE_NAME = "blockverse-shell-v5";
 const SHELL_FILES = [
   "./Index.html",
   "./manifest.json",
@@ -36,8 +36,15 @@ self.addEventListener("fetch", (event) => {
   if(event.request.method !== "GET" || url.origin !== self.location.origin){
     return;
   }
+  // anything with a query string (connection probes, cache-busters, ?launch= links) goes
+  // straight to the network and is never cached
+  if(url.search){
+    return;
+  }
+  // "no-cache" = always re-check with the server first, so a new Index.html shows up right away
+  // instead of waiting for the browser's own 10 minute cache
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request.url, { cache: "no-cache" })
       .then((response) => {
         if(response && response.status === 200){
           const copy = response.clone();
