@@ -41,6 +41,7 @@ jobs:
             "appId": "com.blockverse.app",
             "appName": "BlockVerse",
             "webDir": "www",
+            "backgroundColor": "#000000",
             "server": {
               "url": "https://darkboyx.github.io/BlockVerse/Index.html",
               "androidScheme": "https",
@@ -63,7 +64,7 @@ jobs:
           done
           echo '<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#000000</color></resources>' > $RES/values/ic_launcher_background.xml
 
-      - name: blockverse:// deep links
+      - name: blockverse:// deep links, black window, fullscreen
         run: |
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
@@ -81,8 +82,13 @@ jobs:
           package com.blockverse.app;
 
           import android.content.Intent;
+          import android.graphics.Color;
+          import android.graphics.drawable.ColorDrawable;
           import android.net.Uri;
           import android.os.Bundle;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import androidx.core.view.WindowInsetsControllerCompat;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
@@ -96,13 +102,31 @@ jobs:
               return null;
             }
 
+            private void goFullscreen() {
+              try {
+                WindowInsetsControllerCompat c = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                if (c != null) {
+                  c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                  c.hide(WindowInsetsCompat.Type.systemBars());
+                }
+              } catch (Exception e) { }
+            }
+
             @Override
             public void onCreate(Bundle savedInstanceState) {
               super.onCreate(savedInstanceState);
+              getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+              goFullscreen();
               String id = gameIdFrom(getIntent());
               if (id != null && bridge != null) {
                 bridge.getWebView().loadUrl(BASE + "?launch=" + Uri.encode(id));
               }
+            }
+
+            @Override
+            public void onWindowFocusChanged(boolean hasFocus) {
+              super.onWindowFocusChanged(hasFocus);
+              if (hasFocus) goFullscreen();
             }
 
             @Override
