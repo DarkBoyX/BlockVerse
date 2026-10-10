@@ -73,19 +73,6 @@
           "type": "image/png"
         }
       ]
-    },
-    {
-      "name": "BlockVerse Studio",
-      "short_name": "Studio",
-      "description": "Create and publish your own games",
-      "url": "./studio.html",
-      "icons": [
-        {
-          "src": "icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
     }
   ],
   "icons": [
