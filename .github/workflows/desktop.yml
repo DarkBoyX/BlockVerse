@@ -1,0 +1,127 @@
+name: Build Windows App
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Create and build the desktop app
+        shell: bash
+        run: |
+          mkdir desktop
+          cp icon-512.png desktop/icon.png
+          cd desktop
+          cat > package.json <<'EOF'
+          {
+            "name": "blockverse-desktop",
+            "version": "1.0.0",
+            "description": "BlockVerse",
+            "author": "DarkBoyX",
+            "main": "main.js",
+            "devDependencies": {
+              "electron": "^31.0.0",
+              "electron-builder": "^24.13.3"
+            },
+            "build": {
+              "appId": "com.blockverse.desktop",
+              "productName": "BlockVerse",
+              "files": ["main.js", "icon.png"],
+              "directories": { "output": "dist" },
+              "win": { "target": "nsis", "icon": "icon.png" },
+              "nsis": {
+                "oneClick": false,
+                "perMachine": false,
+                "createDesktopShortcut": true,
+                "artifactName": "BlockVerse-Setup.${ext}"
+              },
+              "protocols": [{ "name": "BlockVerse", "schemes": ["blockverse"] }]
+            }
+          }
+          EOF
+          cat > main.js <<'EOF'
+          const { app, BrowserWindow, shell, Menu } = require("electron");
+          const path = require("path");
+
+          const SITE = "https://darkboyx.github.io/BlockVerse/Index.html";
+          // the website checks for this tag to know it is running inside the real app
+          app.userAgentFallback = app.userAgentFallback + " BlockVerseDesktop/1.0";
+          app.commandLine.appendSwitch("ignore-gpu-blocklist");
+
+          let win = null;
+
+          function findLink(argv){
+            return (argv || []).find(a => typeof a === "string" && a.startsWith("blockverse://")) || "";
+          }
+          function gameFrom(link){
+            try{
+              const u = new URL(link);
+              if(u.protocol === "blockverse:" && u.hostname === "play"){
+                const id = decodeURIComponent(u.pathname.replace(/^\//, ""));
+                return id || null;
+              }
+            }catch(e){}
+            return null;
+          }
+
+          function createWindow(gameId){
+            win = new BrowserWindow({
+              width: 1280, height: 760, minWidth: 900, minHeight: 560,
+              backgroundColor: "#000000",
+              icon: path.join(__dirname, "icon.png"),
+              autoHideMenuBar: true,
+              title: "BlockVerse",
+              webPreferences: { contextIsolation: true, nodeIntegration: false }
+            });
+            Menu.setApplicationMenu(null);
+            win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
+            win.webContents.on("will-navigate", (e, url) => {
+              if(!url.startsWith("https://darkboyx.github.io/") && !url.startsWith("blockverse://")){
+                e.preventDefault(); shell.openExternal(url);
+              }
+            });
+            win.loadURL(gameId ? SITE + "?launch=" + encodeURIComponent(gameId) : SITE);
+            win.on("closed", () => { win = null; });
+          }
+
+          if(process.defaultApp){
+            app.setAsDefaultProtocolClient("blockverse", process.execPath, [path.resolve(process.argv[1])]);
+          } else {
+            app.setAsDefaultProtocolClient("blockverse");
+          }
+
+          if(!app.requestSingleInstanceLock()){
+            app.quit();
+          } else {
+            app.on("second-instance", (event, argv) => {
+              const id = gameFrom(findLink(argv));
+              if(win){
+                if(win.isMinimized()) win.restore();
+                win.focus();
+                if(id) win.webContents.executeJavaScript("window.blockverseDeepLink && window.blockverseDeepLink(" + JSON.stringify(id) + ")").catch(() => {});
+              }
+            });
+            app.whenReady().then(() => createWindow(gameFrom(findLink(process.argv))));
+            app.on("window-all-closed", () => app.quit());
+          }
+          EOF
+          npm install --no-audit --no-fund
+          npx electron-builder --win --publish never
+
+      - name: Publish to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-${{ github.run_number }}
+          name: BlockVerse for Windows ${{ github.run_number }}
+          make_latest: true
+          files: desktop/dist/BlockVerse-Setup.exe
