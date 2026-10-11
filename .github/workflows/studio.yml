@@ -1,0 +1,100 @@
+name: Build Studio for Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Create and build the Studio app
+        shell: bash
+        run: |
+          mkdir studio-app
+          cp icon-512.png studio-app/icon.png
+          cd studio-app
+          cat > package.json <<'EOF'
+          {
+            "name": "blockverse-studio",
+            "version": "1.0.0",
+            "description": "BlockVerse Studio",
+            "author": "DarkBoyX",
+            "main": "main.js",
+            "devDependencies": {
+              "electron": "^31.0.0",
+              "electron-builder": "^24.13.3"
+            },
+            "build": {
+              "appId": "com.blockverse.studio",
+              "productName": "BlockVerse Studio",
+              "files": ["main.js", "icon.png"],
+              "directories": { "output": "dist" },
+              "win": { "target": "nsis", "icon": "icon.png" },
+              "nsis": {
+                "oneClick": false,
+                "perMachine": false,
+                "createDesktopShortcut": true,
+                "artifactName": "BlockVerse-Studio-Setup.${ext}"
+              }
+            }
+          }
+          EOF
+          cat > main.js <<'EOF'
+          const { app, BrowserWindow, shell, Menu } = require("electron");
+          const path = require("path");
+
+          const SITE = "https://darkboyx.github.io/BlockVerse/studio.html";
+          app.userAgentFallback = app.userAgentFallback + " BlockVerseStudio/1.0";
+          app.commandLine.appendSwitch("ignore-gpu-blocklist");
+
+          let win = null;
+
+          function createWindow(){
+            win = new BrowserWindow({
+              width: 1440, height: 880, minWidth: 1000, minHeight: 640,
+              backgroundColor: "#0a0a0b",
+              icon: path.join(__dirname, "icon.png"),
+              autoHideMenuBar: true,
+              title: "BlockVerse Studio",
+              webPreferences: { contextIsolation: true, nodeIntegration: false }
+            });
+            Menu.setApplicationMenu(null);
+            win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
+            win.webContents.on("will-navigate", (e, url) => {
+              if(!url.startsWith("https://darkboyx.github.io/")){
+                e.preventDefault(); shell.openExternal(url);
+              }
+            });
+            win.loadURL(SITE);
+            win.on("closed", () => { win = null; });
+          }
+
+          if(!app.requestSingleInstanceLock()){
+            app.quit();
+          } else {
+            app.on("second-instance", () => {
+              if(win){ if(win.isMinimized()) win.restore(); win.focus(); }
+            });
+            app.whenReady().then(createWindow);
+            app.on("window-all-closed", () => app.quit());
+          }
+          EOF
+          npm install --no-audit --no-fund
+          npx electron-builder --win --publish never
+
+      - name: Publish to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: studio-windows
+          name: BlockVerse Studio for Windows
+          make_latest: false
+          files: studio-app/dist/BlockVerse-Studio-Setup.exe
