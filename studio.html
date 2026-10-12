@@ -949,6 +949,36 @@
   #bvUpdating .up-sub{ font-size:13px; color:#9a9aa0; }
   #bvUpdating .sp-logo{ width:64px; height:64px; border-radius:16px; background:linear-gradient(160deg,#3a3a3e,#101012); border:1px solid #333336;
     display:flex; align-items:center; justify-content:center; font-weight:900; font-size:22px; color:#e8e8ea; animation:bvPulse 1.4s ease-in-out infinite; }
+
+  /* ---------- profile card: character face + account menu ---------- */
+  .studio-user{ position:relative; cursor:pointer; transition:background .15s, border-color .15s; user-select:none; }
+  .studio-user:hover, .studio-user.open{ background:var(--bg-3); border-color:var(--border); }
+  .studio-user .su-avatar{ width:38px; height:38px; border-radius:10px; overflow:hidden; background:var(--grey-2); border:1px solid var(--border); padding:0; }
+  .studio-user .su-avatar svg{ width:100%; height:100%; display:block; }
+  .studio-user .su-info{ flex:1; min-width:0; }
+  .studio-user .su-name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .studio-user .su-caret{ width:14px; height:14px; color:var(--text-3); flex-shrink:0; transition:transform .15s; }
+  .studio-user.open .su-caret{ transform:rotate(180deg); }
+  #suMenu{
+    position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:60; display:none; flex-direction:column; gap:2px; padding:6px;
+    background:var(--bg-2); border:1px solid var(--border); border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,.55); cursor:default;
+  }
+  #suMenu.show{ display:flex; animation:fadeUp .15s ease both; }
+  .su-menu-item{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:transparent; border:none; color:var(--text-1);
+    padding:9px 10px; border-radius:8px; font-size:12.5px; cursor:pointer; font-family:inherit;
+  }
+  .su-menu-item:hover{ background:var(--grey-1); color:var(--text-0); }
+  .su-menu-item svg{ width:15px; height:15px; flex-shrink:0; }
+  .su-menu-item.danger:hover{ color:#ff9d9f; }
+  .su-menu-sep{ height:1px; background:var(--border-soft); margin:3px 4px; }
+  .su-menu-title{ font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); padding:6px 10px 3px; }
+  .su-acct-face{ width:28px; height:28px; border-radius:8px; overflow:hidden; flex-shrink:0; background:var(--grey-2); }
+  .su-acct-face svg{ width:100%; height:100%; display:block; }
+  .su-acct-name{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .su-acct-tag{ font-size:10.5px; color:var(--text-3); }
+  .su-acct-x{ background:transparent; border:none; color:var(--text-3); font-size:16px; cursor:pointer; padding:0 4px; }
+  .su-acct-x:hover{ color:#ff9d9f; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
 <script type="text/plain" id="bvLuaPrelude">
@@ -2339,12 +2369,14 @@ function createLuaRuntime(fengari, A, preludeSrc){
 <div id="dashScreen">
   <div class="studio-sidebar">
     <div class="studio-brand"><span class="lb-mark">BV</span> Studio</div>
-    <div class="studio-user">
+    <div class="studio-user" id="studioUserCard" title="Account">
       <div class="su-avatar" id="dashAvatarInitial">?</div>
-      <div>
+      <div class="su-info">
         <div class="su-name" id="dashUsername">-</div>
         <div class="su-tag">Creator</div>
       </div>
+      <svg class="su-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      <div id="suMenu"></div>
     </div>
     <div class="studio-nav">
       <button class="studio-nav-btn active" data-dview="games">
@@ -2824,15 +2856,153 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
   });
 
-  document.getElementById("studioLogoutBtn").addEventListener("click", () => {
+  function studioSignOut(prefillUsername){
     currentUserKey = null; currentUsername = null;
     clearStudioSession();
     document.getElementById("dashScreen").classList.remove("show");
     document.getElementById("editorScreen").classList.remove("show");
     closeObjCtxMenu(); if(typeof stopServersWatch === "function") stopServersWatch();
+    closeUserMenu();
     document.getElementById("loginScreen").style.display = "flex";
+    document.getElementById("stUsername").value = prefillUsername || "";
     document.getElementById("stPassword").value = "";
+    clearLoginMsg();
+    document.getElementById(prefillUsername ? "stPassword" : "stUsername").focus();
+  }
+  document.getElementById("studioLogoutBtn").addEventListener("click", () => studioSignOut(""));
+
+  /* ---------------- Profile: character face + switch account / log out ---------------- */
+  /* ---- Roblox-style headshot: the character's head + face + shoulders, in their real colors ---- */
+  let _bvHsN = 0;
+  function bvHeadshotSvg(a){
+    a = (a && typeof a === "object") ? a : {};
+    const col = (v, fb) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : fb;
+    const torso = col(a.torso, "#4a5fd6");
+    const lArm = col(a.leftArm || a.leftArmColor, torso);
+    const rArm = col(a.rightArm || a.rightArmColor, torso);
+    const skin = col(a.headColor, "#f0c090");
+    let hs = Number(a.headScale); if(!isFinite(hs)) hs = 1; hs = Math.max(0.8, Math.min(1.2, hs));
+    const id = "bvhs" + (++_bvHsN);
+    const size = 50 * hs, top = 70 - size, left = 50 - size / 2, k = size / 128;
+    const px = (v) => (left + v * k).toFixed(2), py = (v) => (top + v * k).toFixed(2), r = (v) => (v * k).toFixed(2);
+    const mx = (cx) => px(cx);
+    return (
+      '<svg viewBox="5 3 90 90" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+        '<defs>' +
+          '<linearGradient id="' + id + 'bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a42"/><stop offset="1" stop-color="#1b1b1f"/></linearGradient>' +
+          '<linearGradient id="' + id + 'sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient>' +
+        '</defs>' +
+        '<rect width="100" height="100" fill="url(#' + id + 'bg)"/>' +
+        // shoulders: arms at the edges, torso in the middle
+        '<rect x="-6" y="73" width="26" height="50" rx="10" fill="' + lArm + '"/>' +
+        '<rect x="80" y="73" width="26" height="50" rx="10" fill="' + rArm + '"/>' +
+        '<rect x="-6" y="73" width="26" height="50" rx="10" fill="url(#' + id + 'sh)"/>' +
+        '<rect x="80" y="73" width="26" height="50" rx="10" fill="url(#' + id + 'sh)"/>' +
+        '<rect x="15" y="70" width="70" height="55" rx="11" fill="' + torso + '"/>' +
+        '<rect x="15" y="70" width="70" height="55" rx="11" fill="url(#' + id + 'sh)"/>' +
+        // neck + the head's shadow on the shirt
+        '<rect x="41" y="62" width="18" height="12" fill="' + skin + '"/><rect x="41" y="62" width="18" height="12" fill="#000" opacity=".18"/>' +
+        '<ellipse cx="50" cy="71" rx="' + (size * 0.38).toFixed(1) + '" ry="3.4" fill="#000" opacity=".22"/>' +
+        // head
+        '<rect x="' + left.toFixed(2) + '" y="' + top.toFixed(2) + '" width="' + size.toFixed(2) + '" height="' + size.toFixed(2) + '" rx="' + (size * 0.2).toFixed(2) + '" fill="' + skin + '"/>' +
+        '<rect x="' + left.toFixed(2) + '" y="' + top.toFixed(2) + '" width="' + size.toFixed(2) + '" height="' + size.toFixed(2) + '" rx="' + (size * 0.2).toFixed(2) + '" fill="url(#' + id + 'sh)"/>' +
+        // face = same classic face the 3D character wears
+        '<ellipse cx="' + px(44) + '" cy="' + py(56) + '" rx="' + r(6) + '" ry="' + r(10.5) + '" fill="#1c1c1c"/>' +
+        '<ellipse cx="' + px(84) + '" cy="' + py(56) + '" rx="' + r(6) + '" ry="' + r(10.5) + '" fill="#1c1c1c"/>' +
+        '<circle cx="' + px(46) + '" cy="' + py(51) + '" r="' + r(2.2) + '" fill="#fff" opacity=".85"/>' +
+        '<circle cx="' + px(86) + '" cy="' + py(51) + '" r="' + r(2.2) + '" fill="#fff" opacity=".85"/>' +
+        '<path d="M ' + px(86.65) + ' ' + py(82.46) + ' A ' + r(28) + ' ' + r(28) + ' 0 0 1 ' + px(41.35) + ' ' + py(82.46) + '" fill="none" stroke="#1c1c1c" stroke-width="' + r(5.5) + '" stroke-linecap="round"/>' +
+      '</svg>'
+    );
+  }
+
+  const STUDIO_ACCTS_KEY = "blockverse_studio_accounts";   // remembered usernames only - never passwords
+  function getStudioAccounts(){ try{ return JSON.parse(localStorage.getItem(STUDIO_ACCTS_KEY)) || []; }catch(e){ return []; } }
+  function setStudioAccounts(list){ try{ localStorage.setItem(STUDIO_ACCTS_KEY, JSON.stringify(list.slice(0, 8))); }catch(e){} }
+  function rememberStudioAccount(key, username){
+    setStudioAccounts([{ key, username }].concat(getStudioAccounts().filter(a => a.key !== key)));
+  }
+  const faceCache = {}; // key -> avatar object | false
+  async function faceFor(key){
+    if(faceCache[key] !== undefined) return faceCache[key];
+    let raw = null;
+    if(key === currentUserKey){ raw = (await loadStudioAvatar()).avatar; }
+    else{
+      try{ await fbReady; raw = (await fbDb.ref("blockverse_users/" + key + "/avatar").once("value")).val(); }catch(e){}
+    }
+    faceCache[key] = raw || false;
+    return faceCache[key];
+  }
+  async function refreshDashAvatar(){
+    const el = document.getElementById("dashAvatarInitial");
+    el.innerHTML = bvHeadshotSvg({});
+    const key = currentUserKey;
+    delete faceCache[key];
+    const av = await faceFor(key);
+    if(key === currentUserKey) el.innerHTML = bvHeadshotSvg(av || {});
+  }
+
+  const suCard = document.getElementById("studioUserCard"), suMenu = document.getElementById("suMenu");
+  const ICON_SWITCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M3 11V9a2 2 0 012-2h16"/><path d="M7 21l-4-4 4-4"/><path d="M21 13v2a2 2 0 01-2 2H3"/></svg>';
+  const ICON_OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
+  const ICON_BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
+  const ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+  function closeUserMenu(){ suMenu.classList.remove("show"); suCard.classList.remove("open"); }
+  function renderUserMenu(view){
+    if(view === "switch"){
+      const saved = getStudioAccounts();
+      suMenu.innerHTML =
+        '<button class="su-menu-item" data-act="back">' + ICON_BACK + 'Back</button><div class="su-menu-sep"></div>' +
+        '<div class="su-menu-title">Switch to</div>' +
+        saved.map(a => {
+          const cur = a.key === currentUserKey;
+          return '<div class="su-menu-item" data-acct="' + escapeHtmlS(a.key) + '" style="' + (cur ? 'cursor:default;opacity:.7' : '') + '">' +
+            '<div class="su-acct-face" data-face="' + escapeHtmlS(a.key) + '">' + bvHeadshotSvg({}) + '</div>' +
+            '<div class="su-acct-name">' + escapeHtmlS(a.username) + '<div class="su-acct-tag">' + (cur ? "Current account" : "Click to switch") + '</div></div>' +
+            (cur ? '' : '<button class="su-acct-x" data-forget="' + escapeHtmlS(a.key) + '" title="Forget this account">&times;</button>') +
+          '</div>';
+        }).join("") +
+        '<div class="su-menu-sep"></div>' +
+        '<button class="su-menu-item" data-act="add">' + ICON_PLUS + 'Add account</button>';
+      saved.forEach(a => faceFor(a.key).then(av => {
+        const el = suMenu.querySelector('[data-face="' + (window.CSS && CSS.escape ? CSS.escape(a.key) : a.key) + '"]');
+        if(el) el.innerHTML = bvHeadshotSvg(av || {});
+      }));
+    }else{
+      suMenu.innerHTML =
+        '<button class="su-menu-item" data-act="switch">' + ICON_SWITCH + 'Switch account</button>' +
+        '<button class="su-menu-item danger" data-act="logout">' + ICON_OUT + 'Log out</button>';
+    }
+  }
+  function escapeHtmlS(v){ return String(v).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+  suCard.addEventListener("click", (e) => {
+    if(suMenu.contains(e.target)) return;
+    if(suMenu.classList.contains("show")){ closeUserMenu(); return; }
+    renderUserMenu("main"); suMenu.classList.add("show"); suCard.classList.add("open");
   });
+  suMenu.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const forget = e.target.closest("[data-forget]");
+    if(forget){ setStudioAccounts(getStudioAccounts().filter(a => a.key !== forget.getAttribute("data-forget"))); renderUserMenu("switch"); return; }
+    const acct = e.target.closest("[data-acct]");
+    if(acct){
+      const key = acct.getAttribute("data-acct");
+      if(key === currentUserKey) return;
+      const found = getStudioAccounts().find(a => a.key === key);
+      studioSignOut(found ? found.username : "");   // lands on the login with that username filled in; after the password you're in that account's dashboard
+      return;
+    }
+    const btn = e.target.closest("[data-act]");
+    if(!btn) return;
+    const act = btn.getAttribute("data-act");
+    if(act === "switch") renderUserMenu("switch");
+    else if(act === "back") renderUserMenu("main");
+    else if(act === "add") studioSignOut("");
+    else if(act === "logout") studioSignOut("");
+  });
+  document.addEventListener("click", (e) => { if(!suCard.contains(e.target)) closeUserMenu(); });
+  document.addEventListener("keydown", (e) => { if(e.key === "Escape") closeUserMenu(); });
 
   /* ---------------- Dashboard: games list ---------------- */
   function gamesStorageKey(){ return "bv_studio_games_" + currentUserKey; }
@@ -2852,7 +3022,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     document.getElementById("dashScreen").classList.add("show");
     document.getElementById("dashUsername").textContent = currentUsername;
     rvGame = null; setDashView("games");
-    document.getElementById("dashAvatarInitial").textContent = currentUsername.slice(0,1).toUpperCase();
+    rememberStudioAccount(currentUserKey, currentUsername); refreshDashAvatar();
 
     fbDb.ref("studio_games/" + currentUserKey).once("value").then(snap => {
       const cloud = snap.val();
