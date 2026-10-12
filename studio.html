@@ -630,6 +630,184 @@
   #pcOnly{ display:none; position:fixed; inset:0; z-index:999999; background:#0a0a0b; color:#f2f2f3; font-family:system-ui,sans-serif; align-items:center; justify-content:center; text-align:center; padding:24px; }
   .is-touch #pcOnly{ display:flex; }
   .is-touch body > *:not(#pcOnly){ display:none !important; }
+#playHud .game-topbar{
+    position:absolute; top:16px; left:16px; z-index:20; display:flex; align-items:center; gap:9px;
+    background:rgba(20,20,22,0.55); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(6px);
+    padding:8px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s;
+    width:38px; height:38px; box-sizing:border-box;
+  }
+#playHud .game-topbar:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+#playHud .game-topbar .gt-cube{
+    width:20px; height:20px; border-radius:6px; background:linear-gradient(135deg,#48484e,#2a2a2e);
+    border:1px solid #333338; transform:rotate(45deg); flex-shrink:0;
+  }
+#playHud .game-chat-btn{
+    position:absolute; top:16px; left:64px; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,20,22,0.55); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(6px);
+    width:38px; height:38px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s; color:#e4e4e6;
+  }
+#playHud .game-chat-btn:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+#playHud .game-lb-btn{
+    position:absolute; top:16px; right:16px; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,20,22,0.55); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(6px);
+    width:38px; height:38px; border-radius:50%; cursor:pointer; transition:background .15s, transform .15s; color:#e4e4e6;
+  }
+#playHud .game-lb-btn:hover{ background:rgba(30,30,33,0.75); transform:scale(1.05); }
+#playHud .game-lb-btn.active{ background:rgba(74,95,214,0.55); border-color:rgba(74,95,214,0.7); }
+#playHud .game-lb-count{
+    position:absolute; top:-3px; right:-3px; background:var(--accent); color:#fff; font-size:9.5px; font-weight:700;
+    min-width:15px; height:15px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px;
+  }
+#playHud .game-lb-panel{
+    position:absolute; top:64px; right:16px; z-index:20; width:230px; max-height:60vh; overflow-y:auto;
+    background:rgba(20,20,22,0.88); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(12px);
+    border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:5px;
+    box-shadow:0 12px 30px rgba(0,0,0,0.4); animation:lbPanelIn .16s ease both;
+  }
+#playHud .game-lb-panel.hidden{ display:none; }
+#playHud .game-lb-head{
+    display:flex; align-items:center; justify-content:space-between; padding:4px 6px 8px;
+    font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; color:#8a8a90;
+    border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:2px;
+  }
+#playHud .game-lb-head .lb-hint{ font-size:9.5px; text-transform:none; letter-spacing:0; color:#5c5c62; font-weight:500; }
+#playHud .game-lb-row{
+    display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+    transition:background .12s, border-color .12s; color:#e4e4e6; font-size:13px;
+  }
+#playHud .game-lb-row:hover{ background:rgba(255,255,255,0.09); border-color:rgba(255,255,255,0.16); }
+#playHud .game-lb-row .game-lb-rank{ width:16px; flex-shrink:0; font-size:11px; color:#6a6a70; font-weight:700; text-align:center; }
+#playHud .game-lb-row .lb-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#playHud .game-lb-row .lb-you{ color:#8a8a90; font-size:10.5px; margin-left:auto; flex-shrink:0; }
+#playHud .game-chat-btn svg{ width:17px; height:17px; }
+#playHud .game-chat-panel{
+    position:absolute; top:64px; left:16px; z-index:25; width:430px; max-width:90vw;
+    background:rgba(16,16,18,0.86); border:1px solid rgba(255,255,255,0.08); border-radius:14px;
+    backdrop-filter:blur(6px); display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 14px 34px rgba(0,0,0,0.4); animation:modalIn .18s ease both;
+  }
+#playHud .game-chat-log-wrap{ position:relative; }
+#playHud .game-chat-log{
+    height:210px; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px;
+    scroll-behavior:smooth; overscroll-behavior:contain;
+  }
+#playHud .game-chat-log::-webkit-scrollbar{ width:7px; }
+#playHud .game-chat-log::-webkit-scrollbar-track{ background:transparent; }
+#playHud .game-chat-log::-webkit-scrollbar-thumb{ background:rgba(255,255,255,0.14); border-radius:8px; }
+#playHud .game-chat-log::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,0.24); }
+#playHud .game-chat-log{ scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.16) transparent; }
+#playHud .game-chat-log .cm{ font-size:13px; line-height:1.45; color:#d4d4d8; word-break:break-word; animation:fadeIn .15s ease both; }
+#playHud .game-chat-log .cm b{ color:#f2f2f2; }
+#playHud .game-chat-newmsg{
+    position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+    background:#f2f2f2; color:#0a0a0b; font-size:11.5px; font-weight:700;
+    padding:6px 12px; border-radius:20px; cursor:pointer; display:flex; align-items:center; gap:5px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.4); animation:fadeIn .15s ease both;
+  }
+#playHud .game-chat-newmsg svg{ width:12px; height:12px; }
+#playHud .chat-typing-indicator{
+    padding:0 12px; font-size:11px; font-style:italic; color:var(--text-2,#7a7a80);
+    height:16px; line-height:16px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  }
+#playHud .chat-typing-indicator.hidden{ display:none; }
+#playHud .game-chat-input-row{ display:flex; gap:6px; padding:10px; border-top:1px solid rgba(255,255,255,0.07); }
+#playHud .game-chat-input-row input{
+    flex:1; background:#1c1c1f; border:1px solid #2c2c30; border-radius:8px; color:#f2f2f2;
+    font-size:13px; padding:9px 11px; outline:none; font-family:inherit; min-width:0;
+  }
+#playHud .game-chat-input-row input:focus{ border-color:#48484e; }
+#playHud .game-chat-input-row button{
+    background:#f2f2f2; color:#0a0a0b; border:none; border-radius:8px; padding:0 14px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+#playHud .game-chat-input-row button:hover{ background:#dcdcdc; }
+#playHud .chat-whisper-chip{
+    display:flex; align-items:center; gap:6px; margin:0 10px 8px; padding:6px 10px; border-radius:8px;
+    background:rgba(155,120,255,0.16); border:1px solid rgba(155,120,255,0.35); color:#c9a8ff; font-size:11.5px; font-weight:600;
+  }
+#playHud .chat-whisper-chip svg{ width:13px; height:13px; flex-shrink:0; }
+#playHud .chat-whisper-chip span{ flex:1; }
+#playHud .chat-whisper-chip button{
+    width:18px; height:18px; border-radius:5px; background:none; border:none; color:#c9a8ff; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+#playHud .chat-whisper-chip button:hover{ background:rgba(255,255,255,0.12); }
+#playHud .chat-whisper-chip button svg{ width:12px; height:12px; }
+#playHud .game-chat-head{
+    display:flex; align-items:center; justify-content:space-between; padding:9px 12px;
+    border-bottom:1px solid rgba(255,255,255,0.07); font-size:12px; font-weight:700; color:#e4e4e6; letter-spacing:0.2px;
+  }
+#playHud .game-chat-gear{
+    width:26px; height:26px; border-radius:8px; background:rgba(255,255,255,0.06); border:none; color:#c4c4c8;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s, color .15s;
+  }
+#playHud .game-chat-gear:hover{ background:rgba(255,255,255,0.14); color:#f2f2f2; }
+#playHud .game-chat-gear svg{ width:15px; height:15px; }
+#playHud .game-tab-overlay{
+    position:absolute; inset:0; z-index:120; background:rgba(6,6,7,0.55); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; animation:fadeIn .18s ease both;
+  }
+#playHud .game-tab{
+    width:560px; max-width:92vw; max-height:88vh; overflow-y:auto;
+    background:#151517; border:1px solid #2c2c30; border-radius:16px;
+    box-shadow:0 24px 70px rgba(0,0,0,0.55); animation:modalIn .2s ease both;
+  }
+#playHud .game-tab.wide{ width:680px; }
+#playHud .game-tab-head{
+    display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid #242428;
+  }
+#playHud .game-tab-head .gt-cube-sm{
+    width:18px; height:18px; border-radius:5px; background:linear-gradient(135deg,#48484e,#2a2a2e);
+    border:1px solid #333338; transform:rotate(45deg); flex-shrink:0;
+  }
+#playHud .game-tab-head h3{ margin:0; font-size:14.5px; color:#f2f2f2; flex:1; }
+#playHud .game-tab-back{
+    width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:#232326; color:#b4b4b9; cursor:pointer; font-size:14px; transition:background .15s, color .15s;
+  }
+#playHud .game-tab-back:hover{ background:#2e2e32; color:#f2f2f2; }
+#playHud .game-tab-body{ padding:14px 16px 18px; }
+#playHud .game-tab-head .gt-invite-btn{
+    margin-left:auto; display:flex; align-items:center; gap:6px; padding:7px 13px;
+    background:#232326; border:1px solid #2c2c30; border-radius:8px; color:#e4e4e6;
+    font-size:12px; font-weight:600; cursor:pointer; transition:background .15s, border-color .15s;
+    flex-shrink:0;
+  }
+#playHud .game-tab-head .gt-invite-btn:hover{ background:#2c2c30; border-color:#3a3a40; }
+#playHud .game-tab-head .gt-invite-btn svg{ width:14px; height:14px; }
+#playHud .game-tab-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:14px 16px; }
+#playHud .game-tab-grid + .game-tab-grid{ padding-top:0; }
+#playHud .game-tab-btn{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
+    background:#1d1d20; border:1px solid #2a2a2e; border-radius:12px; padding:14px 6px;
+    color:#e4e4e6; font-size:11.5px; font-weight:600; letter-spacing:0.2px; cursor:pointer;
+    transition:background .15s, border-color .15s, transform .1s;
+  }
+#playHud .game-tab-btn:hover{ background:#26262a; border-color:#3a3a40; }
+#playHud .game-tab-btn:active{ transform:scale(0.96); }
+#playHud .game-tab-btn svg{ width:19px; height:19px; }
+#playHud .game-tab-btn.danger{ color:#ff9a9d; }
+#playHud .game-tab-btn.danger:hover{ background:rgba(229,72,77,0.1); border-color:rgba(229,72,77,0.35); }
+#playHud .game-settings-row{ padding:12px 4px; }
+#playHud .game-settings-row label{ display:flex; justify-content:space-between; font-size:12.5px; color:#b4b4b9; margin-bottom:8px; }
+#playHud .game-settings-row input[type="range"]{
+    width:100%; accent-color:#8a8a90; cursor:pointer;
+  }
+#playHud .settings-block .s-desc{ margin:0 0 16px; font-size:12.5px; color:var(--text-2); }
+
+  /* ---------- play-test HUD: the same chat / menu / player list as the real BlockVerse game ---------- */
+  #playHud{ position:absolute; inset:0; z-index:24; pointer-events:none; overflow:hidden; }
+  #playHud .hidden{ display:none !important; }
+  #playHud .game-topbar, #playHud .game-chat-btn, #playHud .game-lb-btn, #playHud .game-lb-panel,
+  #playHud .game-chat-panel, #playHud .game-tab-overlay{ pointer-events:auto; }
+  #playHud .game-tab-overlay{ inset:0; }
+  #playHud .game-settings-row input[type="range"]{ width:100%; }
+  #playHud .ph-note{ font-size:12px; color:var(--text-2); margin:0 0 10px; line-height:1.45; }
+  /* selected row in the Explorer: readable white-on-blue instead of white-on-near-white */
+  .exp-row.selected{ background:#2c4a8f !important; color:#fff !important; }
+  .exp-row.selected .exp-icon{ color:#fff; }
+  .exp-row.selected:hover{ background:#355aa8 !important; }
+
 </style>
 </head>
 <body>
@@ -1250,7 +1428,7 @@
   }
   window.addEventListener("blur", clearStuckKeys);
   const freecam = { yaw:0, pitch:0, speedMult:1 };
-  const playMode = { active:false, loading:false, camYaw:0, camPitch:0.25, camDist:9, velocityY:0, onGround:true, groundY:0 };
+  const playMode = { active:false, loading:false, menuOpen:false, emote:null, sens:1, camYaw:0, camPitch:0.25, camDist:9, velocityY:0, onGround:true, groundY:0 };
 
   const lightState = { brightness: 1, time: 13 }; // time: 0-24 hours
   let hemiLight, sunLight;
@@ -1381,6 +1559,7 @@
 
   async function openEditor(game){
     currentGame = game;
+    if(playMode.active && !playMode.loading) await stopPlay();
     showEditorLoading(true, "Opening " + escapeHtmlSE(game.name) + "&hellip;");
     document.getElementById("dashScreen").classList.remove("show");
     document.getElementById("editorScreen").classList.add("show");
@@ -1413,7 +1592,11 @@
     showEditorLoading(false);
   }
 
-  document.getElementById("editorBackBtn").addEventListener("click", () => {
+  document.getElementById("editorBackBtn").addEventListener("click", async () => {
+    // leaving the project in the middle of a play test used to leave the test running with no rig in the
+    // scene (invisible character you could still walk) and no way to stop it - always end the test first
+    if(playMode.loading) return;
+    if(playMode.active) await stopPlay();
     document.getElementById("editorScreen").classList.remove("show");
     document.getElementById("dashScreen").classList.add("show");
   });
@@ -1730,8 +1913,8 @@
 
       if(lookDragging){
         if(playMode.active){
-          playMode.camYaw -= dx * 0.006;
-          playMode.camPitch = Math.max(-1.1, Math.min(0.9, playMode.camPitch + dy * 0.006));
+          playMode.camYaw -= dx * 0.006 * (playMode.sens || 1);
+          playMode.camPitch = Math.max(-1.1, Math.min(0.9, playMode.camPitch + dy * 0.006 * (playMode.sens || 1)));
         }else{
           freecam.yaw -= dx * 0.0032;
           freecam.pitch = Math.max(-1.5, Math.min(1.5, freecam.pitch - dy * 0.0032));
@@ -1765,13 +1948,19 @@
         if(!playMode.loading){ if(playMode.active) stopPlay(); else startPlay(); }
         return;
       }
+      if(playMode.active && !playMode.loading){
+        if(e.key === "Escape"){ e.preventDefault(); phSetMenu(!playMode.menuOpen); return; }
+        if(e.key === "Tab"){ e.preventDefault(); phToggleLb(); return; }
+        if(playMode.menuOpen) return;                    // menu open: the character stays still
+      }
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if(tag === "INPUT" || tag === "TEXTAREA") return; // don't steal keys while typing
       const k = e.key.toLowerCase();
       if(["w","a","s","d"].includes(k)) keysDown[k] = true;
       if(k === " "){ e.preventDefault(); keysDown[" "] = true; }
       if(k === "enter" && playMode.active && !playMode.loading){
-        openChatInput();
+        e.preventDefault();
+        focusPlayChat();
       }
       if(playMode.active) return; // remaining shortcuts (delete/focus) are studio-mode only
       if(k === "backspace" && selectedId && selectedId !== "__light__"){
@@ -1861,12 +2050,14 @@
     const flatForward = new THREE.Vector3(-Math.sin(playMode.camYaw), 0, -Math.cos(playMode.camYaw));
     const flatRight = new THREE.Vector3(-flatForward.z, 0, flatForward.x);
     const moveDir = new THREE.Vector3();
-    if(keysDown["w"]) moveDir.add(flatForward);
-    if(keysDown["s"]) moveDir.sub(flatForward);
-    if(keysDown["d"]) moveDir.add(flatRight);
-    if(keysDown["a"]) moveDir.sub(flatRight);
+    const inputOn = !playMode.menuOpen;
+    if(inputOn && keysDown["w"]) moveDir.add(flatForward);
+    if(inputOn && keysDown["s"]) moveDir.sub(flatForward);
+    if(inputOn && keysDown["d"]) moveDir.add(flatRight);
+    if(inputOn && keysDown["a"]) moveDir.sub(flatRight);
 
     const isMoving = moveDir.lengthSq() > 0;
+    if(isMoving) playMode.emote = null;                 // walking cancels a dance
     if(isMoving){
       moveDir.normalize();
       rig.position.addScaledVector(moveDir, 7 * dt);
@@ -1875,7 +2066,8 @@
     }
 
     // gravity + jump, colliding against whatever part/platform is directly beneath the rig (not just the baseplate)
-    if(keysDown[" "] && playMode.onGround){
+    if(inputOn && keysDown[" "] && playMode.onGround){
+      playMode.emote = null;                             // jumping cancels a dance too
       playMode.velocityY = 10;
       playMode.onGround = false;
     }
@@ -1902,7 +2094,7 @@
       playMode.onGround = true;
     }
 
-    animateRig(rig, isMoving, !playMode.onGround, dt);
+    animateRig(rig, isMoving, !playMode.onGround, dt, playMode.emote === "dance");
     updateChatBubblePosition();
     checkScriptTouches(rig);
   }
@@ -1920,34 +2112,81 @@
     return hits.length ? hits[0].point.y : null;
   }
 
-  /* ---- rig walk-cycle animation (ported from BlockVerse's arm/leg swing idea) ---- */
-  function animateRig(rig, isMoving, inAir, dt){
-    if(rig.userData.animT === undefined) rig.userData.animT = 0;
-    if(rig.userData.animBlend === undefined) rig.userData.animBlend = 0; // 0=idle,1=walk
-    rig.userData.animT += dt * (isMoving ? 8 : 2);
-    const t = rig.userData.animT;
-    const parts = rig.userData.parts;
-    if(!parts) return;
+  function applyStudioDance(R, t){
+    // same three-move dance as the game: disco point -> raise the roof -> shuffle
+    const w = t * 8.5;
+    const s = Math.sin(w), c = Math.cos(w), half = Math.sin(w * 0.5);
+    const seg = Math.floor(t / 2.8) % 3;
+    const K = 0.28;
+    let lAx = 0, lAz = -0.12, rAx = 0, rAz = 0.12, lLx = 0, rLx = 0, bob = Math.abs(s) * 0.08;
+    if(seg === 0){
+      if(half > 0){ rAx = -0.3 + c * 0.1; rAz = 2.4 + s * 0.2; lAx = 0.1; lAz = -0.6; }
+      else        { lAx = -0.3 + c * 0.1; lAz = -2.4 - s * 0.2; rAx = 0.1; rAz = 0.6; }
+      lLx = s * 0.42; rLx = -s * 0.42;
+    } else if(seg === 1){
+      const pump = Math.sin(w * 2);
+      lAx = rAx = -2.55 + pump * 0.35; lAz = -0.2; rAz = 0.2;
+      lLx = 0.18 + pump * 0.12; rLx = -0.18 - pump * 0.12;
+      bob = Math.abs(pump) * 0.1;
+    } else {
+      lAx = -1.1 + s * 0.55; rAx = -1.1 - s * 0.55; lAz = -0.35; rAz = 0.35;
+      lLx = -Math.max(0, s) * 0.95; rLx = -Math.max(0, -s) * 0.95;
+      bob = Math.abs(s) * 0.12;
+    }
+    const ease = (m, axis, target) => { m.rotation[axis] += (target - m.rotation[axis]) * K; };
+    ease(R.lArm, "x", lAx);  ease(R.lArm, "z", lAz);
+    ease(R.rArm, "x", rAx);  ease(R.rArm, "z", rAz);
+    ease(R.lLeg, "x", lLx);  ease(R.rLeg, "x", rLx);
+    ease(R.lLeg, "z", -Math.abs(s) * 0.12); ease(R.rLeg, "z", Math.abs(s) * 0.12);
+    R.head.position.y = R.head.userData.baseY + bob;
+    R.head.rotation.z = half * 0.16;
+    R.head.rotation.x = c * 0.05;
+    R.root.rotation.z = half * 0.05;
+  }
 
-    // smoothly blend between idle and walk poses so transitions don't pop
-    const targetBlend = isMoving ? 1 : 0;
-    rig.userData.animBlend += (targetBlend - rig.userData.animBlend) * Math.min(1, dt * 8);
-    const blend = rig.userData.animBlend;
+  function animateRig(rig, isMoving, inAir, dt, dancing){
+    const P = rig.userData.parts;
+    if(!P) return;
+    const U = rig.userData;
+    U.walkT = U.walkT || 0; U.idleT = (U.idleT || 0) + dt * 1.8; U.danceT = U.danceT || 0;
+    const ease = (m, axis, target, k) => { m.rotation[axis] += (target - m.rotation[axis]) * k; };
+    const baseY = P.head.userData.baseY;
 
     if(inAir){
-      const jumpBlend = Math.min(1, (rig.userData.jumpT = (rig.userData.jumpT || 0) + dt * 6));
-      parts.lArm.rotation.x = THREE.MathUtils.lerp(parts.lArm.rotation.x, -0.9, jumpBlend);
-      parts.rArm.rotation.x = THREE.MathUtils.lerp(parts.rArm.rotation.x, -0.9, jumpBlend);
-      parts.lLeg.rotation.x = THREE.MathUtils.lerp(parts.lLeg.rotation.x, 0.35, jumpBlend);
-      parts.rLeg.rotation.x = THREE.MathUtils.lerp(parts.rLeg.rotation.x, -0.35, jumpBlend);
+      const k = Math.min(1, dt * 14);
+      ease(P.lArm, "x", -2.3, k); ease(P.rArm, "x", -2.3, k);
+      ease(P.lArm, "z", -0.35, k); ease(P.rArm, "z", 0.35, k);
+      ease(P.lLeg, "x", 0.3, k); ease(P.rLeg, "x", -0.3, k);
+      U.danceT = 0;
+      return;
+    }
+
+    if(dancing && !isMoving){
+      U.danceT += dt;
+      applyStudioDance({ lArm: P.lArm, rArm: P.rArm, lLeg: P.lLeg, rLeg: P.rLeg, head: P.head, root: rig }, U.danceT);
+      return;
+    }
+    U.danceT = 0;
+    // fade out anything a dance left behind
+    P.lLeg.rotation.z *= 0.7; P.rLeg.rotation.z *= 0.7;
+    P.head.rotation.z *= 0.8; P.head.rotation.x *= 0.8;
+    rig.rotation.z *= 0.8;
+
+    if(isMoving){
+      U.walkT += dt * 7.0;
+      const swing = Math.sin(U.walkT) * 0.5;
+      P.lLeg.rotation.x = swing;  P.rLeg.rotation.x = -swing;
+      P.lArm.rotation.x = -swing * 0.85; P.rArm.rotation.x = swing * 0.85;
+      P.lArm.rotation.z = Math.cos(U.walkT) * 0.06; P.rArm.rotation.z = -Math.cos(U.walkT) * 0.06;
+      P.head.position.y = baseY + Math.abs(Math.sin(U.walkT)) * 0.035;
     }else{
-      rig.userData.jumpT = 0;
-      const walkSwing = Math.sin(t) * 0.85;
-      const idleSwing = Math.sin(t * 0.55) * 0.05;
-      const armSwing = THREE.MathUtils.lerp(idleSwing, walkSwing, blend);
-      const legSwing = THREE.MathUtils.lerp(0, walkSwing, blend);
-      parts.lArm.rotation.x = armSwing;  parts.rArm.rotation.x = -armSwing;
-      parts.lLeg.rotation.x = -legSwing; parts.rLeg.rotation.x = legSwing;
+      P.lLeg.rotation.x *= 0.7; P.rLeg.rotation.x *= 0.7;
+      P.lArm.rotation.x *= 0.7; P.rArm.rotation.x *= 0.7;
+      P.lArm.rotation.z *= 0.7; P.rArm.rotation.z *= 0.7;
+      const breathe = Math.sin(U.idleT);
+      P.head.position.y += (baseY + breathe * 0.02 - P.head.position.y) * 0.15;
+      P.lArm.rotation.z += Math.sin(U.idleT) * 0.05; P.rArm.rotation.z -= Math.sin(U.idleT) * 0.05;
+      P.lArm.rotation.x += Math.sin(U.idleT * 0.5) * 0.03; P.rArm.rotation.x -= Math.sin(U.idleT * 0.5) * 0.03;
     }
   }
 
@@ -2121,23 +2360,6 @@
 
   /* ---------------- Play button (spawns the player's real BlockVerse rig) ---------------- */
   let playRigGroup = null;
-  let studioFaceTexture = null;
-  function getStudioFaceTexture(){
-    if(studioFaceTexture) return studioFaceTexture;
-    const canvas = document.createElement("canvas");
-    canvas.width = 128; canvas.height = 128;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#f0c090";
-    ctx.fillRect(0, 0, 128, 128);
-    ctx.fillStyle = "#2b2b2b";
-    ctx.beginPath(); ctx.arc(42, 52, 7, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(86, 52, 7, 0, Math.PI*2); ctx.fill();
-    ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.strokeStyle = "#2b2b2b";
-    ctx.beginPath(); ctx.arc(64, 68, 26, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke();
-    studioFaceTexture = new THREE.CanvasTexture(canvas);
-    return studioFaceTexture;
-  }
-
   function initPlayButton(){
     document.getElementById("editorPlayBtn").addEventListener("click", async () => {
       if(playMode.loading) return; // a startPlay() is already mid-flight - clicking again here is exactly what caused Leave to silently get overridden once that pending call finished
@@ -2146,59 +2368,363 @@
     });
   }
 
+  /* ---- the SAME character model as the real BlockVerse game (rounded plastic parts, new proportions,
+         classic face), scaled up to Studio's stud units ---- */
+  function studioRoundedBox(w, h, d, r, step){
+    const sx = Math.max(2, Math.round(w/step)), sy = Math.max(2, Math.round(h/step)), sz = Math.max(2, Math.round(d/step));
+    const g = new THREE.BoxGeometry(w, h, d, sx, sy, sz);
+    const pos = g.attributes.position, nor = g.attributes.normal;
+    const hw = w/2 - r, hh = h/2 - r, hd = d/2 - r;
+    const v = new THREE.Vector3(), inner = new THREE.Vector3(), dir = new THREE.Vector3();
+    for(let i = 0; i < pos.count; i++){
+      v.fromBufferAttribute(pos, i);
+      inner.set(Math.max(-hw, Math.min(hw, v.x)), Math.max(-hh, Math.min(hh, v.y)), Math.max(-hd, Math.min(hd, v.z)));
+      dir.subVectors(v, inner);
+      if(dir.lengthSq() > 1e-10){
+        dir.normalize();
+        nor.setXYZ(i, dir.x, dir.y, dir.z);
+        v.copy(inner).addScaledVector(dir, r);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+    }
+    pos.needsUpdate = true; nor.needsUpdate = true;
+    return g;
+  }
+  function makeStudioFaceTexture(){
+    const c = document.createElement("canvas"); c.width = 128; c.height = 128;
+    const x = c.getContext("2d");
+    x.fillStyle = "#f0c090"; x.fillRect(0, 0, 128, 128);
+    x.fillStyle = "#1c1c1c";
+    x.beginPath(); x.ellipse(44, 56, 6, 10.5, 0, 0, Math.PI*2); x.fill();
+    x.beginPath(); x.ellipse(84, 56, 6, 10.5, 0, 0, Math.PI*2); x.fill();
+    x.fillStyle = "rgba(255,255,255,0.85)";
+    x.beginPath(); x.arc(46, 51, 2.2, 0, Math.PI*2); x.fill();
+    x.beginPath(); x.arc(86, 51, 2.2, 0, Math.PI*2); x.fill();
+    x.lineWidth = 5.5; x.lineCap = "round"; x.strokeStyle = "#1c1c1c";
+    x.beginPath(); x.arc(64, 66, 28, 0.2*Math.PI, 0.8*Math.PI); x.stroke();
+    return new THREE.CanvasTexture(c);
+  }
+
+  // same defaults + limits the real game uses, so a missing/old/invalid saved look can never break the rig
+  function normalizeStudioAvatar(a){
+    a = a && typeof a === "object" ? a : {};
+    const col = (v, fb) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : fb;
+    const num = (v, lo, hi, fb) => { v = Number(v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : fb; };
+    const torso = col(a.torso, "#4a5fd6");
+    return {
+      torso,
+      leftArm: col(a.leftArm || a.leftArmColor, torso),
+      rightArm: col(a.rightArm || a.rightArmColor, torso),
+      leftLeg: col(a.leftLeg || a.leftLegColor, "#2a2a2e"),
+      rightLeg: col(a.rightLeg || a.rightLegColor, "#2a2a2e"),
+      heightScale: num(a.heightScale, 0.85, 1.15, 1),
+      headScale: num(a.headScale, 0.8, 1.2, 1)
+    };
+  }
+  // your saved look: this browser's copy first (what the game just saved), then the cloud copy
+  async function loadStudioAvatar(){
+    let raw = null;
+    try{
+      const s = localStorage.getItem("blockverse_custom_" + currentUserKey);
+      if(s) raw = JSON.parse(s);
+    }catch(e){}
+    if(!raw){
+      try{
+        const snap = await fbDb.ref("blockverse_users/" + currentUserKey + "/avatar").once("value");
+        raw = snap.val();
+      }catch(err){ console.error("Studio: couldn't load avatar for play test:", err); }
+    }
+    return { avatar: normalizeStudioAvatar(raw), found: !!raw };
+  }
+
   function buildRig(avatar){
-    avatar = avatar || {};
-    const torsoColor = avatar.torso || "#e8e8ec";
-    const leftArmColor = avatar.leftArm || avatar.leftArmColor || "#e8e8ec";
-    const rightArmColor = avatar.rightArm || avatar.rightArmColor || "#e8e8ec";
-    const leftLegColor = avatar.leftLeg || avatar.leftLegColor || "#3a3a3e";
-    const rightLegColor = avatar.rightLeg || avatar.rightLegColor || "#3a3a3e";
-    const headColor = avatar.headColor || "#f0c090";
-    const heightScale = avatar.heightScale || 1;
-    const headScale = avatar.headScale || 1;
+    const c = normalizeStudioAvatar(avatar);
+    const K = 2.1;                       // game units -> Studio studs (keeps the character ~5 studs tall)
+    const grp = new THREE.Group();
+    const PLASTIC = { roughness: 0.7, metalness: 0.0 };
+    const std = (hex) => new THREE.MeshStandardMaterial({ color: hex, ...PLASTIC });
+    const skin = std(0xf0c090);
+    const faceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: makeStudioFaceTexture(), ...PLASTIC });
+    const headMats = [skin, skin, skin, skin, faceMat, skin];
 
-    const group = new THREE.Group();
-    const mkMat = (hex) => new THREE.MeshLambertMaterial({ color: new THREE.Color(hex) });
+    const limb = (mat, w, h, d, pivotY) => {
+      const g = new THREE.Group();
+      const m = new THREE.Mesh(studioRoundedBox(w, h, d, 0.04, 0.09), mat);
+      m.position.y = -h/2; m.castShadow = true; m.receiveShadow = true;
+      g.add(m); g.position.y = pivotY;
+      return g;
+    };
 
-    const legH = 2 * heightScale, torsoH = 2 * heightScale, headSize = 1.2 * headScale;
+    const TORSO_H = 1.1, TORSO_Y = 1.35, HEAD_BASE = 0.62, NECK = 0.01;
+    const torso = new THREE.Mesh(studioRoundedBox(0.9, TORSO_H, 0.46, 0.04, 0.09), std(c.torso));
+    torso.position.y = TORSO_Y; torso.castShadow = true; torso.receiveShadow = true;
+    grp.add(torso);
 
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(2,torsoH,1), mkMat(torsoColor));
-    torso.position.y = legH + torsoH/2;
-    torso.castShadow = true; torso.receiveShadow = true;
-    group.add(torso);
+    const headSize = HEAD_BASE * c.headScale;
+    const headY = TORSO_Y + TORSO_H/2 + headSize/2 + NECK;
+    const head = new THREE.Mesh(studioRoundedBox(headSize, headSize, headSize, 0.1, 0.05), headMats);
+    head.position.y = headY; head.userData.baseY = headY; head.castShadow = true;
+    grp.add(head);
 
-    // face goes on the front (+Z) only, matching BoxGeometry's fixed face
-    // order [+X,-X,+Y,-Y,+Z,-Z] - the back of the head (-Z) stays plain
-    // skin so the smiley doesn't show through the back of your character
-    const headSkin = mkMat(headColor);
-    const headFace = new THREE.MeshLambertMaterial({ color: new THREE.Color(headColor), map: getStudioFaceTexture() });
-    const head = new THREE.Mesh(new THREE.BoxGeometry(headSize,headSize,headSize), [headSkin, headSkin, headSkin, headSkin, headFace, headSkin]);
-    head.position.y = legH + torsoH + headSize/2;
-    head.castShadow = true; head.receiveShadow = true;
-    group.add(head);
+    const lArm = limb(std(c.leftArm), 0.45, 1.05, 0.45, 1.85);  lArm.position.x = -0.685; grp.add(lArm);
+    const rArm = limb(std(c.rightArm), 0.45, 1.05, 0.45, 1.85); rArm.position.x = 0.685;  grp.add(rArm);
+    const lLeg = limb(std(c.leftLeg), 0.45, 1.05, 0.45, 0.78);  lLeg.position.x = -0.226; grp.add(lLeg);
+    const rLeg = limb(std(c.rightLeg), 0.45, 1.05, 0.45, 0.78); rLeg.position.x = 0.226;  grp.add(rLeg);
 
-    // arms/legs get their own pivot groups positioned at the shoulder/hip so rotation swings naturally
-    const armGeo = new THREE.BoxGeometry(0.6, torsoH, 0.6);
-    const lArmPivot = new THREE.Group(); lArmPivot.position.set(-1.3, legH + torsoH, 0);
-    const lArmMesh = new THREE.Mesh(armGeo, mkMat(leftArmColor)); lArmMesh.position.y = -torsoH/2;
-    lArmPivot.add(lArmMesh); group.add(lArmPivot);
+    // lift so the soles sit exactly on the floor (same fix as the game)
+    const lift = new THREE.Group(); lift.position.y = 0.27;
+    grp.children.slice().forEach(k => lift.add(k));
+    grp.add(lift);
 
-    const rArmPivot = new THREE.Group(); rArmPivot.position.set(1.3, legH + torsoH, 0);
-    const rArmMesh = new THREE.Mesh(armGeo.clone(), mkMat(rightArmColor)); rArmMesh.position.y = -torsoH/2;
-    rArmPivot.add(rArmMesh); group.add(rArmPivot);
+    const S = 0.86 * K;
+    grp.scale.set(S, S * c.heightScale, S);
+    grp.userData.parts = { lArm, rArm, lLeg, rLeg, head };
+    grp.userData.bubbleY = (headY + headSize/2 + 0.27) * S * c.heightScale + 0.7;
+    return grp;
+  }
 
-    const legGeo = new THREE.BoxGeometry(0.8, legH, 0.8);
-    const lLegPivot = new THREE.Group(); lLegPivot.position.set(-0.55, legH, 0);
-    const lLegMesh = new THREE.Mesh(legGeo, mkMat(leftLegColor)); lLegMesh.position.y = -legH/2;
-    lLegPivot.add(lLegMesh); group.add(lLegPivot);
+  /* ================= play-test HUD: same chat / menu / player list as the real game ================= */
+  let playHudEl = null;
+  const PLAY_HUD_HTML = `<div class="game-topbar" id="gameMenuBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:20px;height:20px;color:#e4e4e6;"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </div>
+<div class="game-chat-btn" id="gameChatBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+  </div>
+<div class="game-lb-btn" id="gameLbBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    <span class="game-lb-count hidden" id="gameLbCount">0</span>
+  </div>
+<div class="game-lb-panel hidden" id="gameLbPanel"></div>
+<div class="game-chat-panel" id="gameChatPanel">
+    <div class="game-chat-head">
+      <span>Chat</span>
+      <button class="game-chat-gear" id="gameChatGearBtn" title="View messages / report" aria-label="Chat settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+      </button>
+    </div>
+    <div class="game-chat-log-wrap">
+      <div class="game-chat-log" id="gameChatLog"></div>
+      <div class="game-chat-newmsg hidden" id="gameChatNewMsgPill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 9l7 7 7-7"/></svg>
+        New messages
+      </div>
+    </div>
+    <div class="chat-whisper-chip hidden" id="chatWhisperChip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l-4-4 4-4"/><path d="M5 8h11a4 4 0 010 8h-1"/></svg>
+      <span id="chatWhisperChipText"></span>
+      <button id="chatWhisperChipClear" aria-label="Cancel whisper">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="chat-typing-indicator hidden" id="chatTypingIndicator"></div>
+    <div class="game-chat-input-row">
+      <input type="text" id="gameChatInput" maxlength="140" placeholder="Message...">
+      <button id="gameChatSendBtn">Send</button>
+    </div>
+  </div>
+<div class="game-tab-overlay hidden" id="gameMenuOverlay">
+<div class="game-tab" id="tabMain">
+      <div class="game-tab-head"><div class="gt-cube-sm"></div><h3>Menu</h3></div>
+      <div class="game-tab-grid">
+        <button class="game-tab-btn" id="btnView">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          View
+        </button>
+        <button class="game-tab-btn" id="btnSettings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 005 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Settings
+        </button>
+        
+      </div>
+      <div class="game-tab-grid">
+        <button class="game-tab-btn" id="btnResume">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Resume
+        </button>
+        <button class="game-tab-btn" id="btnRespawn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Respawn
+        </button>
+        <button class="game-tab-btn danger" id="btnLeaveGame">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Leave
+        </button>
+      </div>
+    </div>
+<div class="game-tab wide hidden" id="tabView">
+      <div class="game-tab-head"><div class="game-tab-back" data-back="tabMain">&larr;</div><h3>Players</h3></div>
+      <div class="game-tab-body">
+        <p class="ph-note">This is a solo play test, so only you are here. Everything else (chat, menu, player list) works like it does in the real game.</p>
+        <div id="phViewList"></div>
+      </div>
+    </div>
+<div class="game-tab hidden" id="tabSettings">
+      <div class="game-tab-head">
+        <div class="game-tab-back" data-back="tabMain">←</div>
+        <h3>Settings</h3>
+      </div>
+      <div class="game-tab-body">
+        <div class="game-settings-row">
+          <label><span>Mouse sensitivity</span><span id="sensValue">1.0x</span></label>
+          <input type="range" id="sensRange" min="0.2" max="3" step="0.1" value="1">
+        </div>
+        
+        </div>
+        
+        </div>
+      </div>
+    </div>
+</div>`;
 
-    const rLegPivot = new THREE.Group(); rLegPivot.position.set(0.55, legH, 0);
-    const rLegMesh = new THREE.Mesh(legGeo.clone(), mkMat(rightLegColor)); rLegMesh.position.y = -legH/2;
-    rLegPivot.add(rLegMesh); group.add(rLegPivot);
+  function phQ(sel){ return playHudEl ? playHudEl.querySelector(sel) : null; }
+  function phShowTab(id){
+    const ov = phQ("#gameMenuOverlay"); if(!ov) return;
+    ov.querySelectorAll(".game-tab").forEach(t => t.classList.toggle("hidden", t.id !== id));
+  }
+  function phSetMenu(open){
+    const ov = phQ("#gameMenuOverlay"); if(!ov) return;
+    playMode.menuOpen = !!open;
+    clearStuckKeys();
+    ov.classList.toggle("hidden", !open);
+    if(open){ phShowTab("tabMain"); const cb = document.activeElement; if(cb && cb.blur) cb.blur(); }
+  }
+  function phAddChat(name, text, system){
+    const log = phQ("#gameChatLog"); if(!log) return;
+    const row = document.createElement("div");
+    row.className = "cm";
+    if(system){
+      row.style.color = "#9a9aa2";
+      row.textContent = text;
+    }else{
+      const b = document.createElement("b"); b.textContent = name + ": ";
+      row.appendChild(b); row.appendChild(document.createTextNode(text));
+    }
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+  function phRenderPlayers(){
+    const me = currentUsername || "Player";
+    const panel = phQ("#gameLbPanel");
+    const count = phQ("#gameLbCount");
+    if(count){ count.textContent = "1"; count.classList.remove("hidden"); }
+    if(panel){
+      panel.innerHTML = "";
+      const head = document.createElement("div"); head.className = "game-lb-head";
+      head.innerHTML = '<span>Online - 1</span><span class="lb-hint">Tab to close</span>';
+      const row = document.createElement("div"); row.className = "game-lb-row";
+      const rank = document.createElement("span"); rank.className = "game-lb-rank"; rank.textContent = "1";
+      const nm = document.createElement("span"); nm.className = "lb-name"; nm.textContent = me;
+      const you = document.createElement("span"); you.className = "lb-you"; you.textContent = "You";
+      row.append(rank, nm, you);
+      panel.append(head, row);
+    }
+    const list = phQ("#phViewList");
+    if(list){
+      list.innerHTML = "";
+      const row = document.createElement("div"); row.className = "game-lb-row";
+      const rank = document.createElement("span"); rank.className = "game-lb-rank"; rank.textContent = "1";
+      const nm = document.createElement("span"); nm.className = "lb-name"; nm.textContent = me;
+      const you = document.createElement("span"); you.className = "lb-you"; you.textContent = "You";
+      row.append(rank, nm, you);
+      list.appendChild(row);
+    }
+  }
+  function phToggleLb(force){
+    const panel = phQ("#gameLbPanel"), btn = phQ("#gameLbBtn"); if(!panel) return;
+    const show = typeof force === "boolean" ? force : panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", !show);
+    if(btn) btn.classList.toggle("active", show);
+  }
+  function phToggleChat(force){
+    const panel = phQ("#gameChatPanel"); if(!panel) return;
+    const show = typeof force === "boolean" ? force : panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", !show);
+    if(show){ const inp = phQ("#gameChatInput"); if(inp) inp.focus(); }
+  }
+  function focusPlayChat(){
+    phToggleChat(true);
+    const inp = phQ("#gameChatInput"); if(inp) inp.focus();
+  }
+  function phSend(){
+    const inp = phQ("#gameChatInput"); if(!inp) return;
+    const text = inp.value.trim();
+    inp.value = "";
+    if(!text) return;
+    const lower = text.toLowerCase();
+    if(lower === "/dance" || lower === "/dance 1"){
+      playMode.emote = "dance";
+      phAddChat("", "You are dancing - move or jump to stop.", true);
+      return;
+    }
+    phAddChat(currentUsername || "Player", text, false);
+    showChatBubble(text);
+  }
+  function phRespawn(){
+    const rig = playRigGroup; if(!rig) return;
+    const spawn = sceneObjects.find(o => o.className === "SpawnLocation");
+    const sp = spawn ? spawn.mesh.position : new THREE.Vector3(0, 0, 0);
+    rig.position.set(sp.x, playMode.groundY, sp.z);
+    playMode.velocityY = 0; playMode.onGround = true; playMode.emote = null;
+    phAddChat("", "Respawned.", true);
+  }
+  function createPlayHud(){
+    destroyPlayHud();
+    const wrap = document.querySelector(".viewport-wrap");
+    if(!wrap) return;
+    const hud = document.createElement("div");
+    hud.id = "playHud";
+    hud.innerHTML = PLAY_HUD_HTML;
+    wrap.appendChild(hud);
+    playHudEl = hud;
+    playMode.menuOpen = false; playMode.emote = null; playMode.sens = playMode.sens || 1;
 
-    group.userData.parts = { lArm:lArmPivot, rArm:rArmPivot, lLeg:lLegPivot, rLeg:rLegPivot };
-    group.userData.legH = legH;
-    return group;
+    phQ("#gameMenuBtn").addEventListener("click", () => phSetMenu(!playMode.menuOpen));
+    phQ("#gameChatBtn").addEventListener("click", () => phToggleChat());
+    phQ("#gameLbBtn").addEventListener("click", () => phToggleLb());
+    phQ("#gameChatSendBtn").addEventListener("click", phSend);
+    phQ("#gameChatInput").addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){ phSend(); }
+      else if(e.key === "Escape"){ e.target.blur(); }
+      e.stopPropagation();
+    });
+    // the chat's gear is the game's "view messages / report" - there is nothing to report in a solo test
+    const gear = phQ("#gameChatGearBtn"); if(gear) gear.style.display = "none";
+
+    hud.querySelectorAll(".game-tab-back").forEach(b => b.addEventListener("click", () => phShowTab(b.dataset.back || "tabMain")));
+    phQ("#btnResume").addEventListener("click", () => phSetMenu(false));
+    phQ("#btnRespawn").addEventListener("click", () => { phSetMenu(false); phRespawn(); });
+    phQ("#btnLeaveGame").addEventListener("click", () => { phSetMenu(false); stopPlay(); });
+    phQ("#btnView").addEventListener("click", () => { phRenderPlayers(); phShowTab("tabView"); });
+    phQ("#btnSettings").addEventListener("click", () => phShowTab("tabSettings"));
+    const sens = phQ("#sensRange"), sensVal = phQ("#sensValue");
+    if(sens){
+      sens.value = String(playMode.sens);
+      if(sensVal) sensVal.textContent = playMode.sens.toFixed(1) + "x";
+      sens.addEventListener("input", () => {
+        playMode.sens = parseFloat(sens.value) || 1;
+        if(sensVal) sensVal.textContent = playMode.sens.toFixed(1) + "x";
+      });
+    }
+    // clicking the dark area around the menu closes it, like the real game
+    phQ("#gameMenuOverlay").addEventListener("mousedown", (e) => { if(e.target.id === "gameMenuOverlay") phSetMenu(false); });
+
+    phRenderPlayers();
+    phAddChat("", "Play test started. Press Enter to chat, type /dance to dance.", true);
+  }
+  function destroyPlayHud(){
+    const old = document.getElementById("playHud");
+    if(old) old.remove();
+    playHudEl = null;
+    playMode.menuOpen = false; playMode.emote = null;
+  }
+
+  // the ribbon holds the Play/Leave button, so during a play test only the EDIT tools are hidden -
+  // hiding the whole ribbon is what used to make it impossible to leave
+  function setRibbonForPlay(on){
+    const ribbon = document.querySelector(".ribbon"); if(!ribbon) return;
+    const keep = document.getElementById("editorPlayBtn").closest(".ribbon-group");
+    Array.from(ribbon.children).forEach(ch => { ch.style.display = (on && ch !== keep) ? "none" : ""; });
   }
 
   function showPlayLoading(show, label){
@@ -2227,13 +2753,8 @@
       const spawnPos = spawn ? spawn.mesh.position : new THREE.Vector3(0,0,0);
       const spawnHalfH = spawn ? spawn.props.size[1]/2 : 0;
 
-      let avatar = null;
-      try{
-        const snap = await fbDb.ref("blockverse_users/" + currentUserKey + "/avatar").once("value");
-        avatar = snap.val();
-      }catch(err){
-        console.error("Studio: couldn't load avatar for play test:", err);
-      }
+      const loaded = await loadStudioAvatar();
+      const avatar = loaded.avatar;
 
       // small artificial delay so the loading screen is visible even on a fast connection
       await new Promise(res => setTimeout(res, 550));
@@ -2243,6 +2764,7 @@
       playRigGroup.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
       scene.add(playRigGroup);
       compileAllScripts();
+      createPlayHud();
 
       playMode.active = true;
       playMode.velocityY = 0;
@@ -2256,16 +2778,15 @@
       closeObjCtxMenu();
       hidePartsPicker();
       selectObject(null);
-      const tabbar = document.querySelector(".ribbon");
-      if(tabbar) tabbar.style.display = "none";
+      setRibbonForPlay(true);
       document.getElementById("addPartBtn").disabled = true;
 
       const btn = document.getElementById("editorPlayBtn");
       btn.classList.add("playing");
       btn.querySelector("span").textContent = "Leave";
       btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-      document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat &middot; F5 to stop";
-      showToast(avatar ? "Playing with your BlockVerse rig" : "Playing (no saved avatar found, using defaults)");
+      document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat &middot; Esc for the menu &middot; F5 to stop";
+      showToast(loaded.found ? "Playing with your BlockVerse character" : "Playing (no saved character found, using the default look)");
       logOutput("Play test started");
     }catch(err){
       console.error("Studio: error while starting play test (recovered, not stuck):", err);
@@ -2285,15 +2806,19 @@
       clearStuckKeys();
       if(playRigGroup){
         scene.remove(playRigGroup);
-        playRigGroup.traverse((c) => { if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); });
+        playRigGroup.traverse((c) => {
+          if(c.geometry) c.geometry.dispose();
+          const mats = Array.isArray(c.material) ? c.material : (c.material ? [c.material] : []);
+          mats.forEach(m => { if(m.map) m.map.dispose(); m.dispose(); });
+        });
         playRigGroup = null;
       }
       closeChatInput();
       removeChatBubble();
+      destroyPlayHud();
 
       // restore studio editing controls
-      const tabbar = document.querySelector(".ribbon");
-      if(tabbar) tabbar.style.display = "";
+      setRibbonForPlay(false);
       document.getElementById("addPartBtn").disabled = false;
       const panel = document.getElementById("propsBody");
       if(panel) panel.closest(".props-panel").style.pointerEvents = "";
@@ -2361,7 +2886,7 @@
     if(!chatBubbleEl || !playRigGroup) return;
     if(performance.now() > chatBubbleUntil){ removeChatBubble(); return; }
     const headPos = playRigGroup.position.clone();
-    headPos.y += (playRigGroup.userData.legH || 2) * 2 + 1.4;
+    headPos.y += playRigGroup.userData.bubbleY || 6;
     const proj = headPos.project(camera);
     const wrap = document.querySelector(".viewport-wrap");
     const x = (proj.x * 0.5 + 0.5) * wrap.clientWidth;
