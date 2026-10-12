@@ -431,6 +431,9 @@
   .output-line{ color:var(--text-2); padding:1px 0; white-space:pre-wrap; word-break:break-word; }
   .output-error{ color:#f28b8b; }
   .output-panel.closed{ display:none; }
+  .props-panel.collapsed, .explorer-panel.collapsed{ display:none; }
+  .ribbon-btn.view-toggle{ opacity:.55; }
+  .ribbon-btn.view-toggle.active{ background:var(--grey-1); color:var(--text-0); border-color:var(--grey-3); opacity:1; }
   #statusOutputToggle:hover{ color:var(--text-0); }
   .output-warn{ color:#e8c589; }
 
@@ -2562,6 +2565,26 @@ function createLuaRuntime(fengari, A, preludeSrc){
       </div>
       <div class="ribbon-label">Test</div>
     </div>
+
+    <div class="ribbon-divider"></div>
+
+    <div class="ribbon-group">
+      <div class="ribbon-row">
+        <button class="ribbon-btn view-toggle active" id="viewPropsBtn" title="Show / hide Properties">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          <span>Properties</span>
+        </button>
+        <button class="ribbon-btn view-toggle active" id="viewExplorerBtn" title="Show / hide Explorer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+          <span>Explorer</span>
+        </button>
+        <button class="ribbon-btn view-toggle active" id="viewOutputBtn" title="Show / hide Output">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
+          <span>Output</span>
+        </button>
+      </div>
+      <div class="ribbon-label">View</div>
+    </div>
   </div>
 
   <div class="editor-body">
@@ -3263,11 +3286,24 @@ function createLuaRuntime(fengari, A, preludeSrc){
       });
       const outPanel = document.querySelector(".output-panel");
       const outToggle = document.getElementById("statusOutputToggle");
+      const propsPanel = document.querySelector(".props-panel"), expPanel = document.querySelector(".explorer-panel");
+      const vBtn = { props:document.getElementById("viewPropsBtn"), exp:document.getElementById("viewExplorerBtn"), out:document.getElementById("viewOutputBtn") };
+      const savePanels = () => { try{ localStorage.setItem("bv_studio_panels", JSON.stringify({ props:!propsPanel.classList.contains("collapsed"), exp:!expPanel.classList.contains("collapsed"), out:!outPanel.classList.contains("closed") })); }catch(e){} };
+      const refit = () => setTimeout(() => window.dispatchEvent(new Event("resize")), 0); // let the 3D view refill the space
       const setOutput = (open) => {
         outPanel.classList.toggle("closed", !open);
         outToggle.style.display = open ? "none" : "inline";
-        setTimeout(() => window.dispatchEvent(new Event("resize")), 0); // let the 3D view refill the space
+        vBtn.out.classList.toggle("active", open);
+        refit(); savePanels();
       };
+      const setPanel = (panel, btn, open) => { panel.classList.toggle("collapsed", !open); btn.classList.toggle("active", open); refit(); savePanels(); };
+      vBtn.props.addEventListener("click", () => setPanel(propsPanel, vBtn.props, propsPanel.classList.contains("collapsed")));
+      vBtn.exp.addEventListener("click", () => setPanel(expPanel, vBtn.exp, expPanel.classList.contains("collapsed")));
+      vBtn.out.addEventListener("click", () => setOutput(outPanel.classList.contains("closed")));
+      try{
+        const saved = JSON.parse(localStorage.getItem("bv_studio_panels") || "null");
+        if(saved){ if(saved.props === false) setPanel(propsPanel, vBtn.props, false); if(saved.exp === false) setPanel(expPanel, vBtn.exp, false); if(saved.out === false) setOutput(false); }
+      }catch(e){}
       document.getElementById("outputCloseBtn").addEventListener("click", () => setOutput(false));
       outToggle.addEventListener("click", () => setOutput(true));
       editorInited = true;
@@ -3774,6 +3810,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       playMode.emote = null;                             // jumping cancels a dance too
       playMode.velocityY = 10 * ((LuaRT && LuaRT.running ? LuaRT.hum.JumpPower : 50) / 50);
       playMode.onGround = false;
+      playJumpSound();
     }
     playMode.velocityY -= 28 * dt;
     rig.position.y += playMode.velocityY * dt;
@@ -3798,6 +3835,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       playMode.onGround = true;
     }
 
+    rig.userData.vy = playMode.velocityY;
     animateRig(rig, isMoving, !playMode.onGround, dt, playMode.emote === "dance");
     if(LuaRT && LuaRT.running) LuaRT.step(dt);
     updateChatBubblePosition();
@@ -3849,6 +3887,48 @@ function createLuaRuntime(fengari, A, preludeSrc){
     R.root.rotation.z = half * 0.05;
   }
 
+  /* ---- jump / landing: pose, sounds and squash ported from the main BlockVerse app ---- */
+  let bvAudioCtx = null;
+  function bvGetAudio(){
+    if(!bvAudioCtx){ try{ bvAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; } }
+    if(bvAudioCtx.state === "suspended") bvAudioCtx.resume();
+    return bvAudioCtx;
+  }
+  function bvNoiseThud(freq, gainAmt, dur, ctx){
+    const n = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.9;
+    const g = ctx.createGain(); g.gain.setValueAtTime(gainAmt, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    src.connect(f); f.connect(g); g.connect(ctx.destination); src.start();
+  }
+  function playJumpSound(){
+    const ctx = bvGetAudio(); if(!ctx) return;
+    [1, 1.5].forEach((mult, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = i === 0 ? "sine" : "triangle";
+      osc.frequency.setValueAtTime(210 * mult, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(430 * mult, ctx.currentTime + 0.11);
+      gain.gain.setValueAtTime(i === 0 ? 0.08 : 0.035, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.17);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + 0.17);
+    });
+    bvNoiseThud(1400, 0.015, 0.09, ctx);
+  }
+  function playLandSound(){
+    const ctx = bvGetAudio(); if(!ctx) return;
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(150, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(48, ctx.currentTime + 0.14);
+    gain.gain.setValueAtTime(0.09, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.16);
+    bvNoiseThud(900, 0.05, 0.12, ctx);
+  }
+
   function animateRig(rig, isMoving, inAir, dt, dancing){
     const P = rig.userData.parts;
     if(!P) return;
@@ -3857,12 +3937,25 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const ease = (m, axis, target, k) => { m.rotation[axis] += (target - m.rotation[axis]) * k; };
     const baseY = P.head.userData.baseY;
 
+    // landing squash (quick vertical pop on touchdown) - same curve as the main app
+    if(U.squashT > 0){
+      U.squashT = Math.max(0, U.squashT - dt * 6);
+      const sq = Math.sin(U.squashT * Math.PI) * 0.12;
+      const b = U.baseScale || (U.baseScale = rig.scale.clone());
+      rig.scale.set(b.x * (1 + sq * 0.5), b.y * (1 - sq), b.z * (1 + sq * 0.5));
+    }else if(U.baseScale){ rig.scale.copy(U.baseScale); }
+    if(!inAir && U.wasAir){ U.wasAir = false; U.squashT = 1; playLandSound(); }
+
     if(inAir){
-      const k = Math.min(1, dt * 14);
-      ease(P.lArm, "x", -2.3, k); ease(P.rArm, "x", -2.3, k);
-      ease(P.lArm, "z", -0.35, k); ease(P.rArm, "z", 0.35, k);
-      ease(P.lLeg, "x", 0.3, k); ease(P.rLeg, "x", -0.3, k);
-      U.danceT = 0;
+      // rising = legs and arms pull up and in; falling = legs stretch down bracing for the landing
+      const k = 1 - Math.pow(0.7, dt * 60);   // the main app blends 0.3 per 60fps frame
+      const rising = (U.vy || 0) > 0;
+      const legT = rising ? -0.55 : 0.18, armT = rising ? -0.75 : -0.3;
+      ease(P.lLeg, "x", legT, k); ease(P.rLeg, "x", legT, k);
+      ease(P.lArm, "x", armT, k); ease(P.rArm, "x", armT, k);
+      ease(P.lArm, "z", 0, k); ease(P.rArm, "z", 0, k);
+      ease(P.lLeg, "z", 0, k); ease(P.rLeg, "z", 0, k);
+      U.danceT = 0; U.wasAir = true;
       return;
     }
 
@@ -4931,6 +5024,250 @@ function createLuaRuntime(fengari, A, preludeSrc){
     phToggleChat(true);
     const inp = phQ("#gameChatInput"); if(inp) inp.focus();
   }
+  /* ---- chat filter: same profanity / sensitive-term / link censor as the main BlockVerse app ---- */
+  const bvCensorText = (function(){
+    const PROFANITY_LIST = [
+      // English
+      "fuck","fuk","fck","shit","bitch","bytch","cunt","dick","pussy","pussi",
+      "ass","asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
+      "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
+      "sex","porn","nude","nudes","rape",
+      "kys","kill yourself","kill urself","go die","go kill yourself","end yourself",
+      "neck yourself","unalive yourself",
+      // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
+      "كس","كسم","خرا","زبي","شرموطة","شرموط","قحبة","منيك","كلب ابن","ابن كلب","عرص","متناك",
+      // Spanish
+      "puta","puto","mierda","pendejo","pendeja","cabron","cabrón","gilipollas","joder","cono","coño",
+      // French
+      "putain","merde","connard","salope","enculé","encule","batard","bâtard",
+      // German
+      "scheisse","scheiße","hurensohn","fotze","wichser","arschloch",
+      // Portuguese
+      "porra","caralho","merda","puta","filho da puta","cacete",
+      // Russian (transliterated + common Cyrillic)
+      "блять","сука","хуй","пизда","бля"
+    ];
+
+    // separate word list from PROFANITY_LIST: not swear words, but terms
+    // this in-game chat doesn't want spelled out plainly - other platform/
+    // app names (which chat rules disallow mentioning, e.g. to steer kids
+    // off-platform) and a couple of safety-flag words. Matched and hashed
+    // the same way as PROFANITY_LIST (see buildProfanityPattern below).
+    const SENSITIVE_TERMS_LIST = [
+      "predator","predators","preditor","preditors","predetor","predetors","pred","preds",
+      "ped","peds","pedo","pedos","pedophile","pedophiles","paedophile","paedophiles",
+      "groomer","groomers","grooming",
+      "discord","youtube","yt","tiktok","tik tok","twitter","x.com","instagram","insta",
+      "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game"
+    ];
+
+    // strips accents/diacritics (Latin AND Arabic), Arabic tatweel, and
+    // normalizes alef variants - so a word typed with decorations still
+    // matches its plain form
+    function stripDiacritics(s){
+      return s
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")       // Latin combining accents
+        .replace(/[\u064B-\u0652\u0670]/g, "") // Arabic harakat/tanwin
+        .replace(/\u0640/g, "")                // Arabic tatweel (ـ)
+        .replace(/[إأآا]/g, "ا");               // unify alef variants
+    }
+
+    // Invisible/zero-width characters get dropped entirely (not treated as
+    // spaces) - sites that generate "filter-proof" text often sneak these
+    // between every letter (f<ZWSP>u<ZWSP>c<ZWSP>k) specifically because
+    // they're invisible and most naive filters only strip real whitespace.
+    const INVISIBLE_CHARS_RE = /[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+
+    // Homoglyph map: visually-identical letters from other scripts (mostly
+    // Cyrillic/Greek) that "letter changer" sites substitute in because they
+    // render the same but are different codepoints, so plain diacritic
+    // stripping and NFKD alone don't catch them. NFKD already folds things
+    // like fullwidth (ａｂｃ) and Mathematical Alphanumeric (𝓯𝓾𝓬𝓴, 𝔀𝓸𝔀) styles
+    // back to plain Latin on its own, so this map only needs to cover
+    // *cross-script* lookalikes that NFKD doesn't touch.
+    const HOMOGLYPH_MAP = {
+      "а":"a", "в":"b", "с":"c", "е":"e", "н":"h", "і":"i", "ѕ":"s", "ԁ":"d",
+      "к":"k", "м":"m", "о":"o", "р":"p", "т":"t", "х":"x", "у":"y", "ц":"u",
+      "ѡ":"w", "ɡ":"g", "ⅼ":"l", "ⅰ":"i", "ο":"o", "α":"a", "ρ":"p", "τ":"t",
+      "υ":"u", "ν":"v", "κ":"k", "ѵ":"v", "ⅴ":"v", "ⅹ":"x",
+      // non-decomposing Latin-extended letters ("letter changer" sites use
+      // these a lot because NFKD normalize() can't fold them the way it
+      // folds regular accented letters - they're distinct base letters in
+      // Unicode, not letter+accent, so stripDiacritics() alone never
+      // catches them
+      "đ":"d", "ð":"d", "ħ":"h", "ĸ":"k", "ł":"l", "ø":"o", "ø":"o",
+      "þ":"p", "ı":"i", "ĳ":"ij",
+      // capital I used as a lowercase L look-alike, and a multiplication
+      // sign used as an X look-alike - handled before lowercasing happens
+      // for I (since toLowerCase would otherwise turn I into i, not l)
+      "I":"l", "×":"x"
+    };
+    function foldHomoglyphs(s){
+      let out = "";
+      for(const ch of s) out += HOMOGLYPH_MAP[ch] || ch;
+      return out;
+    }
+
+    // collapses common leetspeak/symbol substitutions and squashes runs of
+    // the same letter ("fuuuuck" -> "fuck"), so obfuscated spellings still
+    // hit the same regex as the plain word
+    function normalizeForFilter(text){
+      let s = (text || "").replace(INVISIBLE_CHARS_RE, "");
+      s = foldHomoglyphs(s);
+      s = stripDiacritics(s.toLowerCase());
+      s = s
+        .replace(/[@]/g, "a").replace(/[4]/g, "a")
+        .replace(/[3]/g, "e")
+        .replace(/[1!|]/g, "i")
+        .replace(/[0]/g, "o")
+        .replace(/[$5]/g, "s")
+        .replace(/[7+]/g, "t")
+        .replace(/[8]/g, "b")
+        // any punctuation/symbol/separator character (not just the handful
+        // of ASCII ones we used to list) collapses to a single space - this
+        // is what actually defeats the "insert weird unicode spacing
+        // between every letter" trick, since \p{Z}/\p{P}/\p{S} covers the
+        // whole family of exotic space and punctuation codepoints, not just
+        // the few ASCII symbols we happened to think of
+        .replace(/[\p{Z}\p{P}\p{S}]/gu, " ")
+        .replace(/\s+/g, " ");
+      s = s.replace(/(.)\1{2,}/g, "$1$1"); // aaaa -> aa (keeps double letters like "ss" intact)
+      return s;
+    }
+
+    // Same as normalizeForFilter but with every space removed too, used as
+    // a second detection pass. This is what actually catches "f u c k" /
+    // "f-u-c-k" style spacing tricks (the site your friend found): the
+    // space-tolerant pattern only expects \s+ where a word already has an
+    // internal space (like "ass hole"), so a swear letter-spaced out with
+    // gaps between every character slides right past it. Stripping spaces
+    // entirely before matching closes that gap. It's only used for
+    // detection (looksLikeProfanity/looksLikeSensitiveTerm) - censoring
+    // still runs on the space-preserving version so legitimate sentences
+    // don't get mangled.
+    function normalizeForFilterNoSpaces(text){
+      return normalizeForFilter(text).replace(/\s+/g, "");
+    }
+
+    // builds the raw alternation pattern once (shared by both regexes
+    // below). "ass" gets Unicode-aware word boundaries (\p{L}/\p{N}, not
+    // JS's \b, which only understands [A-Za-z0-9_] and silently fails to
+    // bound non-Latin scripts like Arabic) so it doesn't false-positive on
+    // "class"/"password"/"assassin". Every other word is matched as a
+    // plain substring on purpose, so compound/concatenated profanity like
+    // "dogshit" or "fuckthis" still gets caught even though "shit"/"fuck"
+    // never appear as a standalone word there.
+    const BOUNDARY_PROTECTED = new Set(["ass"]);
+    function buildProfanityPattern(){
+      const parts = PROFANITY_LIST.map(w => {
+        const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+        return BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
+    }
+    const profanityPatternSrc = buildProfanityPattern();
+    // used only for replace() (censoring) - String.replace resets a global
+    // regex's lastIndex at the start of every call, so this one is safe to
+    // share across calls
+    const profanityRegex = new RegExp(profanityPatternSrc, "giu");
+
+    // no-space variant of the same word list, for matching against
+    // normalizeForFilterNoSpaces() output (see comment there) - internal
+    // spaces in multi-word entries like "ass hole" are just removed instead
+    // of turned into \s+, since there's nothing left to match against
+    function buildNoSpacePattern(list){
+      const parts = list.map(w => {
+        const norm = normalizeForFilter(w).replace(/\s+/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
+    }
+    const profanityPatternNoSpaceSrc = buildNoSpacePattern(PROFANITY_LIST);
+
+    // short/ambiguous sensitive terms get word boundaries so they don't
+    // false-positive as substrings of unrelated words (e.g. "yt" inside
+    // "party", "snap" inside "snapshot", "insta" inside "instant")
+    const SENSITIVE_BOUNDARY_PROTECTED = new Set(["yt","snap","insta","kik","x.com","pred","preds","ped","peds"]);
+    function buildSensitivePattern(){
+      const parts = SENSITIVE_TERMS_LIST.map(w => {
+        const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+        return SENSITIVE_BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
+    }
+    const sensitivePatternSrc = buildSensitivePattern();
+    const sensitivePatternNoSpaceSrc = buildNoSpacePattern(SENSITIVE_TERMS_LIST);
+
+    function looksLikeSensitiveTerm(text){
+      if(!text) return false;
+      if(new RegExp(sensitivePatternSrc, "iu").test(normalizeForFilter(text))) return true;
+      return new RegExp(sensitivePatternNoSpaceSrc, "iu").test(normalizeForFilterNoSpaces(text));
+    }
+
+    // true if ANY normalized substring of the text matches the filter -
+    // this is the "is this message bad" check used both to decide whether
+    // to censor a message and, in the report flow, as the automated check
+    // on a reported message. Builds a FRESH non-global regex every call on
+    // purpose: a shared global-flagged regex's .test() mutates .lastIndex
+    // as a side effect, so reusing one instance across many unrelated
+    // .test() calls (chat send, report check, moderation list...) could
+    // make a later call start searching mid-string and silently miss a
+    // real match. A fresh instance has no state to leak between calls.
+    //
+    // NOTE on "AI": this app is a static site with no backend, so there is
+    // no safe way to call a real language model from the client without
+    // exposing an API key to anyone who opens dev tools. This detector is
+    // the honest best-effort substitute - normalized, multi-language,
+    // substring-aware - not an actual model call.
+    function looksLikeProfanity(text){
+      if(!text) return false;
+      if(new RegExp(profanityPatternSrc, "iu").test(normalizeForFilter(text))) return true;
+      // catches letter-spaced-out spellings ("f u c k", "f.u.c.k" with
+      // exotic separators, etc.) that still have real letters between the
+      // gaps - see normalizeForFilterNoSpaces
+      return new RegExp(profanityPatternNoSpaceSrc, "iu").test(normalizeForFilterNoSpaces(text));
+    }
+
+    // each matched bad word gets replaced with hashtags matching its length
+    // (e.g. "shit" -> "####") - the rest of the message stays readable.
+    // looksLikeProfanity() catches obfuscated/leetspeak spellings via
+    // normalization, but replacement runs on the raw text to keep original
+    // formatting; if normalization caught something but no raw substring
+    // lines up (a heavily obfuscated spelling), hash the whole message as a
+    // safe fallback rather than let it through unmarked.
+    // matches links/URLs so kids can't be steered to an outside site via
+    // chat: "http(s)://...", "www.something", or a bare "word.tld" (e.g.
+    // "website.com", "join.gg/abc"). Requires a real-looking TLD (2+
+    // letters) so ordinary sentences with a period ("ok. sounds good") or
+    // decimals ("v2.0") don't get flagged.
+    const LINK_PATTERN_SRC = "\\b((https?:\\/\\/|www\\.)\\S+|[a-z0-9-]+\\.(?:com|net|org|io|gg|me|co|xyz|link|gl|tv|app|dev|to|us|info|biz|club|site|online|live|shop|fun)(?:\\/\\S*)?)\\b";
+    function looksLikeLink(text){
+      if(!text) return false;
+      return new RegExp(LINK_PATTERN_SRC, "i").test(text);
+    }
+
+    function censorText(text){
+      if(!text) return text;
+      let out = text;
+      if(looksLikeProfanity(out)){
+        const replaced = out.replace(new RegExp(profanityPatternSrc, "giu"), m => "#".repeat(m.length));
+        out = (replaced !== out) ? replaced : out.replace(/\S/g, "#");
+      }
+      if(looksLikeSensitiveTerm(out)){
+        const replaced = out.replace(new RegExp(sensitivePatternSrc, "giu"), m => "#".repeat(m.length));
+        if(replaced !== out) out = replaced;
+      }
+      if(looksLikeLink(out)){
+        const replaced = out.replace(new RegExp(LINK_PATTERN_SRC, "gi"), m => "#".repeat(m.length));
+        if(replaced !== out) out = replaced;
+      }
+      return out;
+    }
+
+    return censorText;
+  })();
+
   function phSend(){
     const inp = phQ("#gameChatInput"); if(!inp) return;
     const text = inp.value.trim();
@@ -4942,8 +5279,9 @@ function createLuaRuntime(fengari, A, preludeSrc){
       phAddChat("", "You are dancing - move or jump to stop.", true);
       return;
     }
-    phAddChat(currentUsername || "Player", text, false);
-    showChatBubble(text);
+    const clean = bvCensorText(text.slice(0, 140));
+    phAddChat(currentUsername || "Player", clean, false);
+    showChatBubble(clean);
   }
   function phRespawn(){
     const rig = playRigGroup; if(!rig) return;
@@ -5155,7 +5493,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(e.key === "Enter"){
         const text = box.value.trim();
         closeChatInput();
-        if(text) showChatBubble(text);
+        if(text) showChatBubble(bvCensorText(text));
       }else if(e.key === "Escape"){
         closeChatInput();
       }
