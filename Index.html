@@ -1711,6 +1711,11 @@
     -webkit-user-select:text; user-select:text;
   }
   img, canvas, svg{ -webkit-user-drag:none; }
+
+  /* character-face avatars (Roblox-style headshots) fill their frame */
+  #hubAvatar svg, .sa-avatar svg, .gp-avatar svg{ width:100%; height:100%; display:block; }
+  .sa-avatar{ overflow:hidden; background:var(--grey-2); }
+  .game-player-row .gp-avatar, .game-report-user .gp-avatar{ overflow:hidden; }
 </style>
 </head>
 <body>
@@ -1795,7 +1800,7 @@
     </div>
 
     <div class="sb-user" id="hubUserRow" style="cursor:pointer;" title="Customize your character">
-      <div id="hubAvatar" style="width:32px;height:32px;border-radius:50%;background:var(--grey-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:1px solid var(--border);">?</div>
+      <div id="hubAvatar" style="width:34px;height:34px;flex:none;border-radius:50%;overflow:hidden;background:var(--grey-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:1px solid var(--border);">?</div>
       <div class="su-text" style="overflow:hidden;">
         <div id="hubUsername" style="font-size:13px;font-weight:600;color:var(--text-0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
         <div style="font-size:11px;color:var(--text-2);" data-i18n="online">Online</div>
@@ -4277,7 +4282,7 @@
       const isCurrent = a.key === currentKey;
       return (
         '<div class="sa-row' + (isCurrent ? " sa-current" : "") + '" data-key="' + escapeHtml(a.key) + '">' +
-          '<div class="sa-avatar" style="background:' + colorForKey(a.key) + '">' + escapeHtml(initialsAvatar(a.username)) + '</div>' +
+          '<div class="sa-avatar">' + avatarFaceSvg(a.key) + '</div>' +
           '<div class="sa-info"><div class="sa-name">' + escapeHtml(a.username) + '</div>' +
           '<div class="sa-tag">' + (isCurrent ? "Current account" : "Tap to switch") + '</div></div>' +
           (isCurrent ? '' : '<button class="sa-remove" data-remove="' + escapeHtml(a.key) + '" title="Forget this account">&times;</button>') +
@@ -4373,34 +4378,61 @@
     }).catch(() => { delete avatarCustomCache[key]; });
   }
 
+  /* ---- Roblox-style headshot: the character's head + face + shoulders, in their real colors ---- */
+  let _bvHsN = 0;
+  function bvHeadshotSvg(a){
+    a = (a && typeof a === "object") ? a : {};
+    const col = (v, fb) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : fb;
+    const torso = col(a.torso, "#4a5fd6");
+    const lArm = col(a.leftArm || a.leftArmColor, torso);
+    const rArm = col(a.rightArm || a.rightArmColor, torso);
+    const skin = col(a.headColor, "#f0c090");
+    let hs = Number(a.headScale); if(!isFinite(hs)) hs = 1; hs = Math.max(0.8, Math.min(1.2, hs));
+    const id = "bvhs" + (++_bvHsN);
+    const size = 50 * hs, top = 70 - size, left = 50 - size / 2, k = size / 128;
+    const px = (v) => (left + v * k).toFixed(2), py = (v) => (top + v * k).toFixed(2), r = (v) => (v * k).toFixed(2);
+    const mx = (cx) => px(cx);
+    return (
+      '<svg viewBox="5 3 90 90" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+        '<defs>' +
+          '<linearGradient id="' + id + 'bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a42"/><stop offset="1" stop-color="#1b1b1f"/></linearGradient>' +
+          '<linearGradient id="' + id + 'sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient>' +
+        '</defs>' +
+        '<rect width="100" height="100" fill="url(#' + id + 'bg)"/>' +
+        // shoulders: arms at the edges, torso in the middle
+        '<rect x="-6" y="73" width="26" height="50" rx="10" fill="' + lArm + '"/>' +
+        '<rect x="80" y="73" width="26" height="50" rx="10" fill="' + rArm + '"/>' +
+        '<rect x="-6" y="73" width="26" height="50" rx="10" fill="url(#' + id + 'sh)"/>' +
+        '<rect x="80" y="73" width="26" height="50" rx="10" fill="url(#' + id + 'sh)"/>' +
+        '<rect x="15" y="70" width="70" height="55" rx="11" fill="' + torso + '"/>' +
+        '<rect x="15" y="70" width="70" height="55" rx="11" fill="url(#' + id + 'sh)"/>' +
+        // neck + the head's shadow on the shirt
+        '<rect x="41" y="62" width="18" height="12" fill="' + skin + '"/><rect x="41" y="62" width="18" height="12" fill="#000" opacity=".18"/>' +
+        '<ellipse cx="50" cy="71" rx="' + (size * 0.38).toFixed(1) + '" ry="3.4" fill="#000" opacity=".22"/>' +
+        // head
+        '<rect x="' + left.toFixed(2) + '" y="' + top.toFixed(2) + '" width="' + size.toFixed(2) + '" height="' + size.toFixed(2) + '" rx="' + (size * 0.2).toFixed(2) + '" fill="' + skin + '"/>' +
+        '<rect x="' + left.toFixed(2) + '" y="' + top.toFixed(2) + '" width="' + size.toFixed(2) + '" height="' + size.toFixed(2) + '" rx="' + (size * 0.2).toFixed(2) + '" fill="url(#' + id + 'sh)"/>' +
+        // face = same classic face the 3D character wears
+        '<ellipse cx="' + px(44) + '" cy="' + py(56) + '" rx="' + r(6) + '" ry="' + r(10.5) + '" fill="#1c1c1c"/>' +
+        '<ellipse cx="' + px(84) + '" cy="' + py(56) + '" rx="' + r(6) + '" ry="' + r(10.5) + '" fill="#1c1c1c"/>' +
+        '<circle cx="' + px(46) + '" cy="' + py(51) + '" r="' + r(2.2) + '" fill="#fff" opacity=".85"/>' +
+        '<circle cx="' + px(86) + '" cy="' + py(51) + '" r="' + r(2.2) + '" fill="#fff" opacity=".85"/>' +
+        '<path d="M ' + px(86.65) + ' ' + py(82.46) + ' A ' + r(28) + ' ' + r(28) + ' 0 0 1 ' + px(41.35) + ' ' + py(82.46) + '" fill="none" stroke="#1c1c1c" stroke-width="' + r(5.5) + '" stroke-linecap="round"/>' +
+      '</svg>'
+    );
+  }
+
   function avatarFaceSvg(key){
     const mine = key === currentAccountKey();
     let custom = mine ? getMyCustom() : avatarCustomCache[key];
     if(!mine && (custom === undefined)) fetchAvatarCustom(key);
     if(!custom){
       const shirt = colorForKey(key);
-      custom = { torso: shirt, leftArm: shirt, rightArm: shirt, leftLeg: "#2a2a2e", rightLeg: "#2a2a2e", heightScale: 1, headScale: 1 };
+      custom = { torso: shirt, leftArm: shirt, rightArm: shirt, headScale: 1 };
     }
-    const headSize = Math.round(32 * (custom.headScale || 1));
-    const headX = 50 - headSize / 2, headY = 26 - headSize / 2;
-    return (
-      '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">' +
-        '<rect width="100" height="100" fill="' + custom.torso + '" opacity="0.16"/>' +
-        // legs
-        '<rect x="38" y="78" width="9" height="18" rx="2" fill="' + custom.leftLeg + '"/>' +
-        '<rect x="53" y="78" width="9" height="18" rx="2" fill="' + custom.rightLeg + '"/>' +
-        // arms hanging at the sides
-        '<rect x="20" y="46" width="10" height="30" rx="3" fill="' + custom.leftArm + '"/>' +
-        '<rect x="70" y="46" width="10" height="30" rx="3" fill="' + custom.rightArm + '"/>' +
-        // torso
-        '<rect x="32" y="44" width="36" height="36" rx="5" fill="' + custom.torso + '"/>' +
-        // head (sized by their actual headScale so bigger/smaller heads show up here too)
-        '<rect x="' + headX + '" y="' + headY + '" width="' + headSize + '" height="' + headSize + '" rx="7" fill="#f0c090"/>' +
-        '<rect x="' + (headX + headSize*0.22) + '" y="' + (headY + headSize*0.42) + '" width="' + (headSize*0.18) + '" height="' + (headSize*0.18) + '" rx="1.5" fill="#2a2a2e"/>' +
-        '<rect x="' + (headX + headSize*0.6) + '" y="' + (headY + headSize*0.42) + '" width="' + (headSize*0.18) + '" height="' + (headSize*0.18) + '" rx="1.5" fill="#2a2a2e"/>' +
-      '</svg>'
-    );
+    return bvHeadshotSvg(custom);
   }
+  window.avatarFaceSvg = avatarFaceSvg;
 
   function updateHubAvatar(){
     const el = document.getElementById("hubAvatar");
@@ -9313,6 +9345,7 @@
       return (accounts[key] && accounts[key].username) || key;
     }
     function initials(name){ return (name || "?").trim().slice(0,2).toUpperCase(); }
+    function faceOrInitials(key, name){ return (key && window.avatarFaceSvg) ? window.avatarFaceSvg(key) : initials(name); }
 
     function showTab(id){
       document.querySelectorAll("#gameMenuOverlay .game-tab").forEach(t => t.classList.add("hidden"));
@@ -9428,7 +9461,7 @@
         const row = document.createElement("div");
         row.className = "game-player-row self";
         row.innerHTML =
-          '<div class="gp-avatar">' + initials(me) + '</div>' +
+          '<div class="gp-avatar">' + faceOrInitials(currentAccountKey(), me) + '</div>' +
           '<div><div class="gp-name">' + escapeHtml(me) + ' (You)</div>' +
           '<div class="gp-tag">In this server</div></div>';
         container.appendChild(row);
@@ -9448,7 +9481,7 @@
         const row = document.createElement("div");
         row.className = "game-player-row";
         row.innerHTML =
-          '<div class="gp-avatar">' + initials(p.name) + '</div>' +
+          '<div class="gp-avatar">' + faceOrInitials(p.accountKey, p.name) + '</div>' +
           '<div><div class="gp-name">' + escapeHtml(p.name) + '</div>' +
           '<div class="gp-tag">Playing now</div></div>';
         if(clickable) row.addEventListener("click", () => onRowClick(p.name));
@@ -9475,7 +9508,7 @@
           : '<button class="gp-invite-btn" data-invite-friend="' + key + '">' + t("invite") + '</button>';
         return (
           '<div class="game-player-row invite-row" data-user="' + key + '">' +
-            '<div class="gp-avatar">' + initials(displayNameFor(key)) + '</div>' +
+            '<div class="gp-avatar">' + faceOrInitials(key, displayNameFor(key)) + '</div>' +
             '<div><div class="gp-name">' + escapeHtml(displayNameFor(key)) + '</div>' +
             '<div class="gp-tag">' + (isKeyOnline(key) ? t("online") : t("offline")) + '</div></div>' +
             btnHtml +
@@ -9495,7 +9528,7 @@
     let reportTargetName = null;
     function openReportForm(name){
       reportTargetName = name;
-      document.getElementById("reportAvatar").textContent = initials(name);
+      { const pl = otherRealPlayers().find(x => x.name === name); document.getElementById("reportAvatar").innerHTML = faceOrInitials(pl && pl.accountKey, name); }
       document.getElementById("reportUsername").textContent = name;
       document.getElementById("reportReasonText").value = "";
       showTab("tabReportForm");
