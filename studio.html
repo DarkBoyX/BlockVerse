@@ -1115,6 +1115,7 @@
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/fengari-web/dist/fengari-web.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -1411,6 +1412,19 @@
   /* ---------------- Editor: three.js scene + explorer + properties ---------------- */
   let scene, camera, renderer, raycaster, mouse, canvasEl;
   let sceneObjects = []; // { id, name, className, shape, mesh, props }
+  // Script instances are kept separately from 3D parts and saved per project.
+  let studioScripts = [];
+  let studioInstanceId = 0;
+  const STUDIO_SERVICES = ["ReplicatedStorage","ServerScriptService","StarterPlayer","StarterPlayerScripts","StarterCharacterScripts","StarterCharacter","Workspace"];
+  function scriptsStorageKey(){ return "blockverse_studio_scripts_" + (currentGame && currentGame.id ? currentGame.id : "default"); }
+  function loadStudioScripts(){ try{ const v=JSON.parse(localStorage.getItem(scriptsStorageKey())||"[]"); studioScripts=Array.isArray(v)?v:[]; }catch(e){studioScripts=[];} }
+  function saveStudioScripts(){ try{localStorage.setItem(scriptsStorageKey(),JSON.stringify(studioScripts));}catch(e){showToast("Could not save scripts in this browser");} }
+  function addStudioScript(parent, className){
+    const allowed=["Script","LocalScript","ModuleScript"];
+    if(!allowed.includes(className)) className="Script";
+    const item={id:"script_"+(++studioInstanceId)+"_"+Date.now().toString(36),name:className,parent, className,source:className==="ModuleScript"?"local module = {}\n\nreturn module":"print(\"Hello from " + className + "!\")"};
+    studioScripts.push(item); saveStudioScripts(); renderExplorer(); openStudioScriptEditor(item); return item;
+  }
   let selectedId = null; // object id, or "__light__"
   let editorInited = false;
   let currentGame = null;
@@ -1581,6 +1595,7 @@
     }
     logOutput("BlockVerse Studio ready - " + game.name);
     buildDefaultScene();
+    loadStudioScripts();
     renderExplorer();
     selectObject(null);
     setTool("select");
@@ -2804,6 +2819,7 @@
     try{
       await new Promise(res => setTimeout(res, 300)); // brief and intentional, not a real load - just avoids an instant jarring snap back into the editor
       clearStuckKeys();
+      cleanupLuaScripts();
       if(playRigGroup){
         scene.remove(playRigGroup);
         playRigGroup.traverse((c) => {
@@ -3271,68 +3287,49 @@
     wrapEls.forEach((input, i) => { input.value = Math.round(obj.props.position[i]*100)/100; });
   }
 
-  /* ---------------- Explorer (Workspace tree, incl. Light) ---------------- */
+  /* ---------------- Explorer / script services ---------------- */
   function iconSvg(className){
-    if(className === "SpawnLocation"){
-      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>';
-    }
-    if(className === "Lighting"){
-      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
-    }
+    if(className === "SpawnLocation") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>';
+    if(className === "Lighting") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2"/></svg>';
+    if(["Script","LocalScript","ModuleScript"].includes(className)) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h10l4 4v14H5zM15 3v5h4M8 13h8M8 17h6"/></svg>';
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
   }
-
+  function explorerRow(parent, name, className, click, context){
+    const row=document.createElement("div"); row.className="exp-row"+(className?" exp-service":"");
+    row.innerHTML='<span class="exp-icon">'+iconSvg(className||name)+'</span><span></span>';
+    row.querySelector("span:last-child").textContent=name;
+    if(click) row.addEventListener("click",click);
+    if(context) row.addEventListener("contextmenu",e=>{e.preventDefault();context(e);});
+    parent.appendChild(row); return row;
+  }
+  function askAddScript(parent){
+    if(playMode.active||playMode.loading) return;
+    const choice=window.prompt("Create which object? Enter Script, LocalScript, or ModuleScript:","Script");
+    if(choice===null)return;
+    const kind=({script:"Script",localscript:"LocalScript",modulescript:"ModuleScript"})[choice.trim().toLowerCase()];
+    if(!kind){showToast("Choose Script, LocalScript, or ModuleScript");return;}
+    addStudioScript(parent,kind);
+  }
   function renderExplorer(){
-    const body = document.getElementById("explorerBody");
-    body.innerHTML = "";
-    const workspaceRow = document.createElement("div");
-    workspaceRow.className = "exp-row";
-    workspaceRow.innerHTML =
-      '<span class="exp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg></span>Workspace';
-    body.appendChild(workspaceRow);
-
-    const children = document.createElement("div");
-    children.className = "exp-children";
-
-    // Lighting lives right inside Workspace, alongside Baseplate/SpawnLocation/parts
-    const lightRow = document.createElement("div");
-    lightRow.className = "exp-row" + (selectedId === "__light__" ? " selected" : "");
-    lightRow.innerHTML = '<span class="exp-icon">' + iconSvg("Lighting") + '</span><span>Lighting</span>';
-    lightRow.addEventListener("click", () => { if(!playMode.active) selectObject("__light__"); });
-    children.appendChild(lightRow);
-
-    sceneObjects.forEach(o => {
-      const row = document.createElement("div");
-      row.className = "exp-row" + (o.id === selectedId ? " selected" : "");
-      row.innerHTML = '<span class="exp-icon">' + iconSvg(o.className) + '</span><span></span>';
-      row.querySelector("span:last-child").textContent = o.name;
-      row.addEventListener("click", () => { if(!playMode.active) selectObject(o.id); });
-      row.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        if(playMode.active) return;
-        selectObject(o.id);
-        showObjCtxMenu(o, e.clientX, e.clientY);
-      });
-      children.appendChild(row);
+    const body=document.getElementById("explorerBody"); if(!body)return; body.innerHTML="";
+    const root=document.createElement("div"); root.className="exp-row"; root.innerHTML='<span class="exp-icon">'+iconSvg("Workspace")+'</span><span>Workspace</span>'; body.appendChild(root);
+    const children=document.createElement("div"); children.className="exp-children";
+    explorerRow(children,"Lighting","Lighting",()=>{if(!playMode.active)selectObject("__light__");});
+    sceneObjects.forEach(o=>{
+      const row=explorerRow(children,o.name,o.className,()=>{if(!playMode.active)selectObject(o.id);},e=>{if(playMode.active)return;selectObject(o.id);showObjCtxMenu(o,e.clientX,e.clientY);});
+      if(o.id===selectedId)row.classList.add("selected");
+      studioScripts.filter(x=>x.parent==="Workspace"&&(x.attachedTo===o.id||x.attachedToName===o.name)).forEach(sc=>{const sr=explorerRow(children,"　"+sc.name,sc.className,()=>openStudioScriptEditor(sc));sr.style.paddingLeft="32px";});
     });
     body.appendChild(children);
-
-    // These match Roblox's DataModel service names/icons so the Explorer
-    // reads correctly to anyone who's used Studio before - honest caveat:
-    // they're structural placeholders right now, not wired to real
-    // separate-scope behavior yet (BlockVerse Studio's scripts don't
-    // currently distinguish server/client/replicated scope the way
-    // Roblox's actual services do).
-    const services = [
-      { name: "ReplicatedStorage", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>' },
-      { name: "StarterPlayerScripts", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>' },
-      { name: "ServerScriptService", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/></svg>' }
+    const services=[
+      ["ReplicatedStorage","ReplicatedStorage"],["ServerScriptService","ServerScriptService"],["StarterPlayer","StarterPlayer"],
+      ["StarterCharacter","StarterCharacter"],["StarterPlayerScripts","StarterPlayerScripts"],["StarterCharacterScripts","StarterCharacterScripts"]
     ];
-    services.forEach(s => {
-      const row = document.createElement("div");
-      row.className = "exp-row exp-service";
-      row.innerHTML = '<span class="exp-icon">' + s.icon + '</span><span>' + s.name + '</span>';
-      body.appendChild(row);
+    services.forEach(([label,parent])=>{
+      const row=explorerRow(body,label,label,()=>{if(!playMode.active)showToast(label+" selected — right-click to insert a script");},()=>askAddScript(parent));
+      row.title="Right-click to insert Script, LocalScript, or ModuleScript";
+      const scripts=studioScripts.filter(x=>x.parent===parent);
+      scripts.forEach(sc=>{const sr=explorerRow(body,"　"+sc.name,sc.className,()=>openStudioScriptEditor(sc),()=>openStudioScriptEditor(sc));sr.style.paddingLeft="22px";});
     });
   }
 
@@ -3646,106 +3643,104 @@
       scriptRow.className = "prop-row";
       const scriptBtn = document.createElement("button");
       scriptBtn.className = "prop-script-btn";
-      scriptBtn.textContent = obj.script ? "Edit Script" : "Add Script";
+      scriptBtn.textContent = (obj.script || studioScripts.some(x=>x.attachedTo===obj.id || x.attachedToName===obj.name)) ? "Edit Script" : "Add Script";
       scriptBtn.addEventListener("click", () => openScriptEditor(obj));
       scriptRow.appendChild(scriptBtn);
       body.appendChild(scriptRow);
     }
   }
 
-  /* ============ scripting ============
-     Real, working scripting - but JavaScript, not Lua, and with a small,
-     deliberately limited API (not Roblox's full engine surface). Each
-     script is plain JS attached to one Part, compiled once when Play
-     starts. The only thing scripts can currently react to is being
-     touched by the play-test rig - that's the one event the play-test
-     runtime actually tracks right now. Scripts run in the same page
-     context as the editor itself (not a real sandbox), so this is meant
-     for your own game logic, not for running untrusted code from
-     other people.
-  */
+  /* ============ Lua scripting runtime (Fengari / Lua 5.3-compatible subset) ============ */
   function openScriptEditor(obj){
-    const overlay = document.createElement("div");
-    overlay.className = "script-editor-overlay";
-    overlay.innerHTML =
-      '<div class="script-editor-card">' +
-        '<div class="script-editor-head">' +
-          '<span>Script - ' + escapeHtmlSE(obj.name) + '</span>' +
-          '<button class="script-editor-close">&times;</button>' +
-        '</div>' +
-        '<textarea class="script-editor-textarea" spellcheck="false" placeholder="part.onTouched(function(){\n  part.Color = 0xff0000;\n});"></textarea>' +
-        '<div class="script-editor-help">API: <code>part.onTouched(fn)</code>, <code>part.Color</code>, <code>part.Transparency</code>, <code>part.CanCollide</code>, <code>part.Position</code> ({x,y,z}), <code>part.Destroy()</code></div>' +
-        '<div class="script-editor-actions"><button class="script-editor-save">Save</button></div>' +
-      '</div>';
-    document.body.appendChild(overlay);
-    const textarea = overlay.querySelector(".script-editor-textarea");
-    textarea.value = obj.script || "";
-    overlay.querySelector(".script-editor-close").addEventListener("click", () => overlay.remove());
-    overlay.querySelector(".script-editor-save").addEventListener("click", () => {
-      obj.script = textarea.value;
-      overlay.remove();
-      renderProperties(); // refreshes the button text (Add Script -> Edit Script)
-      showToast("Script saved");
-    });
+    const item=studioScripts.find(s=>s.attachedTo===obj.id);
+    if(item){openStudioScriptEditor(item);return;}
+    const sc={id:"script_"+(++studioInstanceId)+"_"+Date.now().toString(36),name:obj.name+"Script",parent:"Workspace",className:"Script",attachedToName:obj.name,source:'local part = script.Parent\n\npart.Color = Color3.fromRGB(255, 0, 0)\npart.Touched:Connect(function()\n    print("Touched " .. part.Name)\nend)',attachedTo:obj.id};
+    studioScripts.push(sc); saveStudioScripts(); renderExplorer(); openStudioScriptEditor(sc);
   }
-  function escapeHtmlSE(s){ return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
-
-  // compiled once per play-test session - maps object id -> { onTouchedHandlers: [] }
-  let compiledScripts = {};
+  function openStudioScriptEditor(item){
+    const overlay=document.createElement("div"); overlay.className="script-editor-overlay";
+    overlay.innerHTML='<div class="script-editor-card"><div class="script-editor-head"><span></span><button class="script-editor-close">&times;</button></div><textarea class="script-editor-textarea" spellcheck="false"></textarea><div class="script-editor-help">Lua syntax: <code>print()</code>, <code>game:GetService("ReplicatedStorage")</code>, <code>Instance.new()</code>, <code>script.Parent</code>, <code>part.Color</code>, <code>part.Transparency</code>, <code>part.CanCollide</code>, <code>part.Position</code>, <code>wait()</code>. This is a browser-based Lua-compatible subset, not the full Roblox engine.</div><div class="script-editor-actions"><button class="script-editor-save">Save</button></div></div>';
+    document.body.appendChild(overlay); overlay.querySelector(".script-editor-head span").textContent=item.className+" - "+item.name;
+    const ta=overlay.querySelector("textarea"); ta.value=item.source||"";
+    overlay.querySelector(".script-editor-close").addEventListener("click",()=>overlay.remove());
+    overlay.querySelector(".script-editor-save").addEventListener("click",()=>{item.source=ta.value;saveStudioScripts();overlay.remove();renderExplorer();renderProperties();showToast("Lua script saved");});
+  }
+  function escapeHtmlSE(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+  let compiledScripts={};
+  const luaInstanceRegistry={};
+  const activeLuaStates=[];
+  function cleanupLuaScripts(){activeLuaStates.splice(0).forEach(x=>{try{x.lua.lua_close(x.L);}catch(e){}});studioScripts.forEach(x=>{delete x._luaTouch;delete x._wasTouching;});}
+  function luaHexColor(r,g,b){return ((Math.max(0,Math.min(255,Math.round(r)))<<16)|(Math.max(0,Math.min(255,Math.round(g)))<<8)|Math.max(0,Math.min(255,Math.round(b))));}
+  function luaTargetFor(item){
+    if(item.attachedTo)return sceneObjects.find(o=>o.id===item.attachedTo)||sceneObjects.find(o=>o.name===item.attachedToName)||null;
+    if(item.attachedToName)return sceneObjects.find(o=>o.name===item.attachedToName)||null;
+    const parent=item.parent;
+    if(parent==="Workspace")return sceneObjects[0]||null;
+    return null;
+  }
+  function runLuaSource(source,item){
+    if(!window.fengari){logOutput("Lua runtime unavailable. Check your internet connection and reload Studio.","error");return false;}
+    const f=window.fengari, lua=f.lua, lauxlib=f.lauxlib, lualib=f.lualib, toL=f.to_luastring, toJS=f.to_jsstring;
+    const L=lauxlib.luaL_newstate(); lualib.luaL_openlibs(L);
+    const target=luaTargetFor(item);
+    function readArg(i){const t=lua.lua_type(L,i); if(t===lua.LUA_TNUMBER)return lua.lua_tonumber(L,i); if(t===lua.LUA_TBOOLEAN)return !!lua.lua_toboolean(L,i); if(t===lua.LUA_TSTRING)return toJS(lua.lua_tostring(L,i)); return null;}
+    function register(name,fn){lua.lua_pushjsfunction(L,function(LS){try{const n=lua.lua_gettop(LS),args=[];for(let i=1;i<=n;i++)args.push(readArg.call(null,i));const out=fn(...args);if(out===undefined||out===null)lua.lua_pushnil(LS);else if(typeof out==="boolean")lua.lua_pushboolean(LS,out);else if(typeof out==="number")lua.lua_pushnumber(LS,out);else lua.lua_pushstring(LS,toL(String(out)));return 1;}catch(e){logOutput("Lua API error: "+e.message,"error");lua.lua_pushnil(LS);return 1;}});lua.lua_setglobal(L,toL(name));}
+    register("__log",(...a)=>{logOutput(a.map(v=>v==null?"nil":String(v)).join("\t"));return true;});
+    lua.lua_pushjsfunction(L,function(LS){try{if(lua.lua_type(LS,1)===lua.LUA_TFUNCTION){const ref=lauxlib.luaL_ref(LS,lua.LUA_REGISTRYINDEX);item._luaTouch={L,ref,lua,lauxlib};}return 0;}catch(e){logOutput("Touched callback error: "+e.message,"error");return 0;}});lua.lua_setglobal(L,toL("__registerTouched"));
+    register("__getName",()=>target?target.name:"Part");
+    register("__getColor",()=>target?target.props.color:0xffffff);
+    register("__setColor",v=>{if(target&&typeof v==="number"){const hex=Math.max(0,Math.min(0xffffff,Math.floor(v)));target.props.color=hex;target.mesh.material.color.setHex(hex);}return true;});
+    register("__getTransparency",()=>target?(target.props.transparency||0):0);
+    register("__setTransparency",v=>{if(target&&typeof v==="number"){target.props.transparency=Math.max(0,Math.min(1,v));target.mesh.material.transparent=target.props.transparency>0;target.mesh.material.opacity=1-target.props.transparency;}return true;});
+    register("__getCanCollide",()=>target?target.props.canCollide:false);
+    register("__setCanCollide",v=>{if(target){target.props.canCollide=!!v;target.mesh.material.transparent=!v||target.props.transparency>0;target.mesh.material.opacity=!v?0.45:1-(target.props.transparency||0);}return true;});
+    register("__getX",()=>target?target.mesh.position.x:0);register("__getY",()=>target?target.mesh.position.y:0);register("__getZ",()=>target?target.mesh.position.z:0);
+    register("__setPosition",(x,y,z)=>{if(target&&[x,y,z].every(v=>typeof v==="number")){target.mesh.position.set(x,y,z);target.props.position=[x,y,z];}return true;});
+    register("__getService",name=>{if(!STUDIO_SERVICES.includes(name)&&name!=="Workspace"&&name!=="Lighting"){logOutput("GetService: unsupported service "+name,"warn");}return name;});
+    register("__createInstance",(kind,name,parent)=>{const id="lua_"+(++studioInstanceId);luaInstanceRegistry[id]={id,ClassName:kind,Name:name||kind,Parent:parent||null};return id;});
+    const shim=`
+      function print(...) __log(...) end
+      warn = function(...) __log("WARNING:", ...) end
+      function wait(seconds) return seconds or 0 end
+      task = {wait=wait, spawn=function(fn) if type(fn)=="function" then fn() end end, defer=function(fn) if type(fn)=="function" then fn() end end}
+      Color3 = {fromRGB=function(r,g,b) return (math.floor(r)*65536)+(math.floor(g)*256)+math.floor(b) end, fromHex=function(h) return tonumber(string.gsub(h,"#",""),16) or 0xffffff end}
+      Vector3 = {new=function(x,y,z) return {X=x or 0,Y=y or 0,Z=z or 0,x=x or 0,y=y or 0,z=z or 0} end}
+      local partMeta = {__index=function(_,k)
+        if k=="Name" then return __getName() elseif k=="Color" then return __getColor() elseif k=="Transparency" then return __getTransparency() elseif k=="CanCollide" then return __getCanCollide() elseif k=="Position" then return Vector3.new(__getX(),__getY(),__getZ()) end
+        if k=="Destroy" then return function() __setCanCollide(false); __setTransparency(1) end end
+        if k=="Touched" then return {Connect=function(_,fn) __registerTouched(fn) end} end
+      end, __newindex=function(_,k,v)
+        if k=="Color" then __setColor(v) elseif k=="Transparency" then __setTransparency(v) elseif k=="CanCollide" then __setCanCollide(v) elseif k=="Position" and type(v)=="table" then __setPosition(v.X or v.x or 0,v.Y or v.y or 0,v.Z or v.z or 0) end
+      end}
+      local part = setmetatable({},partMeta)
+      script = {Name=${JSON.stringify(item.name)}, Parent=part}
+      local services = {}
+      game = {GetService=function(self,name) return {Name=name, GetChildren=function() return {} end, FindFirstChild=function(self,n) return nil end} end}
+      workspace = game:GetService("Workspace")
+      Instance = {new=function(kind) local obj={ClassName=kind,Name=kind,Parent=nil}; setmetatable(obj,{__newindex=function(t,k,v) rawset(t,k,v); if k=="Parent" then __createInstance(t.ClassName,t.Name,tostring(v and v.Name or "")) end end}); return obj end}
+      `;
+    const wrapped=shim+"\n"+source;
+    try{const status=lauxlib.luaL_loadstring(L,toL(wrapped));if(status!==lua.LUA_OK){throw new Error(toJS(lua.lua_tostring(L,-1)));}const result=lua.lua_pcall(L,0,lua.LUA_MULTRET,0);if(result!==lua.LUA_OK)throw new Error(toJS(lua.lua_tostring(L,-1)));return true;}catch(err){logOutput(item.name+" Lua error: "+err.message,"error");showToast("Lua error in "+item.name);return false;}finally{activeLuaStates.push({L,lua});}
+  }
   function compileAllScripts(){
-    compiledScripts = {};
-    sceneObjects.forEach(obj => {
-      if(!obj.script || !obj.script.trim()) return;
-      const handlers = { onTouched: [] };
-      const partApi = {
-        onTouched(fn){ if(typeof fn === "function") handlers.onTouched.push(fn); },
-        get Color(){ return obj.mesh.material.color.getHex(); },
-        set Color(hex){ obj.mesh.material.color.setHex(hex); obj.props.color = hex; },
-        get Transparency(){ return obj.props.transparency || 0; },
-        set Transparency(v){ obj.props.transparency = v; obj.mesh.material.transparent = v > 0; obj.mesh.material.opacity = 1 - v; },
-        get CanCollide(){ return obj.props.canCollide; },
-        set CanCollide(v){ obj.props.canCollide = v; },
-        get Position(){ return { x: obj.mesh.position.x, y: obj.mesh.position.y, z: obj.mesh.position.z }; },
-        set Position(p){ obj.mesh.position.set(p.x, p.y, p.z); },
-        Destroy(){ scene.remove(obj.mesh); obj.mesh.visible = false; obj.props.canCollide = false; }
-      };
-      try{
-        const fn = new Function("part", "game", obj.script);
-        fn(partApi, { wait: () => {} }); // wait is a no-op stub for now - real timing/coroutines aren't implemented
-      }catch(err){
-        showToast("Script error in " + obj.name + ": " + err.message);
-        logOutput(obj.name + " script error: " + err.message, "error");
-      }
-      compiledScripts[obj.id] = { handlers, wasTouching: false };
+    cleanupLuaScripts();
+    compiledScripts={};
+    studioScripts.forEach(item=>{
+      if(item.className==="ModuleScript"||!item.source||!item.source.trim())return;
+      if(item.className==="LocalScript" && !["StarterPlayerScripts","StarterCharacterScripts","StarterCharacter"].includes(item.parent))return;
+      logOutput("Running "+item.className+": "+item.name);
+      runLuaSource(item.source,item);
+      if(item.attachedTo){const target=sceneObjects.find(o=>o.id===item.attachedTo)||sceneObjects.find(o=>o.name===item.attachedToName);if(target)compiledScripts[target.id]={handlers:{onTouched:[]},wasTouching:false};}
     });
+    // Backwards compatibility: if older projects have a script field on a Part, open and migrate it.
+    sceneObjects.forEach(obj=>{if(obj.script&&!studioScripts.some(x=>x.attachedTo===obj.id)){const item={id:"script_"+(++studioInstanceId),name:obj.name+"Script",parent:"Workspace",className:"Script",source:obj.script,attachedTo:obj.id,attachedToName:obj.name};studioScripts.push(item);runLuaSource(item.source,item);}});
+    saveStudioScripts();
   }
   function checkScriptTouches(rig){
-    const rigBox = new THREE.Box3().setFromCenterAndSize(rig.position.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(1.4,2.4,1.4));
-    for(const id in compiledScripts){
-      const entry = compiledScripts[id];
-      const obj = sceneObjects.find(o => o.id === id);
-      if(!obj || obj.props.canTouch === false) continue;
-      const partBox = new THREE.Box3().setFromObject(obj.mesh);
-      const touching = rigBox.intersectsBox(partBox);
-      if(touching && !entry.wasTouching){
-        entry.handlers.onTouched.forEach(fn => { try{ fn(); }catch(err){ showToast("Script error: " + err.message); logOutput("Touched handler error: " + err.message, "error"); } });
-      }
-      entry.wasTouching = touching;
-    }
+    const rigBox=new THREE.Box3().setFromCenterAndSize(rig.position.clone().add(new THREE.Vector3(0,1,0)),new THREE.Vector3(1.4,2.4,1.4));
+    for(const item of studioScripts){if(!item.attachedTo)continue;const obj=sceneObjects.find(o=>o.id===item.attachedTo)||sceneObjects.find(o=>o.name===item.attachedToName);if(!obj||obj.props.canTouch===false)continue;const box=new THREE.Box3().setFromObject(obj.mesh);if(rigBox.intersectsBox(box)&&!item._wasTouching){item._wasTouching=true;logOutput("Touched: "+obj.name);if(item._luaTouch){try{const t=item._luaTouch;t.lua.lua_rawgeti(t.L,t.lua.LUA_REGISTRYINDEX,t.ref);const code=t.lua.lua_pcall(t.L,0,t.lua.LUA_MULTRET,0);if(code!==t.lua.LUA_OK)logOutput(item.name+" Touched error: "+window.fengari.to_jsstring(t.lua.lua_tostring(t.L,-1)),"error");}catch(e){logOutput("Touched callback error: "+e.message,"error");}}}else if(!rigBox.intersectsBox(box)){item._wasTouching=false;}}
   }
 
-
-  /* ---------------- Boot ---------------- */
-  window.addEventListener("load", () => {
-    const saved = getStudioSession();
-    if(saved && saved.key && saved.username){
-      currentUserKey = saved.key;
-      currentUsername = saved.username;
-      enterDashboard();
-    } else {
-      document.getElementById("stUsername").focus();
-    }
-  });
 })();
 </script>
 <script>
