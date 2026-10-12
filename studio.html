@@ -430,6 +430,8 @@
   .output-body{ flex:1; overflow-y:auto; padding:6px 12px; font-family:'Cascadia Code',Consolas,monospace; font-size:11.5px; }
   .output-line{ color:var(--text-2); padding:1px 0; white-space:pre-wrap; word-break:break-word; }
   .output-error{ color:#f28b8b; }
+  .output-panel.closed{ display:none; }
+  #statusOutputToggle:hover{ color:var(--text-0); }
   .output-warn{ color:#e8c589; }
 
   /* ---- Status bar ---- */
@@ -835,6 +837,20 @@
   .lua-fs-card .lua-editor-wrap textarea.script-editor-textarea{ height:100%; min-height:0; resize:none; }
   .lua-fs-card .lua-gutter{ height:100%; box-sizing:border-box; }
   .lua-fs-card .script-editor-help{ max-height:48px; overflow:auto; }
+  .lua-area{ position:relative; flex:1; min-width:0; min-height:320px; }
+  .lua-hl, .lua-editor-wrap .lua-area textarea.script-editor-textarea{
+    position:absolute; inset:0; margin:0; width:100%; height:100%; box-sizing:border-box; padding:12px;
+    font:12.5px/1.55 'Cascadia Code',Consolas,ui-monospace,monospace; letter-spacing:0; tab-size:2; white-space:pre; border:none; border-radius:0;
+  }
+  .lua-hl{ overflow:hidden; pointer-events:none; color:#e8e8ec; padding-right:40px; padding-bottom:40px; }
+  .lua-editor-wrap .lua-area textarea.script-editor-textarea{ background:transparent; color:transparent; caret-color:#fff; resize:none; overflow:auto; min-height:0; z-index:1; outline:none; }
+  .lua-area textarea::selection{ background:rgba(80,130,255,.35); color:transparent; }
+  .lua-gutter{ padding:12px 8px 40px 10px !important; }
+  .lua-k{ color:#569cd6; } .lua-s{ color:#ce9178; } .lua-n{ color:#b5cea8; } .lua-c{ color:#6a9955; font-style:italic; }
+  .lua-f{ color:#dcdcaa; } .lua-g{ color:#4ec9b0; } .lua-p{ color:#9cdcfe; }
+  .lua-ghost{ color:#6b6b78; }
+  .lua-sq-error{ text-decoration:underline wavy #ff4d4d; text-decoration-thickness:1.5px; text-underline-offset:3px; background:rgba(255,77,77,.10); }
+  .lua-sq-warn{ text-decoration:underline wavy #f0a030; text-decoration-thickness:1.5px; text-underline-offset:3px; }
   .lua-tag{ font-size:11px; color:var(--text-2); font-weight:400; margin-left:8px; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
@@ -2477,7 +2493,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
   <div class="output-panel">
     <div class="output-head">
       <span>Output</span>
-      <button id="outputClearBtn">Clear</button>
+      <span style="display:flex;gap:6px;align-items:center">
+        <button id="outputClearBtn">Clear</button>
+        <button id="outputCloseBtn" title="Close Output" aria-label="Close Output" style="font-size:15px;line-height:1;padding:2px 8px">&times;</button>
+      </span>
     </div>
     <div class="output-body" id="outputBody"></div>
   </div>
@@ -2486,6 +2505,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     <span id="statusFps">FPS: --</span>
     <span id="statusParts">Parts: 0</span>
     <span id="statusTool">Select</span>
+    <span id="statusOutputToggle" style="margin-left:auto;cursor:pointer;display:none" title="Show the Output panel">Output</span>
   </div>
 </div>
 
@@ -2954,6 +2974,15 @@ function createLuaRuntime(fengari, A, preludeSrc){
       document.getElementById("outputClearBtn").addEventListener("click", () => {
         document.getElementById("outputBody").innerHTML = "";
       });
+      const outPanel = document.querySelector(".output-panel");
+      const outToggle = document.getElementById("statusOutputToggle");
+      const setOutput = (open) => {
+        outPanel.classList.toggle("closed", !open);
+        outToggle.style.display = open ? "none" : "inline";
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 0); // let the 3D view refill the space
+      };
+      document.getElementById("outputCloseBtn").addEventListener("click", () => setOutput(false));
+      outToggle.addEventListener("click", () => setOutput(true));
       editorInited = true;
     }
     logOutput("BlockVerse Studio ready - " + game.name);
@@ -4078,12 +4107,129 @@ function createLuaRuntime(fengari, A, preludeSrc){
     body.appendChild(del);
   }
 
+  /* ---------- Lua editor: colors, squiggles, Tab suggestions ---------- */
+  const LUA_KW = new Set(["and","break","do","else","elseif","end","false","for","function","if","in","local","nil","not","or","repeat","return","then","true","until","while","continue"]);
+  const LUA_GLOBALS = ["game","workspace","script","print","warn","error","wait","spawn","delay","tick","time","tostring","tonumber","typeof","type","pairs","ipairs","next","select","pcall","xpcall","assert","require","unpack","setmetatable","getmetatable","rawget","rawset","rawequal","collectgarbage","task","Instance","Vector3","Color3","CFrame","Enum","TweenInfo","Random","math","string","table","os","coroutine","Workspace","newproxy","Signal","_G","_VERSION"];
+  const LUA_KNOWN = new Set(LUA_GLOBALS.concat(["self"]));
+  const LUA_SERVICES = ["Players","Workspace","ReplicatedStorage","ServerScriptService","StarterPlayer","Lighting","RunService","UserInputService","HttpService"];
+  const LUA_METHODS = ["FindFirstChild","FindFirstChildOfClass","GetChildren","GetDescendants","WaitForChild","Destroy","Clone","IsA","ClearAllChildren","GetFullName","GetAttribute","SetAttribute","GetService","Connect","Once","Wait","Disconnect"];
+  const LUA_PROPS = ["Parent","Name","ClassName","Position","Size","Color","Transparency","Anchored","CanCollide","Material","Orientation","Touched"];
+  const LUA_LIBS = {
+    math:["abs","ceil","floor","sqrt","sin","cos","tan","asin","acos","atan","atan2","exp","log","max","min","random","randomseed","huge","pi","clamp","sign","round"],
+    string:["format","sub","upper","lower","len","rep","find","match","gmatch","gsub","byte","char","reverse","split"],
+    table:["insert","remove","concat","sort","unpack","find","clear","clone","create"],
+    task:["wait","spawn","delay","defer"],
+    Vector3:["new","zero","one"], Color3:["new","fromRGB","fromHSV"], CFrame:["new","Angles"], Instance:["new"], os:["time","clock","date"],
+    game:["GetService","Workspace"]
+  };
+  const escHtml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // names the script declares itself (so they aren't flagged as unknown)
+  function luaDeclared(src){
+    const set = new Set();
+    const list = (t) => t.split(",").forEach(x => { x = x.trim().replace(/[^\w].*$/, ""); if(x) set.add(x); });
+    let m;
+    const clean = src.replace(/--[^\n]*/g, "");
+    const rLocal = /\blocal\s+(?:function\s+)?([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)/g;
+    while((m = rLocal.exec(clean))) list(m[1]);
+    const rFn = /\bfunction\s+([A-Za-z_]\w*)/g;
+    while((m = rFn.exec(clean))) set.add(m[1]);
+    const rParams = /\bfunction\s*[\w.:]*\s*\(([^)]*)\)/g;
+    while((m = rParams.exec(clean))) list(m[1]);
+    const rFor = /\bfor\s+([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*(?:in|=)/g;
+    while((m = rFor.exec(clean))) list(m[1]);
+    const rAssign = /(?:^|\n)\s*([A-Za-z_]\w*)\s*=[^=]/g;     // x = 5 creates a global
+    while((m = rAssign.exec(clean))) set.add(m[1]);
+    return set;
+  }
+
+  // tokenise + colour. issues = { lineNumber: "error" | "warn" }. ghost = { at, text } or null.
+  function luaHighlight(src, issues, ghost){
+    const declared = luaDeclared(src);
+    const re = /--\[(=*)\[[\s\S]*?(?:\]\1\]|$)|--[^\n]*|\[(=*)\[[\s\S]*?(?:\]\2\]|$)|"(?:\\[\s\S]|[^"\\\n])*"?|'(?:\\[\s\S]|[^'\\\n])*'?|0[xX][0-9a-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?|[A-Za-z_]\w*|\s+|[\s\S]/g;
+    let out = "", line = 1, pos = 0, m, prevSig = "";
+    const emit = (cls, text, noSquig) => {
+      const parts = text.split("\n");
+      parts.forEach((p, i) => {
+        if(i > 0){ out += "\n"; line++; }
+        if(!p) return;
+        const sev = (issues && issues[line] === "error" && p.trim()) ? "error" : "";
+        const c = (cls || "") + (sev ? " lua-sq-" + sev : "");
+        out += c.trim() ? '<span class="' + c.trim() + '">' + escHtml(p) + "</span>" : escHtml(p);
+      });
+    };
+    const emitAt = (cls, text, noSquig) => {          // emit, splitting around the ghost caret position
+      const end = pos + text.length;
+      if(ghost && ghost.at >= pos && ghost.at <= end && !ghost.done){
+        const cut = ghost.at - pos;
+        // place the ghost after the token that ends exactly at the caret
+        emit(cls, text.slice(0, cut), noSquig);
+        out += '<span class="lua-ghost">' + escHtml(ghost.text) + "</span>";
+        ghost.done = true;
+        emit(cls, text.slice(cut), noSquig);
+      }else emit(cls, text, noSquig);
+      pos = end;
+    };
+    if(ghost && ghost.at === 0){ out += '<span class="lua-ghost">' + escHtml(ghost.text) + "</span>"; ghost.done = true; }
+    while((m = re.exec(src)) !== null){
+      const t = m[0];
+      if(!t) { re.lastIndex++; continue; }
+      let cls = "";
+      if(t.startsWith("--")) cls = "lua-c";
+      else if(t[0] === '"' || t[0] === "'" || /^\[=*\[/.test(t)) cls = "lua-s";
+      else if(/^\d/.test(t)) cls = "lua-n";
+      else if(/^[A-Za-z_]/.test(t)){
+        const after = src.slice(re.lastIndex).match(/^\s*(\(|=[^=])/);
+        if(LUA_KW.has(t)) cls = (t === "true" || t === "false" || t === "nil") ? "lua-n" : "lua-k";
+        else if(prevSig === "." || prevSig === ":") cls = (after && after[1] === "(") ? "lua-f" : "lua-p";
+        else if(LUA_KNOWN.has(t)) cls = "lua-g";
+        else if(after && after[1] === "(") cls = "lua-f";
+        else cls = "";
+        // orange: a plain name that was never declared and isn't a known global
+        if(prevSig !== "." && prevSig !== ":" && !LUA_KW.has(t) && !LUA_KNOWN.has(t) && !declared.has(t) && !(after && after[1] !== "(") && issues){
+          const before = src.slice(0, m.index);
+          const lineStart = before.lastIndexOf("\n") + 1;
+          const inTableKey = /[{,]\s*$/.test(before.slice(lineStart)) && /^\s*=[^=]/.test(src.slice(re.lastIndex));
+          if(!inTableKey){ cls += " lua-sq-warn"; (luaHighlight._warns = luaHighlight._warns || []).push({ line: line, name: t }); }
+        }
+      }
+      if(!/^\s+$/.test(t)) prevSig = /^[.:]$/.test(t) ? t : "x"; 
+      emitAt(cls, t, false);
+    }
+    if(ghost && !ghost.done) out += '<span class="lua-ghost">' + escHtml(ghost.text) + "</span>";
+    return out + "\n";
+  }
+
+  // best Tab-completion for the text before the caret ("" if nothing to suggest)
+  function luaSuggest(src, caret){
+    const lineStart = src.lastIndexOf("\n", caret - 1) + 1;
+    const lineEnd = src.indexOf("\n", caret) === -1 ? src.length : src.indexOf("\n", caret);
+    if(src.slice(caret, lineEnd).trim() !== "") return "";             // only suggest at the end of a line
+    const before = src.slice(lineStart, caret);
+    if(/--/.test(before.replace(/"[^"]*"|'[^']*'/g, ""))) return "";   // not inside a comment
+    let m = before.match(/GetService\(\s*["'](\w*)$/);
+    if(m){ const c = LUA_SERVICES.find(s => s.startsWith(m[1]) && s !== m[1]); return c ? c.slice(m[1].length) : ""; }
+    m = before.match(/([A-Za-z_]\w*)?([.:])([A-Za-z_]\w*)$/);
+    if(m){
+      let pool = m[1] && LUA_LIBS[m[1]] ? LUA_LIBS[m[1]] : (m[2] === ":" ? LUA_METHODS : LUA_PROPS.concat(LUA_METHODS));
+      const c = pool.find(s => s.startsWith(m[3]) && s !== m[3]);
+      return c ? c.slice(m[3].length) : "";
+    }
+    m = before.match(/(?:^|[^\w.:])([A-Za-z_]\w*)$/);
+    if(!m || m[1].length < 2) return "";
+    const pre = m[1];
+    let pool = Array.from(LUA_KW).concat(LUA_GLOBALS);
+    const words = src.slice(0, caret - pre.length).concat(" ", src.slice(caret)).match(/[A-Za-z_]\w{2,}/g) || [];
+    pool = pool.concat(Array.from(new Set(words)));
+    const c = pool.find(s => s.startsWith(pre) && s !== pre);
+    return c ? c.slice(pre.length) : "";
+  }
+
   /* ---------- Lua editor ---------- */
   function openLuaEditor(n){
     closeLuaEditor();
     const ov = document.createElement("div");
-    ov.id = "luaEditorOverlay"; ov.className = "script-editor-overlay"; ov.style.display = "flex";
-    ov.classList.add("lua-fullscreen");
+    ov.id = "luaEditorOverlay"; ov.className = "script-editor-overlay lua-fullscreen"; ov.style.display = "flex";
     const card = document.createElement("div"); card.className = "script-editor-card lua-fs-card";
     const head = document.createElement("div"); head.className = "script-editor-head";
     const title = document.createElement("span"); title.textContent = n.name;
@@ -4093,34 +4239,90 @@ function createLuaRuntime(fengari, A, preludeSrc){
     head.append(title, x);
     const wrap = document.createElement("div"); wrap.className = "lua-editor-wrap";
     const gutter = document.createElement("div"); gutter.className = "lua-gutter";
+    const area = document.createElement("div"); area.className = "lua-area";
+    const hl = document.createElement("pre"); hl.className = "lua-hl"; hl.setAttribute("aria-hidden", "true");
     const ta = document.createElement("textarea"); ta.className = "script-editor-textarea"; ta.spellcheck = false; ta.value = n.source || "";
-    wrap.append(gutter, ta);
+    ta.setAttribute("autocapitalize", "off"); ta.setAttribute("autocomplete", "off"); ta.setAttribute("autocorrect", "off");
+    area.append(hl, ta);
+    wrap.append(gutter, area);
     const err = document.createElement("div"); err.className = "lua-err";
     const help = document.createElement("div"); help.className = "script-editor-help";
-    help.innerHTML = 'Lua, like Roblox: <code>script.Parent</code> &middot; <code>workspace</code> &middot; <code>game:GetService("Players")</code> &middot; <code>part.Touched:Connect(function(hit) end)</code> &middot; <code>task.wait(1)</code> &middot; <code>Instance.new("Part")</code> &middot; <code>require(module)</code> &middot; RemoteEvents in ReplicatedStorage. Supported extras: <code>x += 1</code> (start of a line) and <code>continue</code>. Not supported yet: type annotations and string interpolation.';
+    help.innerHTML = 'Press <code>Tab</code> to accept the grey suggestion &middot; red line = error, orange line = unknown name &middot; <code>script.Parent</code> &middot; <code>workspace</code> &middot; <code>game:GetService("Players")</code> &middot; <code>part.Touched:Connect(function(hit) end)</code> &middot; <code>task.wait(1)</code> &middot; <code>Instance.new("Part")</code> &middot; <code>require(module)</code>. Not supported yet: type annotations and string interpolation.';
     const actions = document.createElement("div"); actions.className = "script-editor-actions";
     const save = document.createElement("button"); save.className = "script-editor-save"; save.textContent = "Save (Ctrl+S)";
     actions.appendChild(save);
     card.append(head, wrap, err, help, actions); ov.appendChild(card); document.body.appendChild(ov);
+
+    let issues = {}, messages = {}, synErr = null, ghostText = "";
+    const caretLine = () => ta.value.slice(0, ta.selectionStart).split("\n").length;
     const lines = () => { const c = ta.value.split("\n").length; let s = ""; for(let i = 1; i <= c; i++) s += i + "\n"; gutter.textContent = s; gutter.scrollTop = ta.scrollTop; };
-    const doSave = () => {
-      n.source = ta.value;
+    const syncScroll = () => { hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft; gutter.scrollTop = ta.scrollTop; };
+    const status = () => {
+      const cl = caretLine();
+      if(messages[cl]) err.textContent = (issues[cl] === "error" ? "Error" : "Warning") + " on line " + cl + ": " + messages[cl];
+      else if(synErr) err.textContent = "Syntax error: " + synErr;
+      else err.textContent = "";
+      err.style.color = (!messages[cl] && !synErr) ? "" : (issues[cl] === "warn" ? "#f0b45a" : "#ff8a8a");
+    };
+    const render = () => {
+      const caret = ta.selectionStart === ta.selectionEnd ? ta.selectionStart : -1;
+      ghostText = caret >= 0 ? luaSuggest(ta.value, caret) : "";
+      hl.innerHTML = luaHighlight(ta.value, issues, ghostText ? { at: caret, text: ghostText } : null);
+      syncScroll(); status();
+    };
+    let lintTimer = null;
+    const lint = () => {
+      issues = {}; messages = {}; synErr = null;
       const lua = ensureLua();
       const e = lua ? lua.checkSyntax(ta.value, n.name) : null;
-      err.textContent = e ? "Syntax error: " + e : "";
-      saveWorld(false);
-      showToast(e ? "Saved - but the script has a syntax error" : "Script saved");
+      if(e){
+        synErr = e;
+        const m = /:(\d+):\s*(.*)$/.exec(e);
+        if(m){ const ln = parseInt(m[1], 10); issues[ln] = "error"; messages[ln] = m[2]; }
+      }
+      // orange: names that are used but never declared (found while highlighting)
+      luaHighlight._warns = [];
+      luaHighlight(ta.value, { 0: null }, null);
+      (luaHighlight._warns || []).forEach(w => { if(!issues[w.line]){ issues[w.line] = "warn"; messages[w.line] = "'" + w.name + "' is not defined here (typo?)"; } });
+      luaHighlight._warns = [];
+      render();
     };
-    ta.addEventListener("input", lines); ta.addEventListener("scroll", () => { gutter.scrollTop = ta.scrollTop; });
+    const queueLint = () => { clearTimeout(lintTimer); lintTimer = setTimeout(lint, 350); };
+    const insert = (text) => {
+      ta.focus();
+      if(!document.execCommand || !document.execCommand("insertText", false, text)){
+        const s = ta.selectionStart; ta.setRangeText(text, s, ta.selectionEnd, "end");
+      }
+    };
+    const doSave = () => {
+      n.source = ta.value;
+      lint();
+      saveWorld(false);
+      showToast(synErr ? "Saved - but the script has a syntax error" : "Script saved");
+    };
+    ta.addEventListener("input", () => { lines(); render(); queueLint(); });
+    ta.addEventListener("scroll", syncScroll);
+    ["keyup", "click", "mouseup", "focus"].forEach(ev => ta.addEventListener(ev, render));
     ta.addEventListener("keydown", (e) => {
-      if(e.key === "Tab"){ e.preventDefault(); const s = ta.selectionStart; ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = s + 2; lines(); }
+      if(e.key === "Tab" && !e.shiftKey){
+        e.preventDefault();
+        if(ghostText) insert(ghostText); else insert("  ");
+      }
+      else if(e.key === "Enter" && !e.ctrlKey && !e.metaKey){
+        const s = ta.selectionStart;
+        const ls = ta.value.lastIndexOf("\n", s - 1) + 1;
+        const cur = ta.value.slice(ls, s);
+        const ind = (cur.match(/^\s*/) || [""])[0];
+        const more = /(\bthen|\bdo|\belse|\brepeat|\bfunction\b.*\)|[{(])\s*$/.test(cur) ? "  " : "";
+        e.preventDefault(); insert("\n" + ind + more);
+      }
       else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s"){ e.preventDefault(); doSave(); }
-      else if(e.key === "Escape"){ closeLuaEditor(); }
+      else if(e.key === "Escape"){ if(ghostText){ ghostText = ""; render(); } else { n.source = ta.value; saveWorld(false); closeLuaEditor(); } }
       e.stopPropagation();
     });
     save.addEventListener("click", doSave);
     x.addEventListener("click", () => { n.source = ta.value; saveWorld(false); closeLuaEditor(); });
-    lines(); ta.focus();
+    lines(); lint(); ta.focus();
   }
   function closeLuaEditor(){ const o = document.getElementById("luaEditorOverlay"); if(o) o.remove(); }
 
