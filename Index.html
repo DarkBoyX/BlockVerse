@@ -1704,6 +1704,13 @@
   .is-touch .game-lb-head .lb-hint{ display:none !important; }
   .is-touch .game-lb-row{ padding:5px 8px !important; font-size:11px !important; gap:6px !important; min-height:0 !important; }
   .is-touch .game-lb-rank{ font-size:10px !important; min-width:12px !important; }
+
+  /* no blue text-selection highlight on UI (only real inputs, editors and the output log stay selectable) */
+  html, body, body *{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  body input, body textarea, body [contenteditable="true"], body [contenteditable=""], body .selectable, body .selectable *{
+    -webkit-user-select:text; user-select:text;
+  }
+  img, canvas, svg{ -webkit-user-drag:none; }
 </style>
 </head>
 <body>
