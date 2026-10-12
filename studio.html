@@ -837,6 +837,52 @@
   .lua-fs-card .lua-editor-wrap textarea.script-editor-textarea{ height:100%; min-height:0; resize:none; }
   .lua-fs-card .lua-gutter{ height:100%; box-sizing:border-box; }
   .lua-fs-card .script-editor-help{ max-height:48px; overflow:auto; }
+
+  /* ---- sidebar nav + Reviews / Servers ---- */
+  .studio-nav{ display:flex; flex-direction:column; gap:4px; }
+  .studio-nav-btn{
+    display:flex; align-items:center; gap:10px; width:100%; padding:9px 11px; border-radius:9px; border:1px solid transparent;
+    background:none; color:var(--text-2); font-size:13px; font-weight:600; cursor:pointer; text-align:left; transition:background .15s,color .15s;
+  }
+  .studio-nav-btn svg{ width:16px; height:16px; flex-shrink:0; }
+  .studio-nav-btn:hover{ background:var(--grey-1); color:var(--text-0); }
+  .studio-nav-btn.active{ background:var(--bg-2); border-color:var(--border-soft); color:var(--text-0); }
+  .rv-tabs{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .rv-tab{ background:var(--bg-1); border:1px solid var(--border-soft); color:var(--text-2); border-radius:999px; padding:7px 14px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .rv-tab span{ margin-left:5px; color:var(--text-3); font-weight:700; }
+  .rv-tab:hover{ color:var(--text-0); border-color:var(--grey-3); }
+  .rv-tab.active{ background:var(--text-0); color:#0a0a0b; border-color:var(--text-0); } .rv-tab.active span{ color:#555; }
+  .rv-list{ display:flex; flex-direction:column; gap:10px; }
+  .rv-row{ display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:13px; background:var(--bg-1); border:1px solid var(--border-soft); cursor:pointer; transition:border-color .15s, transform .12s; }
+  .rv-row:hover{ border-color:var(--grey-3); transform:translateY(-1px); }
+  .rv-thumb{ width:54px; height:54px; border-radius:10px; background:linear-gradient(#c9d8ff,#7aa2ff 50%,#34c759 50%,#1f9d45); background-size:cover; background-position:center; flex-shrink:0; }
+  .rv-info{ flex:1; min-width:0; } .rv-name{ font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rv-meta{ font-size:11.5px; color:var(--text-3); margin-top:4px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .rv-chev{ width:16px; height:16px; color:var(--text-3); flex-shrink:0; }
+  .rv-empty{ padding:34px; text-align:center; color:var(--text-3); font-size:13px; border:1px dashed var(--border); border-radius:13px; }
+  .rv-back{ display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--text-2); font-size:13px; font-weight:600; cursor:pointer; padding:0 0 14px; }
+  .rv-back svg{ width:15px; height:15px; } .rv-back:hover{ color:var(--text-0); }
+  .rv-detail{ background:var(--bg-1); border:1px solid var(--border-soft); border-radius:16px; overflow:hidden; }
+  .rv-banner{ height:150px; background:linear-gradient(#c9d8ff,#7aa2ff 55%,#34c759 55%,#1f9d45); background-size:cover; background-position:center; }
+  .rv-dbody{ padding:20px 22px 22px; } .rv-dbody h2{ margin:0 0 8px; font-size:20px; }
+  .rv-deny{ margin:12px 0 0; padding:10px 12px; border-radius:9px; background:#3a1c1d; color:#ff9d9f; font-size:12.5px; line-height:1.5; }
+  .rv-facts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:16px 0; }
+  .rv-fact{ background:var(--bg-2); border:1px solid var(--border-soft); border-radius:10px; padding:10px 12px; }
+  .rv-fact b{ display:block; font-size:15px; } .rv-fact span{ font-size:10.5px; color:var(--text-3); text-transform:uppercase; letter-spacing:.4px; }
+  .rv-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .rv-btn{ padding:10px 18px; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; background:var(--bg-2); border:1px solid var(--border); color:var(--text-0); }
+  .rv-btn:hover{ border-color:var(--grey-3); background:var(--grey-1); }
+  .rv-btn.primary{ background:var(--text-0); color:#0a0a0b; border-color:var(--text-0); } .rv-btn.primary:hover{ background:#fff; }
+  .srv-card{ background:var(--bg-1); border:1px solid var(--border-soft); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+  .srv-card-head{ display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:12px; }
+  .srv-range button{ background:none; border:1px solid var(--border-soft); color:var(--text-2); font-size:11px; font-weight:600; padding:4px 10px; margin-left:6px; border-radius:6px; cursor:pointer; }
+  .srv-range button.active{ background:var(--text-0); color:#0a0a0b; border-color:var(--text-0); }
+  .srv-chart-wrap{ position:relative; height:260px; } #srvChart{ width:100%; height:100%; display:block; }
+  .srv-tip{ position:absolute; pointer-events:none; display:none; background:#000c; border:1px solid var(--border); border-radius:7px; padding:5px 8px; font-size:11px; white-space:nowrap; transform:translate(-50%,-120%); }
+  .srv-note{ font-size:11.5px; color:var(--text-3); margin-top:10px; min-height:14px; }
+  .srv-row{ display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--border-soft); font-size:13px; }
+  .srv-row:first-child{ border-top:none; } .srv-dot{ width:8px; height:8px; border-radius:50%; background:#6be29a; flex-shrink:0; } .srv-dot.off{ background:var(--grey-3); }
+  .srv-people{ margin-left:auto; color:var(--text-2); font-size:12px; } .srv-names{ color:var(--text-3); font-size:11.5px; margin-top:3px; }
   .lua-area{ position:relative; flex:1; min-width:0; min-height:320px; }
   .lua-hl, .lua-editor-wrap .lua-area textarea.script-editor-textarea{
     position:absolute; inset:0; margin:0; width:100%; height:100%; box-sizing:border-box; padding:12px;
@@ -2248,10 +2294,20 @@ function createLuaRuntime(fengari, A, preludeSrc){
         <div class="su-tag">Creator</div>
       </div>
     </div>
+    <div class="studio-nav">
+      <button class="studio-nav-btn active" data-dview="games">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        My Games
+      </button>
+      <button class="studio-nav-btn" data-dview="reviews">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Reviews
+      </button>
+    </div>
     <div class="studio-spacer"></div>
     <button class="studio-logout" id="studioLogoutBtn">Log out</button>
   </div>
-  <div class="dash-main">
+  <div class="dash-main" id="gamesMain">
     <div class="dash-header">
       <div>
         <h1>My Games</h1>
@@ -2287,6 +2343,49 @@ function createLuaRuntime(fengari, A, preludeSrc){
         </div>
         <span>New Game</span>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== Reviews page ===== -->
+  <div class="dash-main" id="reviewsMain" style="display:none">
+    <div id="rvListView">
+      <div class="dash-header"><div><h1>Reviews</h1><p>Every game you've published, sent for review, or left as a draft.</p></div></div>
+      <div class="rv-tabs" id="rvTabs">
+        <button class="rv-tab active" data-rf="all">All <span id="rvCAll">0</span></button>
+        <button class="rv-tab" data-rf="published">Published <span id="rvCPub">0</span></button>
+        <button class="rv-tab" data-rf="pending">In review <span id="rvCPen">0</span></button>
+        <button class="rv-tab" data-rf="draft">Drafts <span id="rvCDra">0</span></button>
+      </div>
+      <div class="rv-list" id="rvList"></div>
+    </div>
+    <div id="rvDetailView" style="display:none">
+      <button class="rv-back" id="rvDetailBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> Reviews</button>
+      <div class="rv-detail" id="rvDetail"></div>
+    </div>
+  </div>
+
+  <!-- ===== Servers page ===== -->
+  <div class="dash-main" id="serversMain" style="display:none">
+    <button class="rv-back" id="srvBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg> <span id="srvBackLabel">Back</span></button>
+    <div class="dash-header"><div><h1 id="srvTitle">Servers</h1><p id="srvSub">Live players and visits</p></div></div>
+    <div class="dash-stats">
+      <div class="dash-stat ds-published"><div class="ds-num" id="srvActive">0</div><div class="ds-label">Active now</div></div>
+      <div class="dash-stat"><div class="ds-num" id="srvVisits">0</div><div class="ds-label">Total visits</div></div>
+      <div class="dash-stat ds-pending"><div class="ds-num" id="srvPeak">0</div><div class="ds-label">Peak players</div></div>
+      <div class="dash-stat"><div class="ds-num" id="srvCap">20</div><div class="ds-label">Server capacity</div></div>
+    </div>
+    <div class="srv-card">
+      <div class="srv-card-head"><span>Players over time</span>
+        <span class="srv-range" id="srvRange">
+          <button data-r="10">10m</button><button data-r="60" class="active">1h</button><button data-r="1440">24h</button>
+        </span>
+      </div>
+      <div class="srv-chart-wrap"><canvas id="srvChart"></canvas><div class="srv-tip" id="srvTip"></div></div>
+      <div class="srv-note" id="srvNote"></div>
+    </div>
+    <div class="srv-card">
+      <div class="srv-card-head"><span>Servers</span></div>
+      <div id="srvList"></div>
     </div>
   </div>
 </div>
@@ -2652,6 +2751,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     clearStudioSession();
     document.getElementById("dashScreen").classList.remove("show");
     document.getElementById("editorScreen").classList.remove("show");
+    closeObjCtxMenu(); if(typeof stopServersWatch === "function") stopServersWatch();
     document.getElementById("loginScreen").style.display = "flex";
     document.getElementById("stPassword").value = "";
   });
@@ -2673,6 +2773,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     document.getElementById("loginScreen").style.display = "none";
     document.getElementById("dashScreen").classList.add("show");
     document.getElementById("dashUsername").textContent = currentUsername;
+    rvGame = null; setDashView("games");
     document.getElementById("dashAvatarInitial").textContent = currentUsername.slice(0,1).toUpperCase();
 
     fbDb.ref("studio_games/" + currentUserKey).once("value").then(snap => {
@@ -2751,6 +2852,192 @@ function createLuaRuntime(fengari, A, preludeSrc){
     });
   }
   document.getElementById("dashSearch").addEventListener("input", renderGameGrid);
+
+  /* ---------------- Reviews + Servers (dashboard) ---------------- */
+  let rvFilter = "all", rvGame = null, srvFrom = "reviews";
+  const dashViews = { games:"gamesMain", reviews:"reviewsMain", servers:"serversMain" };
+  function setDashView(v){
+    if(v !== "servers") stopServersWatch();
+    Object.keys(dashViews).forEach(k => { document.getElementById(dashViews[k]).style.display = (k === v) ? "" : "none"; });
+    const navKey = v === "servers" ? "reviews" : v;
+    document.querySelectorAll(".studio-nav-btn").forEach(b => b.classList.toggle("active", b.dataset.dview === navKey));
+    if(v === "reviews") renderReviews();
+  }
+  document.querySelectorAll(".studio-nav-btn").forEach(b => b.addEventListener("click", () => {
+    rvGame = null; setDashView(b.dataset.dview);
+  }));
+  const STATUS_LABEL = { draft:"Draft", pending:"In review", published:"Published", denied:"Denied" };
+  function statusBucket(g){ const s = g.publishStatus || "draft"; return s === "denied" ? "draft" : s; }
+
+  function renderReviews(){
+    const games = loadGames().slice().reverse();
+    const c = { all:games.length, published:0, pending:0, draft:0 };
+    games.forEach(g => c[statusBucket(g)]++);
+    document.getElementById("rvCAll").textContent = c.all; document.getElementById("rvCPub").textContent = c.published;
+    document.getElementById("rvCPen").textContent = c.pending; document.getElementById("rvCDra").textContent = c.draft;
+    document.querySelectorAll(".rv-tab").forEach(t => t.classList.toggle("active", t.dataset.rf === rvFilter));
+    const list = document.getElementById("rvList"); list.innerHTML = "";
+    const shown = games.filter(g => rvFilter === "all" || statusBucket(g) === rvFilter);
+    if(!shown.length){
+      const e = document.createElement("div"); e.className = "rv-empty";
+      e.textContent = games.length ? "No games in this section yet." : "You haven't made any games yet.";
+      list.appendChild(e);
+    }
+    shown.forEach(g => {
+      const st = g.publishStatus || "draft";
+      const row = document.createElement("div"); row.className = "rv-row";
+      row.innerHTML = '<div class="rv-thumb"></div><div class="rv-info"><div class="rv-name"></div><div class="rv-meta"><span class="gc-status-pill ' + st + '">' + STATUS_LABEL[st] + '</span><span class="rv-date"></span></div></div>' +
+        '<svg class="rv-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+      row.querySelector(".rv-name").textContent = g.name || "Untitled Game";
+      row.querySelector(".rv-date").textContent = (g.isPublic ? "Public" : "Private") + " · created " + new Date(g.created).toLocaleDateString();
+      if(g.icon) row.querySelector(".rv-thumb").style.backgroundImage = "url('" + g.icon + "')";
+      row.addEventListener("click", () => openReviewDetail(g));
+      list.appendChild(row);
+    });
+    document.getElementById("rvListView").style.display = rvGame ? "none" : "";
+    document.getElementById("rvDetailView").style.display = rvGame ? "" : "none";
+  }
+  document.getElementById("rvTabs").addEventListener("click", (e) => {
+    const t = e.target.closest(".rv-tab"); if(!t) return; rvFilter = t.dataset.rf; renderReviews();
+  });
+  document.getElementById("rvDetailBack").addEventListener("click", () => { rvGame = null; renderReviews(); });
+
+  function openReviewDetail(g){
+    rvGame = g;
+    const st = g.publishStatus || "draft";
+    const d = document.getElementById("rvDetail"); d.innerHTML = "";
+    const banner = document.createElement("div"); banner.className = "rv-banner";
+    if(g.banner) banner.style.backgroundImage = "url('" + g.banner + "')";
+    const body = document.createElement("div"); body.className = "rv-dbody";
+    const h = document.createElement("h2"); h.textContent = g.name || "Untitled Game";
+    const pill = document.createElement("span"); pill.className = "gc-status-pill " + st; pill.textContent = STATUS_LABEL[st];
+    body.append(h, pill);
+    if(st === "denied" && g.denyReason){ const r = document.createElement("div"); r.className = "rv-deny"; r.textContent = "Denied: " + g.denyReason; body.appendChild(r); }
+    if(st === "pending"){ const r = document.createElement("div"); r.className = "rv-deny"; r.style.cssText = "background:#3a3320;color:#ffd98a"; r.textContent = "Waiting for an admin to review this game."; body.appendChild(r); }
+    const facts = document.createElement("div"); facts.className = "rv-facts";
+    [["Visibility", g.isPublic ? "Public" : "Private"], ["Max players", String(g.maxPlayers || 20)], ["Created", new Date(g.created).toLocaleDateString()]].forEach(f => {
+      const el = document.createElement("div"); el.className = "rv-fact"; el.innerHTML = "<b></b><span></span>"; el.querySelector("b").textContent = f[1]; el.querySelector("span").textContent = f[0]; facts.appendChild(el);
+    });
+    const acts = document.createElement("div"); acts.className = "rv-actions";
+    const mk = (label, cls, fn) => { const b = document.createElement("button"); b.className = "rv-btn " + cls; b.textContent = label; b.addEventListener("click", fn); acts.appendChild(b); };
+    mk("Servers", "primary", () => openServers(g, "reviews"));
+    mk("Open in editor", "", () => openEditor(g));
+    mk("Game settings", "", () => openGameSettings(g));
+    body.append(facts, acts);
+    d.append(banner, body);
+    renderReviews();
+  }
+
+  /* ---- Servers: live player count, visits and a history line chart ---- */
+  let srvW = null, srvRangeMin = 60;
+  const histKey = (id) => "bv_srv_hist_" + id;
+  function loadHist(id){ try{ return JSON.parse(localStorage.getItem(histKey(id)) || "[]"); }catch(e){ return []; } }
+  function saveHist(id, arr){ try{ localStorage.setItem(histKey(id), JSON.stringify(arr)); }catch(e){} }
+
+  function stopServersWatch(){
+    if(!srvW) return;
+    try{ srvW.playersRef.off("value", srvW.onPlayers); srvW.visitsRef.off("value", srvW.onVisits); }catch(e){}
+    clearInterval(srvW.timer); window.removeEventListener("resize", srvW.onResize);
+    srvW = null;
+  }
+  function openServers(g, from){
+    srvFrom = from || "reviews";
+    stopServersWatch(); setDashView("servers");
+    const cap = g.maxPlayers || 20;
+    document.getElementById("srvTitle").textContent = (g.name || "Untitled Game") + " - Servers";
+    document.getElementById("srvSub").textContent = "Live players, visits and activity";
+    document.getElementById("srvBackLabel").textContent = "Reviews";
+    document.getElementById("srvCap").textContent = cap;
+    const st = g.publishStatus || "draft";
+    const note = document.getElementById("srvNote");
+    note.textContent = st === "published" ? "" : "This game isn't published yet, so nobody can join. Numbers show up here once it's live.";
+    const w = srvW = { game:g, cap, names:[], active:0, visits:0, hist:loadHist(g.id), err:false, hover:null };
+    w.playersRef = fbDb.ref("rooms/" + g.id + "/players");
+    w.visitsRef = fbDb.ref("rooms/" + g.id + "/visitors");
+    const cut = () => { const lim = Date.now() - 24*3600*1000; w.hist = w.hist.filter(p => p[0] >= lim).slice(-3000); };
+    const record = (force) => {
+      const last = w.hist[w.hist.length - 1], now = Date.now();
+      if(force || !last || last[1] !== w.active || now - last[0] >= 30000){ w.hist.push([now, w.active]); cut(); saveHist(g.id, w.hist); }
+    };
+    const fail = () => { w.err = true; note.textContent = "Couldn't read live data from the server (check your connection or database rules)."; };
+    w.onPlayers = (snap) => { const v = snap.val() || {}; w.names = Object.keys(v); w.active = w.names.length; record(true); update(); };
+    w.onVisits = (snap) => { w.visits = snap.numChildren(); update(); };
+    w.playersRef.on("value", w.onPlayers, fail);
+    w.visitsRef.on("value", w.onVisits, fail);
+    w.timer = setInterval(() => { record(false); update(); }, 5000);
+    w.onResize = () => draw(); window.addEventListener("resize", w.onResize);
+    function update(){
+      const rangeStart = Date.now() - srvRangeMin * 60000;
+      const peak = Math.max(w.active, ...w.hist.filter(p => p[0] >= rangeStart).map(p => p[1]), 0);
+      document.getElementById("srvActive").textContent = w.active;
+      document.getElementById("srvVisits").textContent = w.visits;
+      document.getElementById("srvPeak").textContent = peak;
+      const list = document.getElementById("srvList"); list.innerHTML = "";
+      const row = document.createElement("div"); row.className = "srv-row";
+      row.innerHTML = '<span class="srv-dot' + (w.active ? "" : " off") + '"></span><div><div>Server 1</div><div class="srv-names"></div></div><span class="srv-people"></span>';
+      row.querySelector(".srv-people").textContent = w.active + " / " + cap + " players";
+      row.querySelector(".srv-names").textContent = w.names.length ? w.names.slice(0, 12).join(", ") + (w.names.length > 12 ? " +" + (w.names.length - 12) + " more" : "") : "Nobody is in this server right now";
+      list.appendChild(row);
+      draw();
+    }
+    update();
+  }
+  document.getElementById("srvBack").addEventListener("click", () => { setDashView("reviews"); });
+  document.getElementById("srvRange").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if(!b) return;
+    srvRangeMin = parseInt(b.dataset.r, 10);
+    document.querySelectorAll("#srvRange button").forEach(x => x.classList.toggle("active", x === b));
+    if(srvW){ document.getElementById("srvPeak").textContent = Math.max(srvW.active, ...srvW.hist.filter(p => p[0] >= Date.now() - srvRangeMin*60000).map(p => p[1]), 0); draw(); }
+  });
+
+  function draw(){
+    const cv = document.getElementById("srvChart"); if(!cv || !srvW) return;
+    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    if(!W || !H) return;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+    const L = 34, R = 10, T = 10, B = 24, pw = W - L - R, ph = H - T - B;
+    const now = Date.now(), t0 = now - srvRangeMin * 60000;
+    let pts = srvW.hist.filter(p => p[0] >= t0);
+    pts.push([now, srvW.active]);
+    const maxV = Math.max(4, srvW.cap > 0 ? 0 : 0, ...pts.map(p => p[1]));
+    const top = Math.ceil(maxV / 4) * 4 || 4;
+    const X = (t) => L + (t - t0) / (now - t0) * pw, Y = (v) => T + ph - v / top * ph;
+    c.font = "10.5px system-ui,sans-serif"; c.fillStyle = "#8a8a94"; c.strokeStyle = "rgba(255,255,255,0.07)"; c.lineWidth = 1;
+    for(let i = 0; i <= 4; i++){
+      const v = top / 4 * i, y = Math.round(Y(v)) + .5;
+      c.beginPath(); c.moveTo(L, y); c.lineTo(W - R, y); c.stroke();
+      c.textAlign = "right"; c.textBaseline = "middle"; c.fillText(String(Math.round(v)), L - 6, y);
+    }
+    c.textAlign = "center"; c.textBaseline = "top";
+    for(let i = 0; i <= 4; i++){
+      const t = t0 + (now - t0) / 4 * i, d = new Date(t);
+      c.textAlign = i === 0 ? "left" : (i === 4 ? "right" : "center");
+      c.fillText(d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0"), L + pw / 4 * i, H - B + 7);
+    }
+    // step line: players hold their value until the next change
+    const path = new Path2D();
+    pts.forEach((p, i) => { const x = X(p[0]), y = Y(p[1]); if(i === 0) path.moveTo(x, y); else { path.lineTo(x, Y(pts[i-1][1])); path.lineTo(x, y); } });
+    const fill = new Path2D(path); fill.lineTo(X(now), Y(0)); fill.lineTo(X(pts[0][0]), Y(0)); fill.closePath();
+    const gr = c.createLinearGradient(0, T, 0, T + ph); gr.addColorStop(0, "rgba(107,226,154,0.28)"); gr.addColorStop(1, "rgba(107,226,154,0)");
+    c.fillStyle = gr; c.fill(fill);
+    c.strokeStyle = "#6be29a"; c.lineWidth = 2; c.lineJoin = "round"; c.stroke(path);
+    c.fillStyle = "#6be29a"; pts.forEach(p => { c.beginPath(); c.arc(X(p[0]), Y(p[1]), 2.4, 0, 6.3); c.fill(); });
+    srvW.map = { pts, X, Y, L, R, W };
+  }
+  (function(){
+    const cv = document.getElementById("srvChart"), tip = document.getElementById("srvTip");
+    cv.addEventListener("mousemove", (e) => {
+      if(!srvW || !srvW.map) return;
+      const r = cv.getBoundingClientRect(), mx = e.clientX - r.left;
+      let best = null, bd = 1e9;
+      srvW.map.pts.forEach(p => { const d = Math.abs(srvW.map.X(p[0]) - mx); if(d < bd){ bd = d; best = p; } });
+      if(!best || bd > 40){ tip.style.display = "none"; return; }
+      tip.style.display = "block"; tip.style.left = srvW.map.X(best[0]) + "px"; tip.style.top = srvW.map.Y(best[1]) + "px";
+      tip.textContent = best[1] + " player" + (best[1] === 1 ? "" : "s") + " · " + new Date(best[0]).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+    });
+    cv.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+  })();
 
   /* ---- the 3-lines "≡" menu popover shown from each game card ---- */
   let openCardMenuEl = null;
@@ -3006,7 +3293,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     // scene (invisible character you could still walk) and no way to stop it - always end the test first
     if(playMode.loading) return;
     if(playMode.active) await stopPlay();
-    closeLuaEditor(); saveWorld(true);
+    closeLuaEditor(); closeObjCtxMenu(); saveWorld(true);
     document.getElementById("editorScreen").classList.remove("show");
     document.getElementById("dashScreen").classList.add("show");
   });
@@ -4003,6 +4290,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
     menu.style.top = Math.max(8, y) + "px";
     menu.addEventListener("click", (e) => e.stopPropagation());
     document.body.appendChild(menu);
+    setTimeout(() => {
+      window.addEventListener("click", closeObjCtxMenu, { once:true });
+      window.addEventListener("keydown", function esc(e){ if(e.key === "Escape"){ closeObjCtxMenu(); } window.removeEventListener("keydown", esc); }, { once:false });
+    }, 0);
     // after items are added, pull it back up if it would run off the bottom
     requestAnimationFrame(() => {
       const r = menu.getBoundingClientRect();
