@@ -474,12 +474,19 @@
   /* ---- Object context menu (left-click on a part) ---- */
   .obj-ctx-menu{
     position:fixed; z-index:60; background:var(--bg-2); border:1px solid var(--border-soft);
-    border-radius:10px; padding:5px; box-shadow:0 14px 34px rgba(0,0,0,0.45); min-width:150px;
+    border-radius:10px; padding:5px; box-shadow:0 14px 34px rgba(0,0,0,0.45); min-width:190px;
+    max-height:min(340px, calc(100vh - 20px)); overflow-y:auto; overscroll-behavior:contain;
+    scrollbar-width:thin; scrollbar-color:var(--grey-3) transparent;
     animation:popIn .12s ease both;
   }
+  .obj-ctx-menu::-webkit-scrollbar{ width:6px; }
+  .obj-ctx-menu::-webkit-scrollbar-thumb{ background:var(--grey-3); border-radius:6px; }
+  .obj-ctx-sep{ height:1px; background:var(--border-soft); margin:4px 6px; flex-shrink:0; }
+  .obj-ctx-head{ padding:6px 10px 4px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); font-weight:700; }
   .obj-ctx-item{
     display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:7px; cursor:pointer;
     font-size:12.5px; color:var(--text-1); transition:background .12s, color .12s;
+    flex-shrink:0; white-space:nowrap; min-height:32px; box-sizing:border-box;
   }
   .obj-ctx-item:hover{ background:var(--grey-1); color:var(--text-0); }
   .obj-ctx-item.danger:hover{ background:rgba(229,72,77,0.15); color:#ff9a9d; }
@@ -819,6 +826,15 @@
   .lua-gutter{ padding:12px 8px 12px 10px; text-align:right; color:var(--text-3); font:12.5px/1.55 ui-monospace,Consolas,monospace; user-select:none; background:rgba(255,255,255,0.03); overflow:hidden; white-space:pre; }
   .lua-editor-wrap textarea.script-editor-textarea{ border:none; border-radius:0; flex:1; min-height:320px; line-height:1.55; tab-size:2; white-space:pre; overflow:auto; }
   .lua-err{ font-size:12px; color:#ff8a8a; min-height:16px; font-family:ui-monospace,Consolas,monospace; }
+  .script-editor-overlay.lua-fullscreen{ background:var(--bg-0,#0a0a0b); align-items:stretch; justify-content:stretch; z-index:5000; }
+  .lua-fs-card{ width:100vw !important; height:100vh; height:100dvh; max-width:none; border-radius:0 !important; border:none !important; padding:12px 16px 14px; box-sizing:border-box; gap:8px; }
+  .lua-fs-card .script-editor-head{ font-size:14px; padding-bottom:4px; border-bottom:1px solid var(--border-soft); }
+  .lua-fs-card .script-editor-head button{ font-size:26px; width:36px; height:36px; border-radius:8px; }
+  .lua-fs-card .script-editor-head button:hover{ background:var(--grey-1); color:var(--text-0); }
+  .lua-fs-card .lua-editor-wrap{ flex:1; min-height:0; border-radius:8px; }
+  .lua-fs-card .lua-editor-wrap textarea.script-editor-textarea{ height:100%; min-height:0; resize:none; }
+  .lua-fs-card .lua-gutter{ height:100%; box-sizing:border-box; }
+  .lua-fs-card .script-editor-help{ max-height:48px; overflow:auto; }
   .lua-tag{ font-size:11px; color:var(--text-2); font-weight:400; margin-left:8px; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
@@ -2447,7 +2463,6 @@ function createLuaRuntime(fengari, A, preludeSrc){
     <div class="viewport-wrap">
       <div class="parts-picker" id="partsPicker"></div>
       <canvas id="studioCanvas"></canvas>
-      <div class="viewport-hint" id="viewportHint">Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan</div>
     </div>
 
     <div class="explorer-panel">
@@ -3333,9 +3348,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
         focusPlayChat();
       }
       if(playMode.active) return; // remaining shortcuts (delete/focus) are studio-mode only
-      if(k === "backspace" && selectedId && selectedId !== "__light__"){
+      if(document.getElementById("luaEditorOverlay")) return; // script editor open: keys belong to it
+      if((k === "backspace" || k === "delete") && selectedId && selectedId !== "__light__"){
         e.preventDefault();
-        deleteObject(selectedId);
+        if(nodeById(selectedId)){ const nm = nodeById(selectedId).name; deleteNode(selectedId); showToast("Deleted " + nm); }
+        else deleteObject(selectedId);
       }
       if(k === "f" && selectedId){
         focusCameraOnObject(selectedId);
@@ -3953,22 +3970,33 @@ function createLuaRuntime(fengari, A, preludeSrc){
     closeObjCtxMenu();
     const menu = document.createElement("div");
     menu.id = "objCtxMenu"; menu.className = "obj-ctx-menu";
-    menu.style.left = Math.min(x, window.innerWidth - 190) + "px";
-    menu.style.top = Math.min(y, window.innerHeight - 260) + "px";
+    menu.style.left = Math.max(8, Math.min(x, window.innerWidth - 210)) + "px";
+    menu.style.top = Math.max(8, y) + "px";
     menu.addEventListener("click", (e) => e.stopPropagation());
     document.body.appendChild(menu);
+    // after items are added, pull it back up if it would run off the bottom
+    requestAnimationFrame(() => {
+      const r = menu.getBoundingClientRect();
+      if(r.bottom > window.innerHeight - 8) menu.style.top = Math.max(8, window.innerHeight - 8 - r.height) + "px";
+    });
     return menu;
   }
   function showInsertMenu(pid, x, y){
     const opts = insertOptionsFor(pid);
     if(!opts.length) return;
     const menu = openCtxMenu(x, y);
-    opts.forEach(c => menuItem(menu, "Insert " + c, () => addNode(c, pid), '<span class="exp-icon" style="width:14px;height:14px">' + (NODE_ICONS[c] || "") + '</span>'));
+    const h = document.createElement("div"); h.className = "obj-ctx-head"; h.textContent = "Insert"; menu.appendChild(h);
+    opts.forEach(c => menuItem(menu, c, () => addNode(c, pid), '<span class="exp-icon" style="width:14px;height:14px">' + (NODE_ICONS[c] || "") + '</span>'));
   }
   function showNodeMenu(n, x, y){
     const menu = openCtxMenu(x, y);
     if(isScriptClass(n.className)) menuItem(menu, "Open script", () => openLuaEditor(n));
-    insertOptionsFor(n.id).forEach(c => menuItem(menu, "Insert " + c, () => addNode(c, n.id)));
+    const _ins = insertOptionsFor(n.id);
+    if(_ins.length){
+      const h = document.createElement("div"); h.className = "obj-ctx-head"; h.textContent = "Insert"; menu.appendChild(h);
+      _ins.forEach(c => menuItem(menu, c, () => addNode(c, n.id), '<span class="exp-icon" style="width:14px;height:14px">' + (NODE_ICONS[c] || "") + '</span>'));
+      const sep = document.createElement("div"); sep.className = "obj-ctx-sep"; menu.appendChild(sep);
+    }
     menuItem(menu, "Rename", () => {
       const nv = prompt("Rename", n.name);
       if(nv && nv.trim()){ n.name = nv.trim().slice(0, 40); renderExplorer(); renderProperties(); saveWorld(false); }
@@ -4055,7 +4083,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
     closeLuaEditor();
     const ov = document.createElement("div");
     ov.id = "luaEditorOverlay"; ov.className = "script-editor-overlay"; ov.style.display = "flex";
-    const card = document.createElement("div"); card.className = "script-editor-card"; card.style.width = "min(860px, 94vw)";
+    ov.classList.add("lua-fullscreen");
+    const card = document.createElement("div"); card.className = "script-editor-card lua-fs-card";
     const head = document.createElement("div"); head.className = "script-editor-head";
     const title = document.createElement("span"); title.textContent = n.name;
     const tag = document.createElement("span"); tag.className = "lua-tag"; tag.textContent = n.className + " - " + whereItRuns(n);
@@ -4557,7 +4586,6 @@ function createLuaRuntime(fengari, A, preludeSrc){
       btn.classList.add("playing");
       btn.querySelector("span").textContent = "Leave";
       btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-      document.getElementById("viewportHint").innerHTML = "WASD to move &middot; Space to jump &middot; Hold right-click to look &middot; Enter to chat &middot; Esc for the menu &middot; F5 to stop";
       showToast(loaded.found ? "Playing with your BlockVerse character" : "Playing (no saved character found, using the default look)");
       logOutput("Play test started");
     }catch(err){
@@ -4677,14 +4705,6 @@ function createLuaRuntime(fengari, A, preludeSrc){
     document.querySelectorAll(".ribbon-btn[data-tool]").forEach(t => t.classList.toggle("active", t.dataset.tool === tool));
     const statusTool = document.getElementById("statusTool");
     if(statusTool) statusTool.textContent = tool.charAt(0).toUpperCase() + tool.slice(1);
-    const hint = document.getElementById("viewportHint");
-    const hints = {
-      select:"Drag to orbit &middot; Scroll to zoom &middot; Right-drag to pan &middot; Click a part to select it",
-      move:"Drag a colored arrow to move along that axis &middot; Drag the white handle to move freely",
-      rotate:"Drag a colored ring to rotate around that axis",
-      scale:"Drag a colored handle to resize along that axis &middot; Drag the white handle to scale evenly"
-    };
-    hint.innerHTML = hints[tool] || hints.select;
     rebuildGizmo();
   }
 
