@@ -808,7 +808,1369 @@
   .exp-row.selected .exp-icon{ color:#fff; }
   .exp-row.selected:hover{ background:#355aa8 !important; }
 
+
+  /* ---------- scripting: service folders, script rows, Lua editor ---------- */
+  .exp-row .exp-add{ margin-left:auto; display:none; width:18px; height:18px; border-radius:5px; border:none; background:var(--grey-1); color:var(--text-1); cursor:pointer; font-size:14px; line-height:16px; padding:0; }
+  .exp-row:hover .exp-add{ display:block; }
+  .exp-row .exp-add:hover{ background:var(--grey-3); color:var(--text-0); }
+  .exp-nested{ margin-left:14px; border-left:1px solid var(--grey-2); padding-left:4px; }
+  .exp-row.exp-dim span:last-child{ opacity:.55; }
+  .lua-editor-wrap{ display:flex; gap:0; border:1px solid var(--grey-2); border-radius:9px; overflow:hidden; background:var(--bg-1,#101012); min-height:320px; }
+  .lua-gutter{ padding:12px 8px 12px 10px; text-align:right; color:var(--text-3); font:12.5px/1.55 ui-monospace,Consolas,monospace; user-select:none; background:rgba(255,255,255,0.03); overflow:hidden; white-space:pre; }
+  .lua-editor-wrap textarea.script-editor-textarea{ border:none; border-radius:0; flex:1; min-height:320px; line-height:1.55; tab-size:2; white-space:pre; overflow:auto; }
+  .lua-err{ font-size:12px; color:#ff8a8a; min-height:16px; font-family:ui-monospace,Consolas,monospace; }
+  .lua-tag{ font-size:11px; color:var(--text-2); font-weight:400; margin-left:8px; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
+<script type="text/plain" id="bvLuaPrelude">
+-- BlockVerse Studio: Roblox-style API written in Lua on top of a tiny host bridge.
+-- Called as: chunk(bridge, VM)   (VM is "server" or "client")
+local bridge, VM = ...
+
+local type, tostring, tonumber, pairs, ipairs, select, error, pcall, xpcall = type, tostring, tonumber, pairs, ipairs, select, error, pcall, xpcall
+local setmetatable, getmetatable, rawget, rawset, rawequal, next, assert = setmetatable, getmetatable, rawget, rawset, rawequal, next, assert
+local co_create, co_resume, co_yield, co_status, co_running = coroutine.create, coroutine.resume, coroutine.yield, coroutine.status, coroutine.running
+local _load = load
+local sformat, tconcat, mfloor, msqrt, mcos, msin = string.format, table.concat, math.floor, math.sqrt, math.cos, math.sin
+local dbg_traceback = debug and debug.traceback
+
+local function host(op, payload)
+  local ok, res = bridge(op, payload or {})
+  if not ok then error(res, 3) end
+  return res
+end
+
+-- numbers print like Luau (5 not 5.0)
+local function fmtnum(n)
+  if n ~= n then return "nan" end
+  if n == math.huge then return "inf" end
+  if n == -math.huge then return "-inf" end
+  if n == mfloor(n) and n > -1e15 and n < 1e15 then return sformat("%d", n) end
+  return sformat("%.14g", n)
+end
+local function tostr(v)
+  if type(v) == "number" then return fmtnum(v) end
+  return tostring(v)
+end
+
+---------------------------------------------------------------- pure-Lua signal (BindableEvent-style)
+local SignalMT = {}
+SignalMT.__index = SignalMT
+local nextCo
+local function newSignal()
+  return setmetatable({ _c = {}, _n = 0 }, SignalMT)
+end
+function SignalMT:Connect(fn)
+  local conn = { Connected = true, _fn = fn }
+  self._n = self._n + 1
+  conn._id = self._n
+  self._c[conn._id] = conn
+  local sig = self
+  function conn:Disconnect() self.Connected = false; sig._c[self._id] = nil end
+  conn.disconnect = conn.Disconnect
+  return conn
+end
+function SignalMT:Once(fn)
+  local conn
+  conn = self:Connect(function(...) conn:Disconnect(); return fn(...) end)
+  return conn
+end
+function SignalMT:Wait()
+  local co = co_running()
+  local conn
+  conn = self:Connect(function(...) conn:Disconnect(); nextCo(co, ...) end)
+  return co_yield({ __sig = true })
+end
+function SignalMT:Fire(...)
+  local list = {}
+  for _, c in pairs(self._c) do list[#list + 1] = c end
+  for _, c in ipairs(list) do
+    if c.Connected then nextCo(co_create(c._fn), ...) end
+  end
+end
+SignalMT.connect = SignalMT.Connect
+
+---------------------------------------------------------------- scheduler (task library)
+local now = 0
+local waiting = {}
+local deferred = {}
+local tweens = {}
+
+local function report(err, co)
+  local msg = tostring(err)
+  if co and dbg_traceback and co_status(co) == "dead" then
+    local tb = dbg_traceback(co, "", 0) or ""
+    local lines, n = {}, 0
+    for line in tb:gmatch("[^\n]+") do
+      if line:find("^%s*%[") == nil and not line:find("stack traceback") and not line:find("prelude:") and n < 4 then
+        lines[#lines + 1] = "    " .. line:gsub("^%s+", "")
+        n = n + 1
+      end
+    end
+    if #lines > 0 then msg = msg .. "\n" .. tconcat(lines, "\n") end
+  end
+  host("log", { k = "error", s = msg })
+end
+
+nextCo = function(co, ...)
+  local res = { co_resume(co, ...) }
+  if not res[1] then report(res[2], co); return end
+  if co_status(co) == "suspended" then
+    local req = res[2]
+    if type(req) == "table" and req.__wait then
+      waiting[#waiting + 1] = { co = co, wake = now + req.t, start = now }
+    end
+  end
+end
+
+local task = {}
+function task.wait(t)
+  t = tonumber(t) or 0
+  return co_yield({ __wait = true, t = t })
+end
+function task.spawn(fn, ...)
+  local co = type(fn) == "thread" and fn or co_create(fn)
+  nextCo(co, ...)
+  return co
+end
+function task.defer(fn, ...)
+  local args = table.pack(...)
+  deferred[#deferred + 1] = function() nextCo(co_create(fn), table.unpack(args, 1, args.n)) end
+end
+function task.delay(t, fn, ...)
+  local args = table.pack(...)
+  local co = co_create(function() task.wait(t); fn(table.unpack(args, 1, args.n)) end)
+  nextCo(co)
+  return co
+end
+function task.cancel(co)
+  for i = #waiting, 1, -1 do if waiting[i].co == co then table.remove(waiting, i) end end
+end
+
+---------------------------------------------------------------- math types
+local V3 = {}
+local V3methods = {}
+local function newV3(x, y, z)
+  return setmetatable({ X = x, Y = y, Z = z }, V3)
+end
+V3.__index = function(t, k)
+  if k == "Magnitude" then return msqrt(t.X * t.X + t.Y * t.Y + t.Z * t.Z) end
+  if k == "Unit" then
+    local m = msqrt(t.X * t.X + t.Y * t.Y + t.Z * t.Z)
+    if m == 0 then return newV3(0, 0, 0) end
+    return newV3(t.X / m, t.Y / m, t.Z / m)
+  end
+  if k == "x" then return t.X elseif k == "y" then return t.Y elseif k == "z" then return t.Z end
+  return V3methods[k]
+end
+V3.__add = function(a, b) return newV3(a.X + b.X, a.Y + b.Y, a.Z + b.Z) end
+V3.__sub = function(a, b) return newV3(a.X - b.X, a.Y - b.Y, a.Z - b.Z) end
+V3.__mul = function(a, b)
+  if type(a) == "number" then return newV3(a * b.X, a * b.Y, a * b.Z) end
+  if type(b) == "number" then return newV3(a.X * b, a.Y * b, a.Z * b) end
+  return newV3(a.X * b.X, a.Y * b.Y, a.Z * b.Z)
+end
+V3.__div = function(a, b)
+  if type(b) == "number" then return newV3(a.X / b, a.Y / b, a.Z / b) end
+  return newV3(a.X / b.X, a.Y / b.Y, a.Z / b.Z)
+end
+V3.__unm = function(a) return newV3(-a.X, -a.Y, -a.Z) end
+V3.__eq = function(a, b) return a.X == b.X and a.Y == b.Y and a.Z == b.Z end
+V3.__tostring = function(a) return fmtnum(a.X) .. ", " .. fmtnum(a.Y) .. ", " .. fmtnum(a.Z) end
+function V3methods.Dot(a, b) return a.X * b.X + a.Y * b.Y + a.Z * b.Z end
+function V3methods.Cross(a, b) return newV3(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X) end
+function V3methods.Lerp(a, b, t) return newV3(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, a.Z + (b.Z - a.Z) * t) end
+function V3methods.FuzzyEq(a, b, e) e = e or 1e-5; return math.abs(a.X - b.X) <= e and math.abs(a.Y - b.Y) <= e and math.abs(a.Z - b.Z) <= e end
+local Vector3 = {
+  new = function(x, y, z) return newV3(x or 0, y or 0, z or 0) end,
+  zero = newV3(0, 0, 0), one = newV3(1, 1, 1),
+  xAxis = newV3(1, 0, 0), yAxis = newV3(0, 1, 0), zAxis = newV3(0, 0, 1),
+}
+
+local C3 = {}
+local C3methods = {}
+local function newC3(r, g, b) return setmetatable({ R = r, G = g, B = b }, C3) end
+C3.__index = function(t, k) return C3methods[k] end
+C3.__eq = function(a, b) return a.R == b.R and a.G == b.G and a.B == b.B end
+C3.__tostring = function(a) return fmtnum(a.R) .. ", " .. fmtnum(a.G) .. ", " .. fmtnum(a.B) end
+function C3methods.Lerp(a, b, t) return newC3(a.R + (b.R - a.R) * t, a.G + (b.G - a.G) * t, a.B + (b.B - a.B) * t) end
+function C3methods.ToHex(a) return sformat("%02x%02x%02x", mfloor(a.R * 255 + 0.5), mfloor(a.G * 255 + 0.5), mfloor(a.B * 255 + 0.5)) end
+local Color3 = {
+  new = function(r, g, b) return newC3(r or 0, g or 0, b or 0) end,
+  fromRGB = function(r, g, b) return newC3((r or 0) / 255, (g or 0) / 255, (b or 0) / 255) end,
+  fromHex = function(h)
+    h = tostring(h):gsub("#", "")
+    local n = tonumber(h, 16) or 0
+    return newC3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
+  end,
+  fromHSV = function(h, s, v)
+    local i = mfloor(h * 6); local f = h * 6 - i
+    local p, q, t = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)
+    i = i % 6
+    if i == 0 then return newC3(v, t, p) elseif i == 1 then return newC3(q, v, p) elseif i == 2 then return newC3(p, v, t)
+    elseif i == 3 then return newC3(p, q, v) elseif i == 4 then return newC3(t, p, v) else return newC3(v, p, q) end
+  end,
+}
+
+-- CFrame: position only (rotation is not simulated yet)
+local CF = {}
+local CFmethods = {}
+local function newCF(x, y, z) return setmetatable({ X = x, Y = y, Z = z }, CF) end
+CF.__index = function(t, k)
+  if k == "Position" then return newV3(t.X, t.Y, t.Z) end
+  return CFmethods[k]
+end
+CF.__add = function(a, b) return newCF(a.X + b.X, a.Y + b.Y, a.Z + b.Z) end
+CF.__sub = function(a, b) return newCF(a.X - b.X, a.Y - b.Y, a.Z - b.Z) end
+CF.__mul = function(a, b)
+  if getmetatable(b) == V3 then return newV3(a.X + b.X, a.Y + b.Y, a.Z + b.Z) end
+  return newCF(a.X + b.X, a.Y + b.Y, a.Z + b.Z)
+end
+CF.__tostring = function(a) return fmtnum(a.X) .. ", " .. fmtnum(a.Y) .. ", " .. fmtnum(a.Z) end
+local CFrame = {
+  new = function(x, y, z)
+    if getmetatable(x) == V3 then return newCF(x.X, x.Y, x.Z) end
+    return newCF(x or 0, y or 0, z or 0)
+  end,
+  Angles = function() return newCF(0, 0, 0) end,
+}
+CFrame.identity = newCF(0, 0, 0)
+
+---------------------------------------------------------------- Enum
+local enumCache = {}
+local EnumItemMT = {}
+EnumItemMT.__tostring = function(i) return "Enum." .. i.EnumType .. "." .. i.Name end
+local function enumItem(etype, name)
+  local key = etype .. "." .. name
+  local it = enumCache[key]
+  if not it then
+    it = setmetatable({ Name = name, EnumType = etype, Value = 0 }, EnumItemMT)
+    enumCache[key] = it
+  end
+  return it
+end
+local Enum = setmetatable({}, { __index = function(t, etype)
+  local sub = setmetatable({}, { __index = function(_, name) return enumItem(etype, name) end })
+  rawset(t, etype, sub)
+  return sub
+end })
+
+---------------------------------------------------------------- encode / decode for the host bridge
+local wrap
+local instMT = {}
+local sigMT = {}
+
+local function enc(v)
+  local t = type(v)
+  if t ~= "table" then
+    if t == "function" or t == "thread" or t == "userdata" then error("cannot send a " .. t .. " to the host", 3) end
+    return v
+  end
+  local mt = getmetatable(v)
+  if mt == instMT then return { __t = "I", id = rawget(v, "__id") } end
+  if mt == V3 then return { __t = "V3", x = v.X, y = v.Y, z = v.Z } end
+  if mt == C3 then return { __t = "C3", r = v.R, g = v.G, b = v.B } end
+  if mt == CF then return { __t = "CF", x = v.X, y = v.Y, z = v.Z } end
+  if mt == EnumItemMT then return { __t = "E", e = v.EnumType, n = v.Name } end
+  local out = {}
+  for k, x in pairs(v) do out[k] = enc(x) end
+  return out
+end
+
+local function dec(v)
+  if type(v) ~= "table" then return v end
+  local tag = v.__t
+  if tag == "I" then return wrap(v.id)
+  elseif tag == "V3" then return newV3(v.x, v.y, v.z)
+  elseif tag == "C3" then return newC3(v.r, v.g, v.b)
+  elseif tag == "CF" then return newCF(v.x, v.y, v.z)
+  elseif tag == "E" then return enumItem(v.e, v.n)
+  elseif tag == "Input" then
+    return { KeyCode = enumItem("KeyCode", v.key), UserInputType = enumItem("UserInputType", "Keyboard"), UserInputState = enumItem("UserInputState", v.state or "Begin") }
+  end
+  local out = {}
+  for k, x in pairs(v) do out[k] = dec(x) end
+  return out
+end
+
+local function packArgs(...)
+  local n = select("#", ...)
+  local out = { n = n }
+  for i = 1, n do out[i] = enc((select(i, ...))) end
+  return out
+end
+local function unpackArgs(a)
+  local n = a.n or #a
+  local out = {}
+  for i = 1, n do out[i] = dec(a[i]) end
+  return table.unpack(out, 1, n)
+end
+
+---------------------------------------------------------------- host signals (Touched, Heartbeat, OnServerEvent...)
+local handlers = {}
+local nextHandler = 0
+sigMT.__index = function(self, k)
+  if k == "Connect" or k == "connect" then
+    return function(_, fn)
+      if type(fn) ~= "function" then error("Connect needs a function", 2) end
+      nextHandler = nextHandler + 1
+      local hid = nextHandler
+      handlers[hid] = fn
+      local cid = host("connect", { id = self.id, name = self.name, h = hid })
+      local conn = { Connected = true }
+      function conn:Disconnect()
+        if not self.Connected then return end
+        self.Connected = false
+        handlers[hid] = nil
+        host("disconnect", { c = cid })
+      end
+      conn.disconnect = conn.Disconnect
+      return conn
+    end
+  elseif k == "Once" then
+    return function(_, fn)
+      local conn
+      conn = self:Connect(function(...) conn:Disconnect(); return fn(...) end)
+      return conn
+    end
+  elseif k == "Wait" then
+    return function(_)
+      local co = co_running()
+      local conn
+      conn = self:Connect(function(...) conn:Disconnect(); nextCo(co, ...) end)
+      return co_yield({ __sig = true })
+    end
+  end
+end
+local sigCache = setmetatable({}, { __mode = "v" })
+local function getSignal(id, name)
+  local key = id .. "|" .. name
+  local s = sigCache[key]
+  if not s then s = setmetatable({ id = id, name = name }, sigMT); sigCache[key] = s end
+  return s
+end
+
+-- the host calls this to run a connected handler
+function __fire(hid, args)
+  local fn = handlers[hid]
+  if not fn then return end
+  local a = args or {}
+  local n = a.n or #a
+  local list = {}
+  for i = 1, n do list[i] = dec(a[i]) end
+  nextCo(co_create(fn), table.unpack(list, 1, n))
+end
+-- synchronous call (RemoteFunction callbacks): must not yield
+function __invoke(hid, args)
+  local fn = handlers[hid]
+  if not fn then return nil end
+  local a = args or {}
+  local n = a.n or #a
+  local list = {}
+  for i = 1, n do list[i] = dec(a[i]) end
+  local ok, res = pcall(fn, table.unpack(list, 1, n))
+  if not ok then report(res); return nil end
+  return enc(res)
+end
+
+---------------------------------------------------------------- Instances
+local wrappers = setmetatable({}, { __mode = "v" })
+local classOf = {}
+
+wrap = function(id)
+  if id == nil then return nil end
+  local w = wrappers[id]
+  if not w then
+    w = setmetatable({ __id = id }, instMT)
+    wrappers[id] = w
+  end
+  return w
+end
+
+local function waitForChild(self, name, timeout)
+  local t0 = now
+  while true do
+    local c = self:FindFirstChild(name)
+    if c then return c end
+    if timeout and now - t0 >= timeout then return nil end
+    task.wait(0.05)
+  end
+end
+
+instMT.__index = function(self, k)
+  local id = rawget(self, "__id")
+  if k == "WaitForChild" then return waitForChild end
+  local r = host("member", { id = id, k = k })
+  local kind = r.k
+  if kind == "prop" then return dec(r.v)
+  elseif kind == "child" then return wrap(r.id)
+  elseif kind == "signal" then return getSignal(id, k)
+  elseif kind == "method" then
+    return function(_, ...)
+      return dec(host("call", { id = id, m = k, a = packArgs(...) }))
+    end
+  end
+  error(tostring(k) .. " is not a valid member of " .. tostring(r.cn or "Instance"), 2)
+end
+instMT.__newindex = function(self, k, v)
+  local id = rawget(self, "__id")
+  if type(v) == "function" then
+    nextHandler = nextHandler + 1
+    handlers[nextHandler] = v
+    host("set", { id = id, k = k, v = { __t = "F", h = nextHandler } })
+    return
+  end
+  host("set", { id = id, k = k, v = enc(v) })
+end
+instMT.__tostring = function(self)
+  local ok, r = pcall(host, "member", { id = rawget(self, "__id"), k = "Name" })
+  if ok and r.k == "prop" then return tostring(r.v) end
+  return "Instance"
+end
+
+local Instance = {
+  new = function(className, parent)
+    local id = host("new", { c = className })
+    local w = wrap(id)
+    if parent ~= nil then w.Parent = parent end
+    return w
+  end
+}
+
+---------------------------------------------------------------- services / globals
+local game = wrap("svc:Game")
+local workspace = wrap("svc:Workspace")
+
+local Debris = nil
+local TweenService = {}
+local TweenInfo = { new = function(t, style, dir) return { Time = t or 1, EasingStyle = style, EasingDirection = dir } end }
+
+local function easeFn(style, dir)
+  local name = style and style.Name or "Linear"
+  local f
+  if name == "Quad" then f = function(x) return x * x end
+  elseif name == "Cubic" then f = function(x) return x * x * x end
+  elseif name == "Sine" then f = function(x) return 1 - mcos(x * math.pi / 2) end
+  elseif name == "Quart" then f = function(x) return x * x * x * x end
+  else f = function(x) return x end end
+  local d = dir and dir.Name or "Out"
+  if name == "Linear" then return f end
+  if d == "In" then return f
+  elseif d == "Out" then return function(x) return 1 - f(1 - x) end
+  else return function(x) if x < 0.5 then return f(x * 2) / 2 end return 1 - f(2 - 2 * x) / 2 end end
+end
+local function lerpAny(a, b, t)
+  if type(a) == "number" then return a + (b - a) * t end
+  if type(a) == "table" and a.Lerp then return a:Lerp(b, t) end
+  return b
+end
+function TweenService:Create(inst, info, goals)
+  info = info or TweenInfo.new()
+  local tw = { PlaybackState = Enum.PlaybackState.Begin, Completed = newSignal() }
+  local ease = easeFn(info.EasingStyle, info.EasingDirection)
+  local starts, elapsed, active = nil, 0, false
+  function tw:Play()
+    starts = {}
+    for k in pairs(goals) do starts[k] = inst[k] end
+    elapsed = 0
+    if not active then active = true; tweens[#tweens + 1] = tw end
+    self.PlaybackState = Enum.PlaybackState.Playing
+  end
+  function tw:Cancel()
+    active = false
+    self.PlaybackState = Enum.PlaybackState.Cancelled
+    for i = #tweens, 1, -1 do if tweens[i] == tw then table.remove(tweens, i) end end
+  end
+  tw.Pause = tw.Cancel
+  function tw:_step(dt)
+    elapsed = elapsed + dt
+    local a = info.Time <= 0 and 1 or math.min(1, elapsed / info.Time)
+    local e = ease(a)
+    for k, goal in pairs(goals) do
+      pcall(function() inst[k] = lerpAny(starts[k], goal, e) end)
+    end
+    if a >= 1 then
+      active = false
+      for i = #tweens, 1, -1 do if tweens[i] == tw then table.remove(tweens, i) end end
+      self.PlaybackState = Enum.PlaybackState.Completed
+      self.Completed:Fire(Enum.PlaybackState.Completed)
+    end
+  end
+  return tw
+end
+
+local function serviceFor(name)
+  if name == "TweenService" then return TweenService end
+  if name == "Debris" then
+    if not Debris then
+      Debris = { AddItem = function(_, inst, t) task.delay(t or 10, function() pcall(function() inst:Destroy() end) end) end }
+    end
+    return Debris
+  end
+  local id = host("service", { n = name })
+  return wrap(id)
+end
+-- game:GetService / game.<Service>
+local gameIndex = instMT.__index
+local gameWrapper = game
+local gameMT = {}
+for k, v in pairs(instMT) do gameMT[k] = v end
+gameMT.__index = function(self, k)
+  if k == "GetService" or k == "getService" then return function(_, name) return serviceFor(name) end end
+  if k == "FindService" then return function(_, name) local ok, s = pcall(serviceFor, name); if ok then return s end return nil end end
+  if k == "TweenService" or k == "Debris" then return serviceFor(k) end
+  return gameIndex(self, k)
+end
+setmetatable(game, gameMT)
+
+---------------------------------------------------------------- module loader + script runner
+local baseEnv = {}
+local modCache, modLoading = {}, {}
+
+local function makeEnv(scriptId)
+  local env = setmetatable({ script = wrap(scriptId) }, { __index = baseEnv })
+  return env
+end
+
+local function require_(m)
+  local id = rawget(m, "__id")
+  if modCache[id] ~= nil then return modCache[id].v end
+  if modLoading[id] then error("cyclic require", 2) end
+  local info = host("module", { id = id })
+  local chunk, err = _load(info.src, "=" .. info.name, "t", makeEnv(id))
+  if not chunk then error(err, 2) end
+  modLoading[id] = true
+  local ok, res = pcall(chunk)
+  modLoading[id] = nil
+  if not ok then error(res, 2) end
+  modCache[id] = { v = res }
+  return res
+end
+
+function __start(id, name, src)
+  local chunk, err = _load(src, "=" .. name, "t", makeEnv(id))
+  if not chunk then report(err); return false end
+  task.spawn(chunk)
+  return true
+end
+function __check(src, name)
+  local chunk, err = _load(src, "=" .. (name or "script"), "t", {})
+  if chunk then return nil end
+  return tostring(err)
+end
+
+function __step(dt)
+  now = now + dt
+  -- tweens
+  for i = #tweens, 1, -1 do
+    local tw = tweens[i]
+    if tw then tw:_step(dt) end
+  end
+  -- deferred
+  if #deferred > 0 then
+    local list = deferred; deferred = {}
+    for _, f in ipairs(list) do f() end
+  end
+  -- waiting threads
+  local due = {}
+  local keep = {}
+  for _, w in ipairs(waiting) do
+    if w.wake <= now then due[#due + 1] = w else keep[#keep + 1] = w end
+  end
+  waiting = keep
+  for _, w in ipairs(due) do nextCo(w.co, now - w.start) end
+end
+
+---------------------------------------------------------------- the environment visible to scripts
+local function safeSelect(...) return select(...) end
+baseEnv.print = function(...)
+  local n = select("#", ...)
+  local t = {}
+  for i = 1, n do t[i] = tostr((select(i, ...))) end
+  host("log", { k = "print", s = tconcat(t, " ") })
+end
+baseEnv.warn = function(...)
+  local n = select("#", ...)
+  local t = {}
+  for i = 1, n do t[i] = tostr((select(i, ...))) end
+  host("log", { k = "warn", s = tconcat(t, " ") })
+end
+baseEnv.tostring = function(v) if type(v) == "number" then return fmtnum(v) end return tostring(v) end
+for _, name in ipairs({ "type", "tonumber", "pairs", "ipairs", "select", "error", "pcall", "xpcall", "setmetatable", "getmetatable", "rawget", "rawset", "rawequal", "next", "assert", "collectgarbage" }) do
+  baseEnv[name] = _G[name]
+end
+baseEnv.typeof = function(v)
+  local mt = getmetatable(v)
+  if mt == V3 then return "Vector3" elseif mt == C3 then return "Color3" elseif mt == CF then return "CFrame"
+  elseif mt == instMT then return "Instance" elseif mt == EnumItemMT then return "EnumItem" end
+  return type(v)
+end
+baseEnv.unpack = table.unpack
+
+local mathLib = {}
+for k, v in pairs(math) do mathLib[k] = v end
+mathLib.clamp = function(x, lo, hi) if x < lo then return lo elseif x > hi then return hi end return x end
+mathLib.sign = function(x) if x > 0 then return 1 elseif x < 0 then return -1 end return 0 end
+mathLib.round = function(x) return mfloor(x + 0.5) end
+mathLib.lerp = function(a, b, t) return a + (b - a) * t end
+mathLib.noise = function(x) return msin(x * 12.9898) end
+mathLib.randomseed = math.randomseed
+baseEnv.math = mathLib
+
+local stringLib = {}
+for k, v in pairs(string) do stringLib[k] = v end
+stringLib.split = function(s, sep)
+  local out = {}
+  sep = sep or ","
+  local start = 1
+  while true do
+    local i, j = string.find(s, sep, start, true)
+    if not i then out[#out + 1] = string.sub(s, start); break end
+    out[#out + 1] = string.sub(s, start, i - 1)
+    start = j + 1
+  end
+  return out
+end
+string.split = stringLib.split
+baseEnv.string = stringLib
+-- strings get methods ("abc"):upper() keep working through the real string metatable
+
+local tableLib = {}
+for k, v in pairs(table) do tableLib[k] = v end
+tableLib.find = function(t, v, init) for i = init or 1, #t do if t[i] == v then return i end end return nil end
+tableLib.clear = function(t) for k in pairs(t) do t[k] = nil end end
+tableLib.clone = function(t) local o = {}; for k, v in pairs(t) do o[k] = v end return o end
+tableLib.create = function(n, v) local o = {}; for i = 1, n do o[i] = v end return o end
+baseEnv.table = tableLib
+
+local startClock = 0
+baseEnv.os = {
+  time = function() return host("time", {}).t end,
+  clock = function() return now end,
+  date = function() return "" end,
+}
+baseEnv.tick = function() return host("time", {}).t end
+baseEnv.time = function() return now end
+baseEnv.utf8 = utf8
+baseEnv.coroutine = coroutine
+
+baseEnv.task = task
+baseEnv.wait = function(t) return task.wait(t) end
+baseEnv.spawn = function(fn, ...) return task.spawn(fn, ...) end
+baseEnv.delay = function(t, fn, ...) return task.delay(t, fn, ...) end
+baseEnv.Vector3 = Vector3
+baseEnv.Color3 = Color3
+baseEnv.CFrame = CFrame
+baseEnv.Enum = Enum
+baseEnv.Instance = Instance
+baseEnv.TweenInfo = TweenInfo
+baseEnv.game = game
+baseEnv.workspace = workspace
+baseEnv.Workspace = workspace
+baseEnv.require = require_
+baseEnv._G = {}
+baseEnv._VERSION = "Luau-compatible (BlockVerse Studio, Lua 5.3)"
+baseEnv.newproxy = nil
+baseEnv.Random = {
+  new = function(seed)
+    local r = {}
+    function r:NextNumber(a, b) if a then return a + math.random() * (b - a) end return math.random() end
+    function r:NextInteger(a, b) return math.random(a, b) end
+    return r
+  end
+}
+baseEnv.Signal = nil
+-- BindableEvent-like helper that works without a host instance
+baseEnv.__newsignal = nil
+
+return true
+
+</script>
+<script>
+/* ===================== BlockVerse Studio Lua runtime (Fengari = Lua 5.3 in JS) =====================
+   Two separate Lua VMs, like Roblox: "server" (Script) and "client" (LocalScript). They share the world
+   but only see what Roblox lets them see, and talk through RemoteEvent / RemoteFunction.
+   `A` is the adapter the Studio page provides (parts, nodes, player, lighting, logging). */
+function luauToLua(src){
+  // 1) mask strings & comments so keyword/operator searches never hit text inside them
+  const n = src.length; const mask = new Array(n);
+  let i = 0;
+  const blank = (a, b) => { for(let k = a; k < b; k++) mask[k] = (src[k] === "\n" ? "\n" : " "); };
+  while(i < n){
+    const c = src[i];
+    if(c === "-" && src[i+1] === "-"){
+      const m = /^--\[(=*)\[/.exec(src.slice(i, i + 40));
+      if(m){
+        const close = "]" + m[1] + "]"; let e = src.indexOf(close, i + m[0].length);
+        e = e === -1 ? n : e + close.length; blank(i, e); i = e; continue;
+      }
+      let e = src.indexOf("\n", i); if(e === -1) e = n; blank(i, e); i = e; continue;
+    }
+    if(c === "\"" || c === "'"){
+      let j = i + 1;
+      while(j < n && src[j] !== c && src[j] !== "\n"){ if(src[j] === "\\") j++; j++; }
+      j = Math.min(n, j + 1); blank(i, j); i = j; continue;
+    }
+    if(c === "["){
+      const m = /^\[(=*)\[/.exec(src.slice(i, i + 40));
+      if(m){
+        const close = "]" + m[1] + "]"; let e = src.indexOf(close, i + m[0].length);
+        e = e === -1 ? n : e + close.length; blank(i, e); i = e; continue;
+      }
+    }
+    mask[i] = c; i++;
+  }
+  const masked = mask.join("");
+  const edits = []; // {at, del, text}
+
+  // 2) compound assignment at the start of a line:  a.b += 1   ->   a.b = a.b + (1)
+  const lineRe = /^([ \t]*)([A-Za-z_][\w.\[\]:'" ]*?)[ \t]*(\+|-|\*|\/|%|\^|\.\.)=(?!=)[ \t]*(.*)$/;
+  let pos = 0;
+  masked.split("\n").forEach(mline => {
+    const m = lineRe.exec(mline);
+    if(m && !/^\s*(if|while|for|return|local)\b/.test(mline)){
+      const rhsStartRel = mline.length - m[4].length;
+      let rhsEndRel = mline.length; while(rhsEndRel > rhsStartRel && mline[rhsEndRel - 1] === " ") rhsEndRel--;
+      const lvalue = src.slice(pos + m[1].length, pos + m[1].length + m[2].length).trim();
+      const rhs = src.slice(pos + rhsStartRel, pos + rhsEndRel);
+      const trailing = src.slice(pos + rhsEndRel, pos + mline.length);
+      if(rhs.length){
+        edits.push({ at: pos + m[1].length, del: rhsEndRel - m[1].length, text: lvalue + " = " + lvalue + " " + m[3] + " (" + rhs + ")" });
+        void trailing;
+      }
+    }
+    pos += mline.length + 1;
+  });
+
+  // 3) `continue`  ->  goto + label at the end of the enclosing loop body
+  const stack = []; let loopId = 0; let skipDo = false;
+  const kw = /\b(function|if|for|while|repeat|do|end|until|continue)\b/g; let m2;
+  while((m2 = kw.exec(masked))){
+    const w = m2[1], at = m2.index;
+    const prev = masked.slice(Math.max(0, at - 1), at);
+    if(prev === "." || prev === ":") continue;
+    if(w === "function" || w === "if") stack.push({ t: w });
+    else if(w === "for" || w === "while"){ stack.push({ t: "loop", id: ++loopId, used: false }); skipDo = true; }
+    else if(w === "do"){ if(skipDo) skipDo = false; else stack.push({ t: "do" }); }
+    else if(w === "repeat") stack.push({ t: "loop", id: ++loopId, used: false, rep: true });
+    else if(w === "end" || w === "until"){
+      const top = stack.pop();
+      if(top && top.t === "loop" && top.used) edits.push({ at, del: 0, text: "::__cont" + top.id + ":: " });
+    } else if(w === "continue"){
+      for(let k = stack.length - 1; k >= 0; k--){
+        if(stack[k].t === "function") break;
+        if(stack[k].t === "loop"){ stack[k].used = true; edits.push({ at, del: 8, text: "goto __cont" + stack[k].id }); break; }
+      }
+    }
+  }
+  edits.sort((a, b) => b.at - a.at);
+  let out = src;
+  edits.forEach(e => { out = out.slice(0, e.at) + e.text + out.slice(e.at + e.del); });
+  return out;
+}
+
+function createLuaRuntime(fengari, A, preludeSrc){
+  const { lua, lauxlib, lualib, to_luastring, to_jsstring } = fengari;
+  const rt = {
+    running: false, vms: {}, signals: new Map(), conns: new Map(), nextConn: 1,
+    now: 0, tmpNodes: [], attrs: new Map(), touching: new Map(), keysDown: new Set(),
+    hum: { Health: 100, MaxHealth: 100, WalkSpeed: 16, JumpPower: 50, dead: false, deadAt: 0 },
+    createdParts: new Map(), invoke: new Map(), checkVM: null
+  };
+  const PLAYER_ID = "player:1", CHAR_ID = "char:1", HRP_ID = "hrp:1", HUM_ID = "hum:1";
+  const SERVICES = ["Workspace", "Players", "ReplicatedStorage", "ServerScriptService", "StarterPlayer", "StarterPlayerScripts", "Lighting", "RunService", "UserInputService", "HttpService"];
+
+  /* ---------------- JS <-> Lua value marshalling ---------------- */
+  function push(L, v){
+    if(v === null || v === undefined) lua.lua_pushnil(L);
+    else if(typeof v === "boolean") lua.lua_pushboolean(L, v);
+    else if(typeof v === "number") lua.lua_pushnumber(L, v);
+    else if(typeof v === "string") lua.lua_pushstring(L, to_luastring(v));
+    else if(Array.isArray(v)){
+      lua.lua_createtable(L, v.length, 1);
+      for(let i = 0; i < v.length; i++){ push(L, v[i]); lua.lua_rawseti(L, -2, i + 1); }
+      lua.lua_pushnumber(L, v.length); lua.lua_setfield(L, -2, to_luastring("n"));
+    } else if(typeof v === "object"){
+      lua.lua_createtable(L, 0, 4);
+      Object.keys(v).forEach(k => { push(L, v[k]); lua.lua_setfield(L, -2, to_luastring(k)); });
+    } else lua.lua_pushnil(L);
+  }
+  function toJs(L, idx, depth){
+    depth = depth || 0; if(depth > 12) return null;
+    switch(lua.lua_type(L, idx)){
+      case lua.LUA_TNIL: return null;
+      case lua.LUA_TBOOLEAN: return !!lua.lua_toboolean(L, idx);
+      case lua.LUA_TNUMBER: return lua.lua_tonumber(L, idx);
+      case lua.LUA_TSTRING: return to_jsstring(lua.lua_tostring(L, idx));
+      case lua.LUA_TTABLE: {
+        const t = lua.lua_absindex(L, idx);
+        const obj = {}; let maxIdx = 0, numeric = 0, other = 0, nField = null;
+        lua.lua_pushnil(L);
+        while(lua.lua_next(L, t) !== 0){
+          const kt = lua.lua_type(L, -2);
+          let key;
+          if(kt === lua.LUA_TNUMBER) key = lua.lua_tonumber(L, -2);
+          else if(kt === lua.LUA_TSTRING) key = to_jsstring(lua.lua_tostring(L, -2));
+          else { lua.lua_pop(L, 1); continue; }
+          const val = toJs(L, -1, depth + 1);
+          if(typeof key === "number" && Number.isInteger(key) && key >= 1){ numeric++; if(key > maxIdx) maxIdx = key; obj[key] = val; }
+          else if(key === "n" && typeof val === "number"){ nField = val; obj.n = val; }
+          else { other++; obj[key] = val; }
+          lua.lua_pop(L, 1);
+        }
+        if(other === 0 && (numeric > 0 || nField !== null)){
+          const len = nField !== null ? nField : maxIdx;
+          const arr = new Array(len);
+          for(let i = 0; i < len; i++) arr[i] = obj[i + 1] === undefined ? null : obj[i + 1];
+          return arr;
+        }
+        return obj;
+      }
+      default: return null;
+    }
+  }
+
+  /* ---------------- VM creation ---------------- */
+  function openLib(L, name, fn){ lauxlib.luaL_requiref(L, to_luastring(name), fn, 1); lua.lua_pop(L, 1); }
+  function makeVM(name){
+    const L = lauxlib.luaL_newstate();
+    openLib(L, "_G", lualib.luaopen_base);
+    openLib(L, "string", lualib.luaopen_string);
+    openLib(L, "table", lualib.luaopen_table);
+    openLib(L, "math", lualib.luaopen_math);
+    openLib(L, "coroutine", lualib.luaopen_coroutine);
+    openLib(L, "utf8", lualib.luaopen_utf8);
+    openLib(L, "debug", lualib.luaopen_debug);
+    const vm = { name, L, closed: false };
+    // the host bridge: bridge(op, payload) -> ok, result
+    lua.lua_pushjsfunction(L, (L2) => {
+      let ok = true, res = null;
+      try{
+        const op = to_jsstring(lua.lua_tostring(L2, 1));
+        const payload = toJs(L2, 2);
+        res = hostOp(vm, op, payload || {});
+      }catch(e){ ok = false; res = String(e && e.message ? e.message : e); }
+      lua.lua_pushboolean(L2, ok);
+      push(L2, res);
+      return 2;
+    });
+    lua.lua_setglobal(L, to_luastring("__bridge_tmp"));
+    // run the prelude: chunk(bridge, vmName)
+    const src = to_luastring(preludeSrc);
+    if(lauxlib.luaL_loadbuffer(L, src, src.length, to_luastring("=prelude")) !== 0){
+      throw new Error("prelude: " + to_jsstring(lua.lua_tostring(L, -1)));
+    }
+    lua.lua_getglobal(L, to_luastring("__bridge_tmp"));
+    lua.lua_pushstring(L, to_luastring(name));
+    if(lua.lua_pcall(L, 2, 1, 0) !== 0) throw new Error("prelude: " + to_jsstring(lua.lua_tostring(L, -1)));
+    lua.lua_pop(L, 1);
+    lua.lua_pushnil(L); lua.lua_setglobal(L, to_luastring("__bridge_tmp"));
+    return vm;
+  }
+  function callLua(vm, fname, args, wantResult){
+    if(!vm || vm.closed) return null;
+    const L = vm.L;
+    lua.lua_getglobal(L, to_luastring(fname));
+    (args || []).forEach(a => push(L, a));
+    if(lua.lua_pcall(L, (args || []).length, wantResult ? 1 : 0, 0) !== 0){
+      const msg = to_jsstring(lua.lua_tostring(L, -1)); lua.lua_pop(L, 1);
+      A.log("error", msg, vm.name);
+      return null;
+    }
+    if(wantResult){ const r = toJs(L, -1); lua.lua_pop(L, 1); return r; }
+    return null;
+  }
+
+  /* ---------------- node model ---------------- */
+  const allNodes = () => A.nodes().concat(rt.tmpNodes);
+  const findNode = (id) => allNodes().find(n => n.id === id) || null;
+  const isPartId = (id) => !!A.partById(id);
+  const V3 = (a) => ({ __t: "V3", x: a[0], y: a[1], z: a[2] });
+  const I = (id) => ({ __t: "I", id });
+  const hexToC3 = (h) => ({ __t: "C3", r: ((h >> 16) & 255) / 255, g: ((h >> 8) & 255) / 255, b: (h & 255) / 255 });
+  const c3ToHex = (c) => (Math.round(c.r * 255) << 16) | (Math.round(c.g * 255) << 8) | Math.round(c.b * 255);
+
+  function containerOf(vmName, id){
+    // walk up to the service the item lives in
+    let cur = id, guard = 0;
+    while(cur && guard++ < 20){
+      if(cur.startsWith("svc:")) return cur;
+      if(isPartId(cur)) return "svc:Workspace";
+      const n = findNode(cur); if(!n) return null;
+      cur = n.parent;
+    }
+    return null;
+  }
+  function visibleToVM(vm, id){
+    const c = containerOf(vm.name, id);
+    if(vm.name === "client" && c === "svc:ServerScriptService") return false;
+    return true;
+  }
+  function childrenOf(vm, id){
+    let out = [];
+    if(id === "svc:Game") out = SERVICES.map(s => "svc:" + s);
+    else if(id === "svc:Workspace"){
+      out = A.parts().filter(p => !p.pending).map(p => p.id);
+      out.push(CHAR_ID);
+      allNodes().forEach(n => { if(n.parent === "svc:Workspace") out.push(n.id); });
+    }
+    else if(id === "svc:Players") out = [PLAYER_ID];
+    else if(id === "svc:StarterPlayer") out = ["svc:StarterPlayerScripts"];
+    else if(id === CHAR_ID) out = [HRP_ID, HUM_ID];
+    else if(id === PLAYER_ID) out = [];
+    else if(id.startsWith("svc:") || isPartId(id) || findNode(id)){
+      allNodes().forEach(n => { if(n.parent === id) out.push(n.id); });
+    }
+    return out.filter(c => visibleToVM(vm, c));
+  }
+  function nameOf(id){
+    if(id === "svc:Game") return "game";
+    if(id.startsWith("svc:")) return id.slice(4);
+    if(id === PLAYER_ID) return A.player.name;
+    if(id === CHAR_ID) return A.player.name;
+    if(id === HRP_ID) return "HumanoidRootPart";
+    if(id === HUM_ID) return "Humanoid";
+    const p = A.partById(id); if(p) return p.name;
+    const n = findNode(id); return n ? n.name : "Instance";
+  }
+  function classOfId(id){
+    if(id === "svc:Game") return "DataModel";
+    if(id.startsWith("svc:")) return id === "svc:StarterPlayerScripts" ? "StarterPlayerScripts" : id.slice(4);
+    if(id === PLAYER_ID) return "Player";
+    if(id === CHAR_ID) return "Model";
+    if(id === HRP_ID) return "Part";
+    if(id === HUM_ID) return "Humanoid";
+    const p = A.partById(id); if(p) return p.className;
+    const n = findNode(id); return n ? n.className : "Instance";
+  }
+  function parentOf(id){
+    if(id === "svc:Game") return null;
+    if(id.startsWith("svc:")){
+      if(id === "svc:StarterPlayerScripts") return "svc:StarterPlayer";
+      return "svc:Game";
+    }
+    if(id === PLAYER_ID) return "svc:Players";
+    if(id === CHAR_ID) return "svc:Workspace";
+    if(id === HRP_ID || id === HUM_ID) return CHAR_ID;
+    const p = A.partById(id); if(p) return p.pending && !p.attached ? null : "svc:Workspace";
+    const n = findNode(id); return n ? (n.parent || null) : null;
+  }
+  const isA = (id, cn) => {
+    const c = classOfId(id);
+    if(c === cn || cn === "Instance") return true;
+    if(cn === "BasePart" && (c === "Part" || c === "SpawnLocation")) return true;
+    if(cn === "LuaSourceContainer" && /Script$/.test(c)) return true;
+    if(cn === "Script" && c === "Script") return true;
+    if(cn === "Model" && c === "Model") return true;
+    return false;
+  };
+  const fullName = (id) => { const p = parentOf(id); const nm = nameOf(id); return (p && p !== "svc:Game" ? fullName(p) + "." : "") + nm; };
+
+  /* ---------------- signals ---------------- */
+  const sigKey = (id, name) => id + "|" + name;
+  function connect(vm, id, name, h){
+    const key = sigKey(id, name);
+    const cid = rt.nextConn++;
+    if(!rt.signals.has(key)) rt.signals.set(key, new Map());
+    rt.signals.get(key).set(cid, { vm, h });
+    rt.conns.set(cid, key);
+    return cid;
+  }
+  function disconnect(cid){
+    const key = rt.conns.get(cid); if(!key) return;
+    const m = rt.signals.get(key); if(m) m.delete(cid);
+    rt.conns.delete(cid);
+  }
+  function hasListeners(id, name){ const m = rt.signals.get(sigKey(id, name)); return !!(m && m.size); }
+  function fire(id, name, args, onlyVM){
+    const m = rt.signals.get(sigKey(id, name)); if(!m) return;
+    Array.from(m.values()).forEach(c => {
+      if(onlyVM && c.vm.name !== onlyVM) return;
+      callLua(c.vm, "__fire", [c.h, args]);
+    });
+  }
+
+  /* ---------------- part property mapping ---------------- */
+  const PART_PROPS = ["Position", "Size", "Orientation", "Rotation", "Color", "Transparency", "Reflectance", "Anchored", "CanCollide", "CanTouch", "CanQuery", "CastShadow", "Massless", "Material", "CFrame"];
+  function partGet(p, k){
+    const v = A.part.get(p, k === "Rotation" ? "Orientation" : (k === "CFrame" ? "Position" : k));
+    if(v === undefined) return undefined;
+    if(k === "Position" || k === "Size" || k === "Orientation" || k === "Rotation") return V3(v);
+    if(k === "CFrame") return { __t: "CF", x: v[0], y: v[1], z: v[2] };
+    if(k === "Color") return hexToC3(v);
+    if(k === "Material") return { __t: "E", e: "Material", n: String(v).charAt(0).toUpperCase() + String(v).slice(1) };
+    return v;
+  }
+  function partSet(p, k, val){
+    let v = val;
+    if(k === "Position" || k === "Size" || k === "Orientation" || k === "Rotation") v = [val.x, val.y, val.z];
+    else if(k === "CFrame"){ k = "Position"; v = [val.x, val.y, val.z]; }
+    else if(k === "Color") v = c3ToHex(val);
+    else if(k === "Material") v = String(val && val.n ? val.n : val).toLowerCase();
+    if(k === "Rotation") k = "Orientation";
+    if(!A.part.set(p, k, v)) throw new Error(k + " is not a valid member of Part");
+  }
+
+  /* ---------------- player / humanoid ---------------- */
+  const HRP_LIFT = 2.6;
+  function hrpPos(){ const p = A.player.getPos(); return [p[0], p[1] + HRP_LIFT, p[2]]; }
+  function setHum(k, v){
+    const h = rt.hum;
+    if(k === "Health"){
+      const old = h.Health; h.Health = Math.max(0, Math.min(h.MaxHealth, Number(v)));
+      if(h.Health !== old) fire(HUM_ID, "HealthChanged", [h.Health]);
+      if(h.Health <= 0 && !h.dead){ h.dead = true; h.deadAt = rt.now; fire(HUM_ID, "Died", []); A.log("info", A.player.name + " died", "server"); }
+    } else if(k === "MaxHealth"){ h.MaxHealth = Math.max(1, Number(v)); if(h.Health > h.MaxHealth) h.Health = h.MaxHealth; }
+    else if(k === "WalkSpeed") h.WalkSpeed = Math.max(0, Number(v));
+    else if(k === "JumpPower") h.JumpPower = Math.max(0, Number(v));
+    else return false;
+    return true;
+  }
+
+  /* ---------------- host ops ---------------- */
+  function member(vm, id, k){
+    const cn = classOfId(id);
+    // generic methods
+    const GEN = ["Destroy", "Clone", "FindFirstChild", "FindFirstChildOfClass", "FindFirstChildWhichIsA", "GetChildren", "GetDescendants", "IsA", "GetFullName", "ClearAllChildren", "SetAttribute", "GetAttribute", "GetAttributes", "IsDescendantOf", "IsAncestorOf"];
+    // kind-specific
+    if(id === "svc:Game"){
+      if(k === "Name") return { k: "prop", v: "game" };
+      if(k === "PlaceId" || k === "GameId") return { k: "prop", v: 0 };
+      if(SERVICES.indexOf(k) >= 0) return { k: "child", id: "svc:" + k };
+    }
+    if(id === "svc:Workspace"){
+      if(k === "Gravity") return { k: "prop", v: 196.2 };
+      if(k === "CurrentCamera") return { k: "prop", v: null };
+    }
+    if(id === "svc:Players"){
+      if(k === "LocalPlayer") return { k: "prop", v: vm.name === "client" ? I(PLAYER_ID) : null };
+      if(k === "PlayerAdded" || k === "PlayerRemoving") return { k: "signal" };
+      if(k === "GetPlayers" || k === "GetPlayerFromCharacter" || k === "GetPlayerByUserId" ) return { k: "method" };
+      if(k === "MaxPlayers") return { k: "prop", v: 1 };
+    }
+    if(id === "svc:RunService"){
+      if(k === "Heartbeat" || k === "Stepped") return { k: "signal" };
+      if(k === "RenderStepped") { if(vm.name === "client") return { k: "signal" }; throw new Error("RenderStepped can only be used on the client"); }
+      if(k === "IsServer" || k === "IsClient" || k === "IsStudio" || k === "IsRunning") return { k: "method" };
+    }
+    if(id === "svc:UserInputService"){
+      if(k === "InputBegan" || k === "InputEnded") return { k: "signal" };
+      if(k === "IsKeyDown") return { k: "method" };
+    }
+    if(id === "svc:Lighting"){
+      if(k === "ClockTime" || k === "Brightness") return { k: "prop", v: A.lighting.get(k) };
+    }
+    if(id === "svc:HttpService"){ if(k === "JSONEncode" || k === "JSONDecode" || k === "GenerateGUID") return { k: "method" }; }
+    if(id === PLAYER_ID){
+      if(k === "Name" || k === "DisplayName") return { k: "prop", v: A.player.name };
+      if(k === "UserId") return { k: "prop", v: 1 };
+      if(k === "Character") return { k: "prop", v: I(CHAR_ID) };
+      if(k === "CharacterAdded" || k === "CharacterRemoving") return { k: "signal" };
+      if(k === "Kick" || k === "LoadCharacter") return { k: "method" };
+    }
+    if(id === CHAR_ID){
+      if(k === "HumanoidRootPart" || k === "PrimaryPart") return { k: "child", id: HRP_ID };
+      if(k === "Humanoid") return { k: "child", id: HUM_ID };
+      if(k === "MoveTo" || k === "PivotTo" || k === "GetPivot") return { k: "method" };
+    }
+    if(id === HRP_ID){
+      if(k === "Position") return { k: "prop", v: V3(hrpPos()) };
+      if(k === "CFrame"){ const p = hrpPos(); return { k: "prop", v: { __t: "CF", x: p[0], y: p[1], z: p[2] } }; }
+      if(k === "Size") return { k: "prop", v: V3([2, 2, 1]) };
+      if(k === "Anchored") return { k: "prop", v: false };
+      if(k === "Velocity" || k === "AssemblyLinearVelocity") return { k: "prop", v: V3([0, 0, 0]) };
+    }
+    if(id === HUM_ID){
+      if(k === "Health" || k === "MaxHealth" || k === "WalkSpeed" || k === "JumpPower") return { k: "prop", v: rt.hum[k] };
+      if(k === "Died" || k === "HealthChanged") return { k: "signal" };
+      if(k === "TakeDamage") return { k: "method" };
+    }
+    const part = A.partById(id);
+    if(part){
+      if(PART_PROPS.indexOf(k) >= 0){ const v = partGet(part, k); if(v !== undefined) return { k: "prop", v }; }
+      if(k === "Touched" || k === "TouchEnded" || k === "ChildAdded" || k === "Destroying") return { k: "signal" };
+    }
+    const node = findNode(id);
+    if(node){
+      if(k === "Disabled" && /Script$/.test(node.className)) return { k: "prop", v: !!node.disabled };
+      if(node.className === "RemoteEvent"){
+        if(k === "OnServerEvent"){ if(vm.name !== "server") throw new Error("OnServerEvent can only be connected on the server"); return { k: "signal" }; }
+        if(k === "OnClientEvent") return { k: "signal" };
+        if(k === "FireServer" || k === "FireClient" || k === "FireAllClients") return { k: "method" };
+      }
+      if(node.className === "RemoteFunction"){
+        if(k === "InvokeServer") return { k: "method" };
+        if(k === "OnServerInvoke") return { k: "prop", v: null };
+      }
+      if(/^(Number|String|Bool)Value$/.test(node.className)){
+        if(k === "Value") return { k: "prop", v: node.value === undefined ? (node.className === "NumberValue" ? 0 : node.className === "BoolValue" ? false : "") : node.value };
+        if(k === "Changed") return { k: "signal" };
+      }
+    }
+    // generic
+    if(k === "Name") return { k: "prop", v: nameOf(id) };
+    if(k === "ClassName") return { k: "prop", v: cn };
+    if(k === "Parent"){ const p = parentOf(id); return { k: "prop", v: p ? I(p) : null }; }
+    if(GEN.indexOf(k) >= 0) return { k: "method" };
+    // named child
+    const kids = childrenOf(vm, id).filter(c => nameOf(c) === k);
+    if(kids.length) return { k: "child", id: kids[0] };
+    return { k: "none", cn };
+  }
+
+  function getAttrs(id){ if(!rt.attrs.has(id)) rt.attrs.set(id, {}); return rt.attrs.get(id); }
+  function destroyId(id){
+    if(isPartId(id)){ A.part.destroy(A.partById(id)); }
+    else {
+      rt.tmpNodes = rt.tmpNodes.filter(n => n.id !== id);
+      A.removeNode(id);
+    }
+    // children go too
+    allNodes().filter(n => n.parent === id).forEach(n => destroyId(n.id));
+  }
+  function cloneId(id){
+    if(isPartId(id)){
+      const np = A.part.clone(A.partById(id)); np.pending = true; np.attached = false; rt.createdParts.set(np.id, np); return np.id;
+    }
+    const n = findNode(id); if(!n) throw new Error("cannot clone this");
+    const c = Object.assign({}, n, { id: "tmp_" + Math.random().toString(36).slice(2, 9), parent: null });
+    rt.tmpNodes.push(c); return c.id;
+  }
+  function callMethod(vm, id, m, a){
+    const args = a || [];
+    switch(m){
+      case "Destroy": destroyId(id); return null;
+      case "Clone": return I(cloneId(id));
+      case "GetChildren": return childrenOf(vm, id).map(I);
+      case "GetDescendants": {
+        const out = []; const walk = (x) => childrenOf(vm, x).forEach(c => { out.push(I(c)); walk(c); }); walk(id); return out;
+      }
+      case "ClearAllChildren": childrenOf(vm, id).forEach(c => { if(c !== CHAR_ID && c !== HRP_ID && c !== HUM_ID) destroyId(c); }); return null;
+      case "FindFirstChild": {
+        const name = args[0], rec = !!args[1];
+        const search = (x) => {
+          const kids = childrenOf(vm, x);
+          for(const c of kids) if(nameOf(c) === name) return c;
+          if(rec) for(const c of kids){ const r = search(c); if(r) return r; }
+          return null;
+        };
+        const r = search(id); return r ? I(r) : null;
+      }
+      case "FindFirstChildOfClass": case "FindFirstChildWhichIsA": {
+        const r = childrenOf(vm, id).find(c => m === "FindFirstChildOfClass" ? classOfId(c) === args[0] : isA(c, args[0])); return r ? I(r) : null;
+      }
+      case "IsA": return isA(id, args[0]);
+      case "GetFullName": return fullName(id);
+      case "SetAttribute": getAttrs(id)[args[0]] = args[1]; return null;
+      case "GetAttribute": { const v = getAttrs(id)[args[0]]; return v === undefined ? null : v; }
+      case "GetAttributes": return Object.assign({}, getAttrs(id));
+      case "IsDescendantOf": { let p = parentOf(id); const t = args[0] && args[0].id; while(p){ if(p === t) return true; p = parentOf(p); } return false; }
+      case "IsAncestorOf": { let p = parentOf(args[0] && args[0].id); while(p){ if(p === id) return true; p = parentOf(p); } return false; }
+    }
+    if(id === "svc:Players"){
+      if(m === "GetPlayers") return [I(PLAYER_ID)];
+      if(m === "GetPlayerFromCharacter"){ return args[0] && (args[0].id === CHAR_ID || args[0].id === HRP_ID) ? I(PLAYER_ID) : null; }
+      if(m === "GetPlayerByUserId") return args[0] === 1 ? I(PLAYER_ID) : null;
+    }
+    if(id === "svc:RunService"){
+      if(m === "IsServer") return vm.name === "server";
+      if(m === "IsClient") return vm.name === "client";
+      if(m === "IsStudio" || m === "IsRunning") return true;
+    }
+    if(id === "svc:UserInputService" && m === "IsKeyDown") return rt.keysDown.has(String(args[0] && args[0].n || "").toUpperCase());
+    if(id === "svc:HttpService"){
+      if(m === "JSONEncode") return JSON.stringify(args[0]);
+      if(m === "JSONDecode") return JSON.parse(args[0]);
+      if(m === "GenerateGUID") return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
+    }
+    if(id === PLAYER_ID){
+      if(m === "Kick"){ A.log("warn", "Player kicked: " + (args[0] || ""), vm.name); A.kick && A.kick(args[0]); return null; }
+      if(m === "LoadCharacter"){ A.respawn(); rt.hum.Health = rt.hum.MaxHealth; rt.hum.dead = false; return null; }
+    }
+    if(id === CHAR_ID){
+      if(m === "MoveTo" || m === "PivotTo"){ const p = args[0]; if(p){ A.player.setPos([p.x, p.y - (m === "PivotTo" ? HRP_LIFT : 0), p.z]); } return null; }
+      if(m === "GetPivot"){ const p = hrpPos(); return { __t: "CF", x: p[0], y: p[1], z: p[2] }; }
+    }
+    if(id === HUM_ID && m === "TakeDamage"){ setHum("Health", rt.hum.Health - Number(args[0] || 0)); return null; }
+    const node = findNode(id);
+    if(node && node.className === "RemoteEvent"){
+      if(m === "FireServer"){
+        if(vm.name !== "client") throw new Error("FireServer can only be called from a LocalScript");
+        fire(id, "OnServerEvent", [I(PLAYER_ID)].concat(args), "server"); return null;
+      }
+      if(m === "FireClient"){ fire(id, "OnClientEvent", args.slice(1), "client"); return null; }
+      if(m === "FireAllClients"){ fire(id, "OnClientEvent", args, "client"); return null; }
+    }
+    if(node && node.className === "RemoteFunction" && m === "InvokeServer"){
+      const h = rt.invoke.get(id);
+      if(!h) throw new Error("InvokeServer: the server has not set OnServerInvoke on " + node.name);
+      return callLua(h.vm, "__invoke", [h.h, [I(PLAYER_ID)].concat(args)], true);
+    }
+    throw new Error(m + " is not a valid method of " + classOfId(id));
+  }
+
+  function setMember(vm, id, k, v){
+    if(k === "Parent"){
+      const pid = v && v.id ? v.id : null;
+      const part = A.partById(id);
+      if(part){
+        if(pid === null){ part.attached = false; A.part.attach(part, false); }
+        else { part.pending = false; part.attached = true; A.part.attach(part, true); if(pid && pid !== "svc:Workspace" && A.partById(pid)) { /* nested parts stay in the world */ } }
+        if(pid) fire(pid, "ChildAdded", [I(id)]);
+        return;
+      }
+      const node = findNode(id);
+      if(node){ node.parent = pid; if(pid) fire(pid, "ChildAdded", [I(id)]); return; }
+      throw new Error("cannot set Parent on " + id);
+    }
+    if(k === "Name"){
+      const part = A.partById(id); if(part){ A.part.set(part, "Name", String(v)); return; }
+      const node = findNode(id); if(node){ node.name = String(v); return; }
+      throw new Error("cannot rename this");
+    }
+    if(id === HUM_ID){ if(setHum(k, v)) return; throw new Error(k + " is not a valid member of Humanoid"); }
+    if(id === HRP_ID){
+      if(k === "Position" || k === "CFrame"){ A.player.setPos([v.x, v.y - HRP_LIFT, v.z]); return; }
+      throw new Error(k + " cannot be set on HumanoidRootPart");
+    }
+    if(id === "svc:Lighting"){ if(k === "ClockTime" || k === "Brightness"){ A.lighting.set(k, Number(v)); return; } }
+    const part = A.partById(id);
+    if(part && PART_PROPS.indexOf(k) >= 0){ partSet(part, k, v); return; }
+    const node = findNode(id);
+    if(node){
+      if(k === "Disabled"){ node.disabled = !!v; return; }
+      if(k === "OnServerInvoke" && node.className === "RemoteFunction"){ if(v && v.__t === "F"){ rt.invoke.set(id, { vm, h: v.h }); return; } }
+      if(k === "Value" && /Value$/.test(node.className)){ const old = node.value; node.value = v; if(old !== v) fire(id, "Changed", [v]); return; }
+    }
+    throw new Error(k + " is not a valid member of " + classOfId(id));
+  }
+
+  function newInstance(className){
+    if(className === "Part" || className === "SpawnLocation" || className === "WedgePart"){
+      const p = A.part.create(className === "Part" ? "Part" : className); p.pending = true; p.attached = false; rt.createdParts.set(p.id, p); return p.id;
+    }
+    const okClasses = ["Folder", "Model", "RemoteEvent", "RemoteFunction", "NumberValue", "StringValue", "BoolValue", "BindableEvent", "Script", "LocalScript", "ModuleScript"];
+    if(okClasses.indexOf(className) < 0) throw new Error("Unable to create an Instance of type \"" + className + "\"");
+    const n = { id: "tmp_" + Math.random().toString(36).slice(2, 9), className, name: className, parent: null, source: "", value: className === "NumberValue" ? 0 : className === "BoolValue" ? false : "" };
+    rt.tmpNodes.push(n); return n.id;
+  }
+
+  function hostOp(vm, op, p){
+    switch(op){
+      case "log": A.log(p.k, String(p.s), vm.name); return null;
+      case "time": return { t: Date.now() / 1000 };
+      case "service": {
+        const name = p.n;
+        if(SERVICES.indexOf(name) < 0) throw new Error(String(name) + " is not a valid service name");
+        return "svc:" + name;
+      }
+      case "member": return member(vm, p.id, p.k);
+      case "call": return callMethod(vm, p.id, p.m, p.a);
+      case "set": setMember(vm, p.id, p.k, p.v); return null;
+      case "new": return newInstance(p.c);
+      case "connect": return connect(vm, p.id, p.name, p.h);
+      case "disconnect": disconnect(p.c); return null;
+      case "module": {
+        const n = findNode(p.id); if(!n || n.className !== "ModuleScript") throw new Error("require expects a ModuleScript");
+        return { src: luauToLua(n.source || ""), name: n.name };
+      }
+    }
+    throw new Error("unknown host op " + op);
+  }
+
+  /* ---------------- life cycle ---------------- */
+  function scriptsFor(kind){
+    const out = [];
+    allNodes().forEach(n => {
+      if(n.disabled) return;
+      const c = containerOf("server", n.id);
+      if(kind === "server" && n.className === "Script" && (c === "svc:ServerScriptService" || c === "svc:Workspace")) out.push(n);
+      if(kind === "client" && n.className === "LocalScript" && c === "svc:StarterPlayerScripts") out.push(n);
+    });
+    // ServerScriptService before Workspace, like Roblox
+    return out;
+  }
+  function start(){
+    stop();
+    rt.running = true; rt.now = 0; rt.tmpNodes = []; rt.attrs.clear(); rt.signals.clear(); rt.conns.clear(); rt.touching.clear(); rt.invoke.clear();
+    rt.hum.Health = rt.hum.MaxHealth = 100; rt.hum.WalkSpeed = 16; rt.hum.JumpPower = 50; rt.hum.dead = false;
+    rt.vms.server = makeVM("server");
+    const servers = scriptsFor("server");
+    servers.forEach(n => callLua(rt.vms.server, "__start", [n.id, n.name, luauToLua(n.source || "")], false));
+    callLua(rt.vms.server, "__step", [0]);
+    // the player joins after the server scripts have run
+    fire("svc:Players", "PlayerAdded", [I(PLAYER_ID)], "server");
+    fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)], "server");
+    rt.vms.client = makeVM("client");
+    scriptsFor("client").forEach(n => callLua(rt.vms.client, "__start", [n.id, n.name, luauToLua(n.source || "")], false));
+    callLua(rt.vms.client, "__step", [0]);
+    fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)], "client");
+    return { server: servers.length, client: scriptsFor("client").length };
+  }
+  function stop(){
+    ["server", "client"].forEach(k => { const vm = rt.vms[k]; if(vm && !vm.closed){ vm.closed = true; try{ lua.lua_close(vm.L); }catch(e){} } });
+    rt.vms = {};
+    const tmpParts = Array.from(rt.createdParts.values());
+    rt.createdParts.clear();
+    rt.signals.clear(); rt.conns.clear(); rt.tmpNodes = []; rt.running = false;
+    return tmpParts;
+  }
+
+  // Touched / TouchEnded for the player's body against parts that have listeners
+  function updateTouches(){
+    const box = A.player.getBox(); if(!box) return;
+    A.parts().forEach(p => {
+      if(p.pending || p.attached === false) return;
+      const wantTouch = hasListeners(p.id, "Touched") || hasListeners(p.id, "TouchEnded");
+      if(!wantTouch) return;
+      if(A.part.get(p, "CanTouch") === false) return;
+      const pos = A.part.get(p, "Position"), size = A.part.get(p, "Size");
+      const hit = box.min[0] <= pos[0] + size[0] / 2 && box.max[0] >= pos[0] - size[0] / 2 &&
+                  box.min[1] <= pos[1] + size[1] / 2 + 0.05 && box.max[1] >= pos[1] - size[1] / 2 &&
+                  box.min[2] <= pos[2] + size[2] / 2 && box.max[2] >= pos[2] - size[2] / 2;
+      const was = rt.touching.get(p.id) === true;
+      if(hit && !was){ rt.touching.set(p.id, true); fire(p.id, "Touched", [I(HRP_ID)]); }
+      else if(!hit && was){ rt.touching.set(p.id, false); fire(p.id, "TouchEnded", [I(HRP_ID)]); }
+    });
+  }
+  function step(dt){
+    if(!rt.running) return;
+    rt.now += dt;
+    fire("svc:RunService", "Stepped", [rt.now, dt]);
+    fire("svc:RunService", "Heartbeat", [dt]);
+    fire("svc:RunService", "RenderStepped", [dt], "client");
+    callLua(rt.vms.server, "__step", [dt]);
+    callLua(rt.vms.client, "__step", [dt]);
+    updateTouches();
+    // respawn a few seconds after dying
+    if(rt.hum.dead && rt.now - rt.hum.deadAt > 3){
+      rt.hum.dead = false; rt.hum.Health = rt.hum.MaxHealth;
+      A.respawn();
+      fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)]);
+    }
+  }
+  function keyEvent(key, down){
+    key = String(key).toUpperCase();
+    const map = { " ": "Space", "SHIFT": "LeftShift", "ENTER": "Return", "ARROWUP": "Up", "ARROWDOWN": "Down", "ARROWLEFT": "Left", "ARROWRIGHT": "Right", "CONTROL": "LeftControl", "TAB": "Tab", "ESCAPE": "Escape" };
+    const name = map[key] || (key.length === 1 && /[0-9]/.test(key) ? ["Zero","One","Two","Three","Four","Five","Six","Seven","Eight","Nine"][+key] : key.charAt(0) + key.slice(1).toLowerCase());
+    const nm = key.length === 1 && /[A-Z]/.test(key) ? key : name;
+    if(down) rt.keysDown.add(nm); else rt.keysDown.delete(nm);
+    if(!rt.running) return;
+    fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [{ __t: "Input", key: nm, state: down ? "Begin" : "End" }, false], "client");
+  }
+  function checkSyntax(src, name){
+    try{
+      if(!rt.checkVM) rt.checkVM = makeVM("check");
+      return callLua(rt.checkVM, "__check", [luauToLua(src), name || "script"], true);
+    }catch(e){ return null; }
+  }
+  rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.checkSyntax = checkSyntax;
+  rt.setHum = setHum; rt.markCreated = (p) => rt.createdParts.set(p.id, p);
+  return rt;
+}
+
+
+</script>
 </head>
 <body>
 <div id="pcOnly"><div><h2 style="margin:0 0 10px">BlockVerse Studio is PC only</h2><p style="margin:0;color:#8a8a90">Studio works on a computer (Windows, Mac or Linux). Open it from a PC or laptop.</p></div></div>
@@ -1115,7 +2477,6 @@
 <div class="toast-wrap" id="toastWrap"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://unpkg.com/fengari-web/dist/fengari-web.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -1412,19 +2773,6 @@
   /* ---------------- Editor: three.js scene + explorer + properties ---------------- */
   let scene, camera, renderer, raycaster, mouse, canvasEl;
   let sceneObjects = []; // { id, name, className, shape, mesh, props }
-  // Script instances are kept separately from 3D parts and saved per project.
-  let studioScripts = [];
-  let studioInstanceId = 0;
-  const STUDIO_SERVICES = ["ReplicatedStorage","ServerScriptService","StarterPlayer","StarterPlayerScripts","StarterCharacterScripts","StarterCharacter","Workspace"];
-  function scriptsStorageKey(){ return "blockverse_studio_scripts_" + (currentGame && currentGame.id ? currentGame.id : "default"); }
-  function loadStudioScripts(){ try{ const v=JSON.parse(localStorage.getItem(scriptsStorageKey())||"[]"); studioScripts=Array.isArray(v)?v:[]; }catch(e){studioScripts=[];} }
-  function saveStudioScripts(){ try{localStorage.setItem(scriptsStorageKey(),JSON.stringify(studioScripts));}catch(e){showToast("Could not save scripts in this browser");} }
-  function addStudioScript(parent, className){
-    const allowed=["Script","LocalScript","ModuleScript"];
-    if(!allowed.includes(className)) className="Script";
-    const item={id:"script_"+(++studioInstanceId)+"_"+Date.now().toString(36),name:className,parent, className,source:className==="ModuleScript"?"local module = {}\n\nreturn module":"print(\"Hello from " + className + "!\")"};
-    studioScripts.push(item); saveStudioScripts(); renderExplorer(); openStudioScriptEditor(item); return item;
-  }
   let selectedId = null; // object id, or "__light__"
   let editorInited = false;
   let currentGame = null;
@@ -1594,8 +2942,10 @@
       editorInited = true;
     }
     logOutput("BlockVerse Studio ready - " + game.name);
-    buildDefaultScene();
-    loadStudioScripts();
+    projectNodes = [];
+    const savedGame = loadGames().find(g => g.id === game.id);
+    if(savedGame && savedGame.world && savedGame.world.parts) loadWorld(savedGame.world);
+    else buildDefaultScene();
     renderExplorer();
     selectObject(null);
     setTool("select");
@@ -1612,6 +2962,7 @@
     // scene (invisible character you could still walk) and no way to stop it - always end the test first
     if(playMode.loading) return;
     if(playMode.active) await stopPlay();
+    closeLuaEditor(); saveWorld(true);
     document.getElementById("editorScreen").classList.remove("show");
     document.getElementById("dashScreen").classList.add("show");
   });
@@ -1868,7 +3219,7 @@
     if(!currentGame) return;
     const games = loadGames();
     const idx = games.findIndex(g => g.id === currentGame.id);
-    if(idx !== -1){ games[idx].name = currentGame.name; games[idx].lastSaved = Date.now(); saveGames(games); }
+    if(idx !== -1){ games[idx].name = currentGame.name; games[idx].lastSaved = Date.now(); games[idx].world = serializeWorld(); saveGames(games); }
     const note = document.getElementById("editorSaveNote");
     note.textContent = "Saved";
     note.style.opacity = "1";
@@ -1963,6 +3314,10 @@
         if(!playMode.loading){ if(playMode.active) stopPlay(); else startPlay(); }
         return;
       }
+      if(playMode.active && !playMode.loading && LuaRT && LuaRT.running && !e.repeat && !playMode.menuOpen){
+        const t0 = (document.activeElement && document.activeElement.tagName) || "";
+        if(t0 !== "INPUT" && t0 !== "TEXTAREA") LuaRT.keyEvent(e.key, true);
+      }
       if(playMode.active && !playMode.loading){
         if(e.key === "Escape"){ e.preventDefault(); phSetMenu(!playMode.menuOpen); return; }
         if(e.key === "Tab"){ e.preventDefault(); phToggleLb(); return; }
@@ -1993,6 +3348,7 @@
       const k = e.key.toLowerCase();
       if(["w","a","s","d"].includes(k)) keysDown[k] = false;
       if(k === " ") keysDown[" "] = false;
+      if(playMode.active && LuaRT && LuaRT.running) LuaRT.keyEvent(e.key, false);
     });
 
     window.addEventListener("resize", onResize);
@@ -2065,7 +3421,7 @@
     const flatForward = new THREE.Vector3(-Math.sin(playMode.camYaw), 0, -Math.cos(playMode.camYaw));
     const flatRight = new THREE.Vector3(-flatForward.z, 0, flatForward.x);
     const moveDir = new THREE.Vector3();
-    const inputOn = !playMode.menuOpen;
+    const inputOn = !playMode.menuOpen && !(LuaRT && LuaRT.running && LuaRT.hum.dead);
     if(inputOn && keysDown["w"]) moveDir.add(flatForward);
     if(inputOn && keysDown["s"]) moveDir.sub(flatForward);
     if(inputOn && keysDown["d"]) moveDir.add(flatRight);
@@ -2075,7 +3431,7 @@
     if(isMoving) playMode.emote = null;                 // walking cancels a dance
     if(isMoving){
       moveDir.normalize();
-      rig.position.addScaledVector(moveDir, 7 * dt);
+      rig.position.addScaledVector(moveDir, 7 * ((LuaRT && LuaRT.running ? LuaRT.hum.WalkSpeed : 16) / 16) * dt);
       const targetAngle = Math.atan2(moveDir.x, moveDir.z);
       rig.rotation.y += ((((targetAngle - rig.rotation.y + Math.PI) % (Math.PI*2)) + Math.PI*2) % (Math.PI*2) - Math.PI) * Math.min(1, dt*10);
     }
@@ -2083,7 +3439,7 @@
     // gravity + jump, colliding against whatever part/platform is directly beneath the rig (not just the baseplate)
     if(inputOn && keysDown[" "] && playMode.onGround){
       playMode.emote = null;                             // jumping cancels a dance too
-      playMode.velocityY = 10;
+      playMode.velocityY = 10 * ((LuaRT && LuaRT.running ? LuaRT.hum.JumpPower : 50) / 50);
       playMode.onGround = false;
     }
     playMode.velocityY -= 28 * dt;
@@ -2110,6 +3466,7 @@
     }
 
     animateRig(rig, isMoving, !playMode.onGround, dt, playMode.emote === "dance");
+    if(LuaRT && LuaRT.running) LuaRT.step(dt);
     updateChatBubblePosition();
     checkScriptTouches(rig);
   }
@@ -2122,7 +3479,7 @@
     raycaster.far = fromY + 200;
     // CanCollide-off parts don't stop the player, so they shouldn't stop
     // the ground raycast either - same rule the real BlockVerse game uses
-    const meshes = sceneObjects.filter(o => o.className !== "SpawnLocation" && o.props.canCollide !== false).map(o => o.mesh);
+    const meshes = sceneObjects.filter(o => o.className !== "SpawnLocation" && o.props.canCollide !== false && !o.hidden).map(o => o.mesh);
     const hits = raycaster.intersectObjects(meshes);
     return hits.length ? hits[0].point.y : null;
   }
@@ -2337,7 +3694,7 @@
     hemiLight.intensity = (0.35 + dayAmt * 0.55) * lightState.brightness;
   }
 
-  function buildDefaultScene(){
+  function buildDefaultScene(skipParts){
     clearScene();
     scene.fog = new THREE.Fog(0x87b6ff, 60, 180);
 
@@ -2354,6 +3711,7 @@
     scene.add(sunLight);
     updateSunAndSky();
 
+    if(skipParts) return;
     addSceneObject({ name:"Baseplate", className:"Part", shape:"cube", pos:[0,-0.5,0], size:[100,1,100], color:0x3ecf6e });
     addSceneObject({ name:"SpawnLocation", className:"SpawnLocation", shape:"cube", pos:[0,0.15,0], size:[6,0.3,6], color:0xc23b3b });
   }
@@ -2496,6 +3854,396 @@
     grp.userData.parts = { lArm, rArm, lLeg, rLeg, head };
     grp.userData.bubbleY = (headY + headSize/2 + 0.27) * S * c.heightScale + 0.7;
     return grp;
+  }
+
+
+  /* =====================================================================================================
+     LUA SCRIPTING - real service folders, Script / LocalScript / ModuleScript objects, a Lua editor and
+     the Roblox-style runtime (two Lua VMs: server + client). The scene and these objects are now saved
+     with the project.
+     ===================================================================================================== */
+  let projectNodes = [];     // scripts, folders, remotes, values (everything that is not a 3D part)
+  let playNodes = [];        // the copy scripts see during a play test (so a script can never damage your project)
+  let playSnap = null;       // world snapshot taken when play starts, restored when it ends
+  let LuaRT = null;
+
+  const SVG = (d) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+  const NODE_ICONS = {
+    Script: SVG('<path d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6H8z"/><path d="M9 14l-2 2 2 2M15 14l2 2-2 2"/>'),
+    LocalScript: SVG('<path d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6H8z"/><circle cx="12" cy="15" r="2.5"/>'),
+    ModuleScript: SVG('<path d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6H8z"/><path d="M9 13h6M9 17h6"/>'),
+    RemoteEvent: SVG('<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>'),
+    RemoteFunction: SVG('<path d="M4 8h13l-3-3M20 16H7l3 3"/>'),
+    Folder: SVG('<path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>'),
+    NumberValue: SVG('<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/>'),
+    StringValue: SVG('<path d="M4 7V5h16v2M12 5v14M9 19h6"/>'),
+    BoolValue: SVG('<rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="16" cy="12" r="2.5"/>')
+  };
+  const SERVICE_DEFS = [
+    { id: "svc:ReplicatedStorage", name: "ReplicatedStorage", icon: SVG('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>'), hint: "Shared: both the server and every player can see these" },
+    { id: "svc:StarterPlayerScripts", name: "StarterPlayerScripts", icon: SVG('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/>'), hint: "LocalScripts here run on each player's device" },
+    { id: "svc:ServerScriptService", name: "ServerScriptService", icon: SVG('<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>'), hint: "Scripts here run only on the server, hidden from players" }
+  ];
+  const INSERT_OPTIONS = {
+    "svc:Workspace": ["Script", "Folder"],
+    "svc:ServerScriptService": ["Script", "ModuleScript", "Folder"],
+    "svc:StarterPlayerScripts": ["LocalScript", "ModuleScript", "Folder"],
+    "svc:ReplicatedStorage": ["ModuleScript", "RemoteEvent", "RemoteFunction", "Folder", "NumberValue", "StringValue", "BoolValue"]
+  };
+  const DEFAULT_SOURCE = {
+    Script: 'print("Hello world!")\n',
+    LocalScript: 'print("Hello from the client!")\n',
+    ModuleScript: 'local module = {}\n\nreturn module\n'
+  };
+  const isScriptClass = (c) => c === "Script" || c === "LocalScript" || c === "ModuleScript";
+  const nodeById = (id) => projectNodes.find(n => n.id === id) || null;
+  function newNodeId(){ return "node_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function serviceOfParent(pid){
+    let cur = pid, guard = 0;
+    while(cur && guard++ < 20){
+      if(String(cur).startsWith("svc:")) return cur;
+      if(sceneObjects.some(o => o.id === cur)) return "svc:Workspace";
+      const n = nodeById(cur); if(!n) return null; cur = n.parent;
+    }
+    return null;
+  }
+  function insertOptionsFor(pid){
+    if(String(pid).startsWith("svc:")) return INSERT_OPTIONS[pid] || [];
+    if(sceneObjects.some(o => o.id === pid)) return ["Script"];
+    const n = nodeById(pid);
+    if(n && n.className === "Folder") return INSERT_OPTIONS[serviceOfParent(pid)] || [];
+    return [];
+  }
+  function whereItRuns(n){
+    const svc = serviceOfParent(n.parent);
+    if(n.className === "Script") return (svc === "svc:ServerScriptService" || svc === "svc:Workspace") ? "Runs on the server" : "Inactive here - Scripts run from ServerScriptService or Workspace";
+    if(n.className === "LocalScript") return svc === "svc:StarterPlayerScripts" ? "Runs on each player's device" : "Inactive here - LocalScripts run from StarterPlayerScripts";
+    if(n.className === "ModuleScript") return "Runs when another script calls require() on it";
+    return "";
+  }
+  function addNode(className, pid){
+    const n = { id: newNodeId(), className, name: className, parent: pid };
+    if(isScriptClass(className)) n.source = DEFAULT_SOURCE[className];
+    if(className === "NumberValue") n.value = 0;
+    if(className === "BoolValue") n.value = false;
+    if(className === "StringValue") n.value = "";
+    projectNodes.push(n);
+    selectedId = n.id;
+    renderExplorer(); renderProperties();
+    saveWorld(false);
+    if(isScriptClass(className)) openLuaEditor(n);
+  }
+  function deleteNode(id){
+    const kill = new Set([id]);
+    let grew = true;
+    while(grew){ grew = false; projectNodes.forEach(n => { if(!kill.has(n.id) && kill.has(n.parent)){ kill.add(n.id); grew = true; } }); }
+    projectNodes = projectNodes.filter(n => !kill.has(n.id));
+    if(kill.has(selectedId)) selectedId = null;
+    renderExplorer(); renderProperties(); saveWorld(false);
+  }
+  function menuItem(menu, label, fn, iconHtml){
+    const it = document.createElement("div");
+    it.className = "obj-ctx-item";
+    it.innerHTML = (iconHtml || "") + "<span></span>";
+    it.querySelector("span").textContent = label;
+    it.addEventListener("click", () => { closeObjCtxMenu(); fn(); });
+    menu.appendChild(it);
+  }
+  function openCtxMenu(x, y){
+    closeObjCtxMenu();
+    const menu = document.createElement("div");
+    menu.id = "objCtxMenu"; menu.className = "obj-ctx-menu";
+    menu.style.left = Math.min(x, window.innerWidth - 190) + "px";
+    menu.style.top = Math.min(y, window.innerHeight - 260) + "px";
+    menu.addEventListener("click", (e) => e.stopPropagation());
+    document.body.appendChild(menu);
+    return menu;
+  }
+  function showInsertMenu(pid, x, y){
+    const opts = insertOptionsFor(pid);
+    if(!opts.length) return;
+    const menu = openCtxMenu(x, y);
+    opts.forEach(c => menuItem(menu, "Insert " + c, () => addNode(c, pid), '<span class="exp-icon" style="width:14px;height:14px">' + (NODE_ICONS[c] || "") + '</span>'));
+  }
+  function showNodeMenu(n, x, y){
+    const menu = openCtxMenu(x, y);
+    if(isScriptClass(n.className)) menuItem(menu, "Open script", () => openLuaEditor(n));
+    insertOptionsFor(n.id).forEach(c => menuItem(menu, "Insert " + c, () => addNode(c, n.id)));
+    menuItem(menu, "Rename", () => {
+      const nv = prompt("Rename", n.name);
+      if(nv && nv.trim()){ n.name = nv.trim().slice(0, 40); renderExplorer(); renderProperties(); saveWorld(false); }
+    });
+    menuItem(menu, "Delete", () => deleteNode(n.id));
+  }
+  function addPlusButton(row, pid){
+    const opts = insertOptionsFor(pid);
+    if(!opts.length) return;
+    const b = document.createElement("button");
+    b.className = "exp-add"; b.textContent = "+"; b.title = "Insert";
+    b.addEventListener("click", (e) => { e.stopPropagation(); const r = b.getBoundingClientRect(); showInsertMenu(pid, r.left, r.bottom + 4); });
+    row.appendChild(b);
+  }
+  function appendNodeRows(container, pid){
+    projectNodes.filter(n => n.parent === pid).forEach(n => {
+      const row = document.createElement("div");
+      row.className = "exp-row" + (n.id === selectedId ? " selected" : "") + (n.disabled ? " exp-dim" : "");
+      row.innerHTML = '<span class="exp-icon">' + (NODE_ICONS[n.className] || "") + '</span><span></span>';
+      row.querySelector("span:last-child").textContent = n.name;
+      row.addEventListener("click", () => { if(!playMode.active) selectObject(n.id); });
+      row.addEventListener("dblclick", () => { if(!playMode.active && isScriptClass(n.className)) openLuaEditor(n); });
+      row.addEventListener("contextmenu", (e) => { e.preventDefault(); if(playMode.active) return; selectObject(n.id); showNodeMenu(n, e.clientX, e.clientY); });
+      if(n.className === "Folder") addPlusButton(row, n.id);
+      container.appendChild(row);
+      const kids = projectNodes.filter(k => k.parent === n.id);
+      if(kids.length){ const sub = document.createElement("div"); sub.className = "exp-nested"; container.appendChild(sub); appendNodeRows(sub, n.id); }
+    });
+  }
+
+  /* ---------- properties panel for these objects ---------- */
+  function renderNodeProperties(body, n){
+    const label = (t) => { const g = document.createElement("div"); g.className = "prop-group-label"; g.textContent = t; body.appendChild(g); };
+    const row = (lbl, val, onChange, ro) => {
+      const r = document.createElement("div"); r.className = "prop-row" + (ro ? " readonly" : "");
+      const l = document.createElement("label"); l.textContent = lbl;
+      const i = document.createElement("input"); i.type = "text"; i.value = val;
+      if(ro) i.disabled = true; else i.addEventListener("change", () => onChange(i.value));
+      r.appendChild(l); r.appendChild(i); body.appendChild(r);
+    };
+    label("Identity");
+    row("Name", n.name, (v) => { n.name = (v || n.name).trim().slice(0, 40) || n.name; renderExplorer(); saveWorld(false); });
+    row("ClassName", n.className, null, true);
+    const pn = String(n.parent).startsWith("svc:") ? n.parent.slice(4) : ((sceneObjects.find(o => o.id === n.parent) || nodeById(n.parent) || {}).name || "?");
+    row("Parent", pn, null, true);
+    if(isScriptClass(n.className)){
+      label("Script");
+      const hint = document.createElement("div"); hint.className = "script-editor-help"; hint.style.marginBottom = "8px"; hint.textContent = whereItRuns(n);
+      body.appendChild(hint);
+      const btn = document.createElement("button");
+      btn.className = "script-editor-save"; btn.textContent = "Open script"; btn.style.width = "100%"; btn.style.marginBottom = "10px";
+      btn.addEventListener("click", () => openLuaEditor(n));
+      body.appendChild(btn);
+      if(n.className !== "ModuleScript"){
+        const r = document.createElement("div"); r.className = "prop-row prop-row-bool";
+        const l = document.createElement("label"); l.textContent = "Disabled";
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!n.disabled;
+        cb.addEventListener("change", () => { n.disabled = cb.checked; renderExplorer(); saveWorld(false); });
+        r.appendChild(l); r.appendChild(cb); body.appendChild(r);
+      }
+    }
+    if(/Value$/.test(n.className)){
+      label("Data");
+      row("Value", String(n.value === undefined ? "" : n.value), (v) => {
+        n.value = n.className === "NumberValue" ? (parseFloat(v) || 0) : n.className === "BoolValue" ? (v === "true" || v === "1") : v;
+        saveWorld(false);
+      });
+    }
+    if(n.className === "RemoteEvent" || n.className === "RemoteFunction"){
+      const hint = document.createElement("div"); hint.className = "script-editor-help";
+      hint.textContent = n.className === "RemoteEvent"
+        ? "Client: remote:FireServer(...)  |  Server: remote.OnServerEvent:Connect(function(player, ...) end), remote:FireClient(player, ...)"
+        : "Server sets remote.OnServerInvoke = function(player, ...) return ... end  |  Client calls remote:InvokeServer(...)";
+      body.appendChild(hint);
+    }
+    const del = document.createElement("button");
+    del.className = "script-editor-save"; del.textContent = "Delete"; del.style.cssText = "width:100%;margin-top:14px;background:#3a1d1d;color:#ff9a9a;";
+    del.addEventListener("click", () => deleteNode(n.id));
+    body.appendChild(del);
+  }
+
+  /* ---------- Lua editor ---------- */
+  function openLuaEditor(n){
+    closeLuaEditor();
+    const ov = document.createElement("div");
+    ov.id = "luaEditorOverlay"; ov.className = "script-editor-overlay"; ov.style.display = "flex";
+    const card = document.createElement("div"); card.className = "script-editor-card"; card.style.width = "min(860px, 94vw)";
+    const head = document.createElement("div"); head.className = "script-editor-head";
+    const title = document.createElement("span"); title.textContent = n.name;
+    const tag = document.createElement("span"); tag.className = "lua-tag"; tag.textContent = n.className + " - " + whereItRuns(n);
+    title.appendChild(tag);
+    const x = document.createElement("button"); x.innerHTML = "&times;"; x.title = "Close";
+    head.append(title, x);
+    const wrap = document.createElement("div"); wrap.className = "lua-editor-wrap";
+    const gutter = document.createElement("div"); gutter.className = "lua-gutter";
+    const ta = document.createElement("textarea"); ta.className = "script-editor-textarea"; ta.spellcheck = false; ta.value = n.source || "";
+    wrap.append(gutter, ta);
+    const err = document.createElement("div"); err.className = "lua-err";
+    const help = document.createElement("div"); help.className = "script-editor-help";
+    help.innerHTML = 'Lua, like Roblox: <code>script.Parent</code> &middot; <code>workspace</code> &middot; <code>game:GetService("Players")</code> &middot; <code>part.Touched:Connect(function(hit) end)</code> &middot; <code>task.wait(1)</code> &middot; <code>Instance.new("Part")</code> &middot; <code>require(module)</code> &middot; RemoteEvents in ReplicatedStorage. Supported extras: <code>x += 1</code> (start of a line) and <code>continue</code>. Not supported yet: type annotations and string interpolation.';
+    const actions = document.createElement("div"); actions.className = "script-editor-actions";
+    const save = document.createElement("button"); save.className = "script-editor-save"; save.textContent = "Save (Ctrl+S)";
+    actions.appendChild(save);
+    card.append(head, wrap, err, help, actions); ov.appendChild(card); document.body.appendChild(ov);
+    const lines = () => { const c = ta.value.split("\n").length; let s = ""; for(let i = 1; i <= c; i++) s += i + "\n"; gutter.textContent = s; gutter.scrollTop = ta.scrollTop; };
+    const doSave = () => {
+      n.source = ta.value;
+      const lua = ensureLua();
+      const e = lua ? lua.checkSyntax(ta.value, n.name) : null;
+      err.textContent = e ? "Syntax error: " + e : "";
+      saveWorld(false);
+      showToast(e ? "Saved - but the script has a syntax error" : "Script saved");
+    };
+    ta.addEventListener("input", lines); ta.addEventListener("scroll", () => { gutter.scrollTop = ta.scrollTop; });
+    ta.addEventListener("keydown", (e) => {
+      if(e.key === "Tab"){ e.preventDefault(); const s = ta.selectionStart; ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = s + 2; lines(); }
+      else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s"){ e.preventDefault(); doSave(); }
+      else if(e.key === "Escape"){ closeLuaEditor(); }
+      e.stopPropagation();
+    });
+    save.addEventListener("click", doSave);
+    x.addEventListener("click", () => { n.source = ta.value; saveWorld(false); closeLuaEditor(); });
+    lines(); ta.focus();
+  }
+  function closeLuaEditor(){ const o = document.getElementById("luaEditorOverlay"); if(o) o.remove(); }
+
+  /* ---------- saving the whole world with the project ---------- */
+  function serializeWorld(){
+    return {
+      v: 1,
+      parts: sceneObjects.filter(o => !o.runtime).map(o => ({ name: o.name, className: o.className, shape: o.shape, props: JSON.parse(JSON.stringify(o.props)), script: o.script || null })),
+      nodes: JSON.parse(JSON.stringify(projectNodes)),
+      light: { brightness: lightState.brightness, time: lightState.time }
+    };
+  }
+  function loadWorld(w){
+    buildDefaultScene(true);
+    w.parts.forEach(p => {
+      const pr = p.props;
+      const o = addSceneObject({ name: p.name, className: p.className, shape: p.shape, pos: pr.position, rot: pr.rotation, size: pr.size, color: pr.color, material: pr.material, transparency: pr.transparency, anchored: pr.anchored, canCollide: pr.canCollide, canTouch: pr.canTouch, canQuery: pr.canQuery, castShadow: pr.castShadow });
+      Object.assign(o.props, pr);
+      if(p.script) o.script = p.script;
+    });
+    projectNodes = (w.nodes || []).map(n => Object.assign({}, n));
+    if(w.light){ lightState.brightness = w.light.brightness; lightState.time = w.light.time; updateSunAndSky(); }
+  }
+  function saveWorld(toCloud){
+    if(!currentGame || playMode.active) return;
+    try{
+      const list = loadGames();
+      const g = list.find(x => x.id === currentGame.id); if(!g) return;
+      g.world = serializeWorld();
+      if(toCloud){ g.lastSaved = Date.now(); saveGames(list); }
+      else localStorage.setItem(gamesStorageKey(), JSON.stringify(list));
+    }catch(e){ console.warn("Studio: couldn't save the world", e); }
+  }
+  setInterval(() => { if(document.getElementById("editorScreen").classList.contains("show") && !playMode.active) saveWorld(false); }, 15000);
+
+  /* ---------- Lua runtime glue ---------- */
+  function ensureLua(){
+    if(LuaRT) return LuaRT;
+    if(!window.fengari){ showToast("The Lua engine didn't load (check your internet connection) - scripts can't run"); return null; }
+    try{
+      LuaRT = createLuaRuntime(window.fengari, makeLuaAdapter(), document.getElementById("bvLuaPrelude").textContent);
+    }catch(e){ console.error(e); showToast("Couldn't start the Lua engine: " + e.message); LuaRT = null; }
+    return LuaRT;
+  }
+  function makeLuaAdapter(){
+    const MAT = (k) => k;
+    const applyOpacity = (o) => { const t = o.props.transparency || 0; o.mesh.material.transparent = t > 0; o.mesh.material.opacity = 1 - t; };
+    return {
+      log(kind, text, vm){ logOutput((vm === "server" ? "[Server] " : vm === "client" ? "[Client] " : "") + text, kind === "error" ? "error" : kind === "warn" ? "warn" : undefined); },
+      parts: () => sceneObjects,
+      partById: (id) => sceneObjects.find(o => o.id === id) || null,
+      nodes: () => playNodes,
+      removeNode(id){ playNodes = playNodes.filter(n => n.id !== id); },
+      part: {
+        get(o, k){
+          const p = o.props;
+          switch(k){
+            case "Name": return o.name;
+            case "ClassName": return o.className;
+            case "Position": { const m = o.mesh.position; return [m.x, m.y, m.z]; }
+            case "Size": return p.size.slice();
+            case "Orientation": return (p.rotation || [0, 0, 0]).map(r => r * 180 / Math.PI);
+            case "Color": return p.color;
+            case "Transparency": return p.transparency || 0;
+            case "Reflectance": return p.reflectance || 0;
+            case "Anchored": return p.anchored !== false;
+            case "CanCollide": return p.canCollide !== false;
+            case "CanTouch": return p.canTouch !== false;
+            case "CanQuery": return p.canQuery !== false;
+            case "CastShadow": return p.castShadow !== false;
+            case "Massless": return !!p.massless;
+            case "Material": return p.material;
+          }
+          return undefined;
+        },
+        set(o, k, v){
+          const p = o.props;
+          switch(k){
+            case "Name": o.name = String(v); return true;
+            case "Position": p.position = [v[0], v[1], v[2]]; o.mesh.position.set(v[0], v[1], v[2]); return true;
+            case "Size": p.size = [Math.max(0.05, v[0]), Math.max(0.05, v[1]), Math.max(0.05, v[2])]; o.mesh.geometry.dispose(); o.mesh.geometry = geometryForShape(o.shape, p.size); return true;
+            case "Orientation": p.rotation = [v[0] * Math.PI / 180, v[1] * Math.PI / 180, v[2] * Math.PI / 180]; o.mesh.rotation.set(p.rotation[0], p.rotation[1], p.rotation[2]); return true;
+            case "Color": p.color = v; o.mesh.material.color.setHex(v); return true;
+            case "Transparency": p.transparency = Math.max(0, Math.min(1, Number(v))); applyOpacity(o); return true;
+            case "Reflectance": p.reflectance = Number(v); return true;
+            case "Anchored": p.anchored = !!v; return true;
+            case "CanCollide": p.canCollide = !!v; return true;
+            case "CanTouch": p.canTouch = !!v; return true;
+            case "CanQuery": p.canQuery = !!v; return true;
+            case "CastShadow": p.castShadow = !!v; o.mesh.castShadow = !!v; return true;
+            case "Massless": p.massless = !!v; return true;
+            case "Material": {
+              const key = MAT(String(v));
+              if(typeof MATERIALS !== "undefined" && !MATERIALS[key]) return true;
+              o.mesh.material.dispose(); o.mesh.material = materialFor(key, p.transparency || 0); o.mesh.material.color.setHex(p.color); p.material = key; return true;
+            }
+          }
+          return false;
+        },
+        create(cn){
+          const o = addSceneObject({ name: cn, className: cn === "SpawnLocation" ? "SpawnLocation" : "Part", shape: "cube", pos: [0, 5, 0], size: [4, 1, 2], color: 0xa3a2a5 });
+          o.runtime = true; o.hidden = true; o.mesh.visible = false; return o;
+        },
+        attach(o, on){ o.hidden = !on; o.mesh.visible = !!on; },
+        destroy(o){
+          scene.remove(o.mesh);
+          const i = sceneObjects.indexOf(o); if(i >= 0) sceneObjects.splice(i, 1);
+          if(o.runtime){ o.mesh.geometry.dispose(); o.mesh.material.dispose(); }
+        },
+        clone(o){
+          const c = addSceneObject({ name: o.name, className: o.className, shape: o.shape, pos: o.props.position, rot: o.props.rotation, size: o.props.size, color: o.props.color, material: o.props.material, transparency: o.props.transparency, anchored: o.props.anchored, canCollide: o.props.canCollide, canTouch: o.props.canTouch, canQuery: o.props.canQuery, castShadow: o.props.castShadow });
+          c.runtime = true; c.hidden = true; c.mesh.visible = false; return c;
+        }
+      },
+      player: {
+        get name(){ return currentUsername || "Player"; },
+        getPos(){ const r = playRigGroup ? playRigGroup.position : { x: 0, y: 0, z: 0 }; return [r.x, r.y, r.z]; },
+        setPos(p){ if(playRigGroup){ playRigGroup.position.set(p[0], p[1], p[2]); playMode.velocityY = 0; } },
+        getBox(){ if(!playRigGroup) return null; const r = playRigGroup.position; return { min: [r.x - 1.2, r.y, r.z - 1.2], max: [r.x + 1.2, r.y + 5, r.z + 1.2] }; }
+      },
+      lighting: {
+        get(k){ return k === "ClockTime" ? lightState.time : lightState.brightness; },
+        set(k, v){ if(k === "ClockTime") lightState.time = ((v % 24) + 24) % 24; else lightState.brightness = Math.max(0, v); updateSunAndSky(); }
+      },
+      respawn(){ phRespawn(); phAddChat("", "You respawned.", true); }
+    };
+  }
+  function snapshotPlayWorld(){
+    playSnap = { parts: sceneObjects.map(o => ({ o, name: o.name, props: JSON.parse(JSON.stringify(o.props)) })), light: { b: lightState.brightness, t: lightState.time } };
+    playNodes = projectNodes.map(n => Object.assign({}, n));
+  }
+  function restorePlayWorld(created){
+    if(!playSnap) return;
+    (created || []).forEach(p => { try{ scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); }catch(e){} });
+    sceneObjects.filter(o => o.runtime).forEach(o => { try{ scene.remove(o.mesh); }catch(e){} });
+    sceneObjects = playSnap.parts.map(s => s.o);
+    playSnap.parts.forEach(s => {
+      const o = s.o, pr = s.props;
+      if(!o.mesh.parent) scene.add(o.mesh);
+      o.name = s.name; o.hidden = false; o.mesh.visible = true;
+      const mismatchMaterial = o.props.material !== pr.material;
+      o.props = pr;
+      o.mesh.position.set(pr.position[0], pr.position[1], pr.position[2]);
+      o.mesh.rotation.set(pr.rotation[0], pr.rotation[1], pr.rotation[2]);
+      o.mesh.geometry.dispose(); o.mesh.geometry = geometryForShape(o.shape, pr.size);
+      if(mismatchMaterial && o.className !== "Baseplate" && o.className !== "SpawnLocation"){ o.mesh.material.dispose(); o.mesh.material = materialFor(pr.material, pr.transparency || 0); }
+      o.mesh.material.color.setHex(pr.color);
+      o.mesh.material.transparent = (pr.transparency || 0) > 0; o.mesh.material.opacity = 1 - (pr.transparency || 0);
+      o.mesh.castShadow = pr.castShadow !== false;
+    });
+    lightState.brightness = playSnap.light.b; lightState.time = playSnap.light.t; updateSunAndSky();
+    playSnap = null; playNodes = [];
   }
 
   /* ================= play-test HUD: same chat / menu / player list as the real game ================= */
@@ -2778,8 +4526,17 @@
       playMode.groundY = spawnPos.y + spawnHalfH;
       playRigGroup.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
       scene.add(playRigGroup);
+      saveWorld(false);
+      snapshotPlayWorld();
       compileAllScripts();
       createPlayHud();
+      const lua = ensureLua();
+      if(lua){
+        try{
+          const info = lua.start();
+          if(info.server || info.client) logOutput("Lua: running " + info.server + " server script(s) and " + info.client + " local script(s)");
+        }catch(e){ logOutput("Lua failed to start: " + e.message, "error"); }
+      }
 
       playMode.active = true;
       playMode.velocityY = 0;
@@ -2819,7 +4576,6 @@
     try{
       await new Promise(res => setTimeout(res, 300)); // brief and intentional, not a real load - just avoids an instant jarring snap back into the editor
       clearStuckKeys();
-      cleanupLuaScripts();
       if(playRigGroup){
         scene.remove(playRigGroup);
         playRigGroup.traverse((c) => {
@@ -2829,6 +4585,9 @@
         });
         playRigGroup = null;
       }
+      let luaCreated = [];
+      if(LuaRT && LuaRT.running){ try{ luaCreated = LuaRT.stop(); }catch(e){ console.error(e); } }
+      restorePlayWorld(luaCreated);
       closeChatInput();
       removeChatBubble();
       destroyPlayHud();
@@ -2977,6 +4736,12 @@
     menu.style.top = Math.min(y, window.innerHeight - 100) + "px";
     menu.addEventListener("click", (e) => e.stopPropagation());
 
+    const insItem = document.createElement("div");
+    insItem.className = "obj-ctx-item";
+    insItem.innerHTML = '<span class="exp-icon" style="width:14px;height:14px">' + NODE_ICONS.Script + '</span><span>Insert Script</span>';
+    insItem.addEventListener("click", () => { closeObjCtxMenu(); addNode("Script", obj.id); });
+    menu.appendChild(insItem);
+
     const renameItem = document.createElement("div");
     renameItem.className = "obj-ctx-item";
     renameItem.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Rename Part';
@@ -3021,6 +4786,7 @@
 
   /* ---- delete a scene object by id (used by context menu + Backspace) ---- */
   function deleteObject(id){
+    projectNodes = projectNodes.filter(n => n.parent !== id);
     const obj = sceneObjects.find(o => o.id === id);
     if(!obj || obj.className !== "Part") return; // guard system objects like Baseplate/SpawnLocation not deletable this way
     scene.remove(obj.mesh);
@@ -3287,49 +5053,69 @@
     wrapEls.forEach((input, i) => { input.value = Math.round(obj.props.position[i]*100)/100; });
   }
 
-  /* ---------------- Explorer / script services ---------------- */
+  /* ---------------- Explorer (Workspace tree, incl. Light) ---------------- */
   function iconSvg(className){
-    if(className === "SpawnLocation") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>';
-    if(className === "Lighting") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2"/></svg>';
-    if(["Script","LocalScript","ModuleScript"].includes(className)) return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h10l4 4v14H5zM15 3v5h4M8 13h8M8 17h6"/></svg>';
+    if(className === "SpawnLocation"){
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>';
+    }
+    if(className === "Lighting"){
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+    }
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
   }
-  function explorerRow(parent, name, className, click, context){
-    const row=document.createElement("div"); row.className="exp-row"+(className?" exp-service":"");
-    row.innerHTML='<span class="exp-icon">'+iconSvg(className||name)+'</span><span></span>';
-    row.querySelector("span:last-child").textContent=name;
-    if(click) row.addEventListener("click",click);
-    if(context) row.addEventListener("contextmenu",e=>{e.preventDefault();context(e);});
-    parent.appendChild(row); return row;
-  }
-  function askAddScript(parent){
-    if(playMode.active||playMode.loading) return;
-    const choice=window.prompt("Create which object? Enter Script, LocalScript, or ModuleScript:","Script");
-    if(choice===null)return;
-    const kind=({script:"Script",localscript:"LocalScript",modulescript:"ModuleScript"})[choice.trim().toLowerCase()];
-    if(!kind){showToast("Choose Script, LocalScript, or ModuleScript");return;}
-    addStudioScript(parent,kind);
-  }
+
   function renderExplorer(){
-    const body=document.getElementById("explorerBody"); if(!body)return; body.innerHTML="";
-    const root=document.createElement("div"); root.className="exp-row"; root.innerHTML='<span class="exp-icon">'+iconSvg("Workspace")+'</span><span>Workspace</span>'; body.appendChild(root);
-    const children=document.createElement("div"); children.className="exp-children";
-    explorerRow(children,"Lighting","Lighting",()=>{if(!playMode.active)selectObject("__light__");});
-    sceneObjects.forEach(o=>{
-      const row=explorerRow(children,o.name,o.className,()=>{if(!playMode.active)selectObject(o.id);},e=>{if(playMode.active)return;selectObject(o.id);showObjCtxMenu(o,e.clientX,e.clientY);});
-      if(o.id===selectedId)row.classList.add("selected");
-      studioScripts.filter(x=>x.parent==="Workspace"&&(x.attachedTo===o.id||x.attachedToName===o.name)).forEach(sc=>{const sr=explorerRow(children,"　"+sc.name,sc.className,()=>openStudioScriptEditor(sc));sr.style.paddingLeft="32px";});
+    const body = document.getElementById("explorerBody");
+    body.innerHTML = "";
+    const workspaceRow = document.createElement("div");
+    workspaceRow.className = "exp-row";
+    workspaceRow.innerHTML =
+      '<span class="exp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-3h5l2 2h8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg></span>Workspace';
+    addPlusButton(workspaceRow, "svc:Workspace");
+    workspaceRow.addEventListener("contextmenu", (e) => { e.preventDefault(); if(!playMode.active) showInsertMenu("svc:Workspace", e.clientX, e.clientY); });
+    body.appendChild(workspaceRow);
+
+    const children = document.createElement("div");
+    children.className = "exp-children";
+
+    // Lighting lives right inside Workspace, alongside Baseplate/SpawnLocation/parts
+    const lightRow = document.createElement("div");
+    lightRow.className = "exp-row" + (selectedId === "__light__" ? " selected" : "");
+    lightRow.innerHTML = '<span class="exp-icon">' + iconSvg("Lighting") + '</span><span>Lighting</span>';
+    lightRow.addEventListener("click", () => { if(!playMode.active) selectObject("__light__"); });
+    children.appendChild(lightRow);
+
+    sceneObjects.forEach(o => {
+      const row = document.createElement("div");
+      row.className = "exp-row" + (o.id === selectedId ? " selected" : "");
+      row.innerHTML = '<span class="exp-icon">' + iconSvg(o.className) + '</span><span></span>';
+      row.querySelector("span:last-child").textContent = o.name;
+      row.addEventListener("click", () => { if(!playMode.active) selectObject(o.id); });
+      row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        if(playMode.active) return;
+        selectObject(o.id);
+        showObjCtxMenu(o, e.clientX, e.clientY);
+      });
+      addPlusButton(row, o.id);
+      children.appendChild(row);
+      if(projectNodes.some(n => n.parent === o.id)){ const sub = document.createElement("div"); sub.className = "exp-nested"; children.appendChild(sub); appendNodeRows(sub, o.id); }
     });
+    appendNodeRows(children, "svc:Workspace");
     body.appendChild(children);
-    const services=[
-      ["ReplicatedStorage","ReplicatedStorage"],["ServerScriptService","ServerScriptService"],["StarterPlayer","StarterPlayer"],
-      ["StarterCharacter","StarterCharacter"],["StarterPlayerScripts","StarterPlayerScripts"],["StarterCharacterScripts","StarterCharacterScripts"]
-    ];
-    services.forEach(([label,parent])=>{
-      const row=explorerRow(body,label,label,()=>{if(!playMode.active)showToast(label+" selected — right-click to insert a script");},()=>askAddScript(parent));
-      row.title="Right-click to insert Script, LocalScript, or ModuleScript";
-      const scripts=studioScripts.filter(x=>x.parent===parent);
-      scripts.forEach(sc=>{const sr=explorerRow(body,"　"+sc.name,sc.className,()=>openStudioScriptEditor(sc),()=>openStudioScriptEditor(sc));sr.style.paddingLeft="22px";});
+
+    // real service folders: put scripts, modules, remotes and values inside them (right-click or the + button)
+    SERVICE_DEFS.forEach(s => {
+      const row = document.createElement("div");
+      row.className = "exp-row exp-service";
+      row.title = s.hint;
+      row.innerHTML = '<span class="exp-icon">' + s.icon + '</span><span>' + s.name + '</span>';
+      addPlusButton(row, s.id);
+      row.addEventListener("contextmenu", (e) => { e.preventDefault(); if(!playMode.active) showInsertMenu(s.id, e.clientX, e.clientY); });
+      body.appendChild(row);
+      const kids = document.createElement("div"); kids.className = "exp-nested";
+      body.appendChild(kids);
+      appendNodeRows(kids, s.id);
     });
   }
 
@@ -3355,6 +5141,8 @@
   function renderProperties(){
     const body = document.getElementById("propsBody");
     body.innerHTML = "";
+    const _node = nodeById(selectedId);
+    if(_node){ renderNodeProperties(body, _node); return; }
 
     if(selectedId === "__light__"){
       const label = document.createElement("div");
@@ -3643,104 +5431,106 @@
       scriptRow.className = "prop-row";
       const scriptBtn = document.createElement("button");
       scriptBtn.className = "prop-script-btn";
-      scriptBtn.textContent = (obj.script || studioScripts.some(x=>x.attachedTo===obj.id || x.attachedToName===obj.name)) ? "Edit Script" : "Add Script";
+      scriptBtn.textContent = obj.script ? "Edit Script" : "Add Script";
       scriptBtn.addEventListener("click", () => openScriptEditor(obj));
       scriptRow.appendChild(scriptBtn);
       body.appendChild(scriptRow);
     }
   }
 
-  /* ============ Lua scripting runtime (Fengari / Lua 5.3-compatible subset) ============ */
+  /* ============ scripting ============
+     Real, working scripting - but JavaScript, not Lua, and with a small,
+     deliberately limited API (not Roblox's full engine surface). Each
+     script is plain JS attached to one Part, compiled once when Play
+     starts. The only thing scripts can currently react to is being
+     touched by the play-test rig - that's the one event the play-test
+     runtime actually tracks right now. Scripts run in the same page
+     context as the editor itself (not a real sandbox), so this is meant
+     for your own game logic, not for running untrusted code from
+     other people.
+  */
   function openScriptEditor(obj){
-    const item=studioScripts.find(s=>s.attachedTo===obj.id);
-    if(item){openStudioScriptEditor(item);return;}
-    const sc={id:"script_"+(++studioInstanceId)+"_"+Date.now().toString(36),name:obj.name+"Script",parent:"Workspace",className:"Script",attachedToName:obj.name,source:'local part = script.Parent\n\npart.Color = Color3.fromRGB(255, 0, 0)\npart.Touched:Connect(function()\n    print("Touched " .. part.Name)\nend)',attachedTo:obj.id};
-    studioScripts.push(sc); saveStudioScripts(); renderExplorer(); openStudioScriptEditor(sc);
-  }
-  function openStudioScriptEditor(item){
-    const overlay=document.createElement("div"); overlay.className="script-editor-overlay";
-    overlay.innerHTML='<div class="script-editor-card"><div class="script-editor-head"><span></span><button class="script-editor-close">&times;</button></div><textarea class="script-editor-textarea" spellcheck="false"></textarea><div class="script-editor-help">Lua syntax: <code>print()</code>, <code>game:GetService("ReplicatedStorage")</code>, <code>Instance.new()</code>, <code>script.Parent</code>, <code>part.Color</code>, <code>part.Transparency</code>, <code>part.CanCollide</code>, <code>part.Position</code>, <code>wait()</code>. This is a browser-based Lua-compatible subset, not the full Roblox engine.</div><div class="script-editor-actions"><button class="script-editor-save">Save</button></div></div>';
-    document.body.appendChild(overlay); overlay.querySelector(".script-editor-head span").textContent=item.className+" - "+item.name;
-    const ta=overlay.querySelector("textarea"); ta.value=item.source||"";
-    overlay.querySelector(".script-editor-close").addEventListener("click",()=>overlay.remove());
-    overlay.querySelector(".script-editor-save").addEventListener("click",()=>{item.source=ta.value;saveStudioScripts();overlay.remove();renderExplorer();renderProperties();showToast("Lua script saved");});
-  }
-  function escapeHtmlSE(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-  let compiledScripts={};
-  const luaInstanceRegistry={};
-  const activeLuaStates=[];
-  function cleanupLuaScripts(){activeLuaStates.splice(0).forEach(x=>{try{x.lua.lua_close(x.L);}catch(e){}});studioScripts.forEach(x=>{delete x._luaTouch;delete x._wasTouching;});}
-  function luaHexColor(r,g,b){return ((Math.max(0,Math.min(255,Math.round(r)))<<16)|(Math.max(0,Math.min(255,Math.round(g)))<<8)|Math.max(0,Math.min(255,Math.round(b))));}
-  function luaTargetFor(item){
-    if(item.attachedTo)return sceneObjects.find(o=>o.id===item.attachedTo)||sceneObjects.find(o=>o.name===item.attachedToName)||null;
-    if(item.attachedToName)return sceneObjects.find(o=>o.name===item.attachedToName)||null;
-    const parent=item.parent;
-    if(parent==="Workspace")return sceneObjects[0]||null;
-    return null;
-  }
-  function runLuaSource(source,item){
-    if(!window.fengari){logOutput("Lua runtime unavailable. Check your internet connection and reload Studio.","error");return false;}
-    const f=window.fengari, lua=f.lua, lauxlib=f.lauxlib, lualib=f.lualib, toL=f.to_luastring, toJS=f.to_jsstring;
-    const L=lauxlib.luaL_newstate(); lualib.luaL_openlibs(L);
-    const target=luaTargetFor(item);
-    function readArg(i){const t=lua.lua_type(L,i); if(t===lua.LUA_TNUMBER)return lua.lua_tonumber(L,i); if(t===lua.LUA_TBOOLEAN)return !!lua.lua_toboolean(L,i); if(t===lua.LUA_TSTRING)return toJS(lua.lua_tostring(L,i)); return null;}
-    function register(name,fn){lua.lua_pushjsfunction(L,function(LS){try{const n=lua.lua_gettop(LS),args=[];for(let i=1;i<=n;i++)args.push(readArg.call(null,i));const out=fn(...args);if(out===undefined||out===null)lua.lua_pushnil(LS);else if(typeof out==="boolean")lua.lua_pushboolean(LS,out);else if(typeof out==="number")lua.lua_pushnumber(LS,out);else lua.lua_pushstring(LS,toL(String(out)));return 1;}catch(e){logOutput("Lua API error: "+e.message,"error");lua.lua_pushnil(LS);return 1;}});lua.lua_setglobal(L,toL(name));}
-    register("__log",(...a)=>{logOutput(a.map(v=>v==null?"nil":String(v)).join("\t"));return true;});
-    lua.lua_pushjsfunction(L,function(LS){try{if(lua.lua_type(LS,1)===lua.LUA_TFUNCTION){const ref=lauxlib.luaL_ref(LS,lua.LUA_REGISTRYINDEX);item._luaTouch={L,ref,lua,lauxlib};}return 0;}catch(e){logOutput("Touched callback error: "+e.message,"error");return 0;}});lua.lua_setglobal(L,toL("__registerTouched"));
-    register("__getName",()=>target?target.name:"Part");
-    register("__getColor",()=>target?target.props.color:0xffffff);
-    register("__setColor",v=>{if(target&&typeof v==="number"){const hex=Math.max(0,Math.min(0xffffff,Math.floor(v)));target.props.color=hex;target.mesh.material.color.setHex(hex);}return true;});
-    register("__getTransparency",()=>target?(target.props.transparency||0):0);
-    register("__setTransparency",v=>{if(target&&typeof v==="number"){target.props.transparency=Math.max(0,Math.min(1,v));target.mesh.material.transparent=target.props.transparency>0;target.mesh.material.opacity=1-target.props.transparency;}return true;});
-    register("__getCanCollide",()=>target?target.props.canCollide:false);
-    register("__setCanCollide",v=>{if(target){target.props.canCollide=!!v;target.mesh.material.transparent=!v||target.props.transparency>0;target.mesh.material.opacity=!v?0.45:1-(target.props.transparency||0);}return true;});
-    register("__getX",()=>target?target.mesh.position.x:0);register("__getY",()=>target?target.mesh.position.y:0);register("__getZ",()=>target?target.mesh.position.z:0);
-    register("__setPosition",(x,y,z)=>{if(target&&[x,y,z].every(v=>typeof v==="number")){target.mesh.position.set(x,y,z);target.props.position=[x,y,z];}return true;});
-    register("__getService",name=>{if(!STUDIO_SERVICES.includes(name)&&name!=="Workspace"&&name!=="Lighting"){logOutput("GetService: unsupported service "+name,"warn");}return name;});
-    register("__createInstance",(kind,name,parent)=>{const id="lua_"+(++studioInstanceId);luaInstanceRegistry[id]={id,ClassName:kind,Name:name||kind,Parent:parent||null};return id;});
-    const shim=`
-      function print(...) __log(...) end
-      warn = function(...) __log("WARNING:", ...) end
-      function wait(seconds) return seconds or 0 end
-      task = {wait=wait, spawn=function(fn) if type(fn)=="function" then fn() end end, defer=function(fn) if type(fn)=="function" then fn() end end}
-      Color3 = {fromRGB=function(r,g,b) return (math.floor(r)*65536)+(math.floor(g)*256)+math.floor(b) end, fromHex=function(h) return tonumber(string.gsub(h,"#",""),16) or 0xffffff end}
-      Vector3 = {new=function(x,y,z) return {X=x or 0,Y=y or 0,Z=z or 0,x=x or 0,y=y or 0,z=z or 0} end}
-      local partMeta = {__index=function(_,k)
-        if k=="Name" then return __getName() elseif k=="Color" then return __getColor() elseif k=="Transparency" then return __getTransparency() elseif k=="CanCollide" then return __getCanCollide() elseif k=="Position" then return Vector3.new(__getX(),__getY(),__getZ()) end
-        if k=="Destroy" then return function() __setCanCollide(false); __setTransparency(1) end end
-        if k=="Touched" then return {Connect=function(_,fn) __registerTouched(fn) end} end
-      end, __newindex=function(_,k,v)
-        if k=="Color" then __setColor(v) elseif k=="Transparency" then __setTransparency(v) elseif k=="CanCollide" then __setCanCollide(v) elseif k=="Position" and type(v)=="table" then __setPosition(v.X or v.x or 0,v.Y or v.y or 0,v.Z or v.z or 0) end
-      end}
-      local part = setmetatable({},partMeta)
-      script = {Name=${JSON.stringify(item.name)}, Parent=part}
-      local services = {}
-      game = {GetService=function(self,name) return {Name=name, GetChildren=function() return {} end, FindFirstChild=function(self,n) return nil end} end}
-      workspace = game:GetService("Workspace")
-      Instance = {new=function(kind) local obj={ClassName=kind,Name=kind,Parent=nil}; setmetatable(obj,{__newindex=function(t,k,v) rawset(t,k,v); if k=="Parent" then __createInstance(t.ClassName,t.Name,tostring(v and v.Name or "")) end end}); return obj end}
-      `;
-    const wrapped=shim+"\n"+source;
-    try{const status=lauxlib.luaL_loadstring(L,toL(wrapped));if(status!==lua.LUA_OK){throw new Error(toJS(lua.lua_tostring(L,-1)));}const result=lua.lua_pcall(L,0,lua.LUA_MULTRET,0);if(result!==lua.LUA_OK)throw new Error(toJS(lua.lua_tostring(L,-1)));return true;}catch(err){logOutput(item.name+" Lua error: "+err.message,"error");showToast("Lua error in "+item.name);return false;}finally{activeLuaStates.push({L,lua});}
-  }
-  function compileAllScripts(){
-    cleanupLuaScripts();
-    compiledScripts={};
-    studioScripts.forEach(item=>{
-      if(item.className==="ModuleScript"||!item.source||!item.source.trim())return;
-      if(item.className==="LocalScript" && !["StarterPlayerScripts","StarterCharacterScripts","StarterCharacter"].includes(item.parent))return;
-      logOutput("Running "+item.className+": "+item.name);
-      runLuaSource(item.source,item);
-      if(item.attachedTo){const target=sceneObjects.find(o=>o.id===item.attachedTo)||sceneObjects.find(o=>o.name===item.attachedToName);if(target)compiledScripts[target.id]={handlers:{onTouched:[]},wasTouching:false};}
+    const overlay = document.createElement("div");
+    overlay.className = "script-editor-overlay";
+    overlay.innerHTML =
+      '<div class="script-editor-card">' +
+        '<div class="script-editor-head">' +
+          '<span>Script - ' + escapeHtmlSE(obj.name) + '</span>' +
+          '<button class="script-editor-close">&times;</button>' +
+        '</div>' +
+        '<textarea class="script-editor-textarea" spellcheck="false" placeholder="part.onTouched(function(){\n  part.Color = 0xff0000;\n});"></textarea>' +
+        '<div class="script-editor-help">API: <code>part.onTouched(fn)</code>, <code>part.Color</code>, <code>part.Transparency</code>, <code>part.CanCollide</code>, <code>part.Position</code> ({x,y,z}), <code>part.Destroy()</code></div>' +
+        '<div class="script-editor-actions"><button class="script-editor-save">Save</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const textarea = overlay.querySelector(".script-editor-textarea");
+    textarea.value = obj.script || "";
+    overlay.querySelector(".script-editor-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelector(".script-editor-save").addEventListener("click", () => {
+      obj.script = textarea.value;
+      overlay.remove();
+      renderProperties(); // refreshes the button text (Add Script -> Edit Script)
+      showToast("Script saved");
     });
-    // Backwards compatibility: if older projects have a script field on a Part, open and migrate it.
-    sceneObjects.forEach(obj=>{if(obj.script&&!studioScripts.some(x=>x.attachedTo===obj.id)){const item={id:"script_"+(++studioInstanceId),name:obj.name+"Script",parent:"Workspace",className:"Script",source:obj.script,attachedTo:obj.id,attachedToName:obj.name};studioScripts.push(item);runLuaSource(item.source,item);}});
-    saveStudioScripts();
+  }
+  function escapeHtmlSE(s){ return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+  // compiled once per play-test session - maps object id -> { onTouchedHandlers: [] }
+  let compiledScripts = {};
+  function compileAllScripts(){
+    compiledScripts = {};
+    sceneObjects.forEach(obj => {
+      if(!obj.script || !obj.script.trim()) return;
+      const handlers = { onTouched: [] };
+      const partApi = {
+        onTouched(fn){ if(typeof fn === "function") handlers.onTouched.push(fn); },
+        get Color(){ return obj.mesh.material.color.getHex(); },
+        set Color(hex){ obj.mesh.material.color.setHex(hex); obj.props.color = hex; },
+        get Transparency(){ return obj.props.transparency || 0; },
+        set Transparency(v){ obj.props.transparency = v; obj.mesh.material.transparent = v > 0; obj.mesh.material.opacity = 1 - v; },
+        get CanCollide(){ return obj.props.canCollide; },
+        set CanCollide(v){ obj.props.canCollide = v; },
+        get Position(){ return { x: obj.mesh.position.x, y: obj.mesh.position.y, z: obj.mesh.position.z }; },
+        set Position(p){ obj.mesh.position.set(p.x, p.y, p.z); },
+        Destroy(){ scene.remove(obj.mesh); obj.mesh.visible = false; obj.props.canCollide = false; }
+      };
+      try{
+        const fn = new Function("part", "game", obj.script);
+        fn(partApi, { wait: () => {} }); // wait is a no-op stub for now - real timing/coroutines aren't implemented
+      }catch(err){
+        showToast("Script error in " + obj.name + ": " + err.message);
+        logOutput(obj.name + " script error: " + err.message, "error");
+      }
+      compiledScripts[obj.id] = { handlers, wasTouching: false };
+    });
   }
   function checkScriptTouches(rig){
-    const rigBox=new THREE.Box3().setFromCenterAndSize(rig.position.clone().add(new THREE.Vector3(0,1,0)),new THREE.Vector3(1.4,2.4,1.4));
-    for(const item of studioScripts){if(!item.attachedTo)continue;const obj=sceneObjects.find(o=>o.id===item.attachedTo)||sceneObjects.find(o=>o.name===item.attachedToName);if(!obj||obj.props.canTouch===false)continue;const box=new THREE.Box3().setFromObject(obj.mesh);if(rigBox.intersectsBox(box)&&!item._wasTouching){item._wasTouching=true;logOutput("Touched: "+obj.name);if(item._luaTouch){try{const t=item._luaTouch;t.lua.lua_rawgeti(t.L,t.lua.LUA_REGISTRYINDEX,t.ref);const code=t.lua.lua_pcall(t.L,0,t.lua.LUA_MULTRET,0);if(code!==t.lua.LUA_OK)logOutput(item.name+" Touched error: "+window.fengari.to_jsstring(t.lua.lua_tostring(t.L,-1)),"error");}catch(e){logOutput("Touched callback error: "+e.message,"error");}}}else if(!rigBox.intersectsBox(box)){item._wasTouching=false;}}
+    const rigBox = new THREE.Box3().setFromCenterAndSize(rig.position.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(1.4,2.4,1.4));
+    for(const id in compiledScripts){
+      const entry = compiledScripts[id];
+      const obj = sceneObjects.find(o => o.id === id);
+      if(!obj || obj.props.canTouch === false) continue;
+      const partBox = new THREE.Box3().setFromObject(obj.mesh);
+      const touching = rigBox.intersectsBox(partBox);
+      if(touching && !entry.wasTouching){
+        entry.handlers.onTouched.forEach(fn => { try{ fn(); }catch(err){ showToast("Script error: " + err.message); logOutput("Touched handler error: " + err.message, "error"); } });
+      }
+      entry.wasTouching = touching;
+    }
   }
 
+
+  /* ---------------- Boot ---------------- */
+  window.addEventListener("load", () => {
+    const saved = getStudioSession();
+    if(saved && saved.key && saved.username){
+      currentUserKey = saved.key;
+      currentUsername = saved.username;
+      enterDashboard();
+    } else {
+      document.getElementById("stUsername").focus();
+    }
+  });
 })();
 </script>
 <script>
