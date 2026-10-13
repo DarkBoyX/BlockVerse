@@ -3621,7 +3621,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       outToggle.addEventListener("click", () => setOutput(true));
       editorInited = true;
     }
-    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13 humanoid-r2)");
+    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13 humanoid-r3)");
     projectNodes = [];
     const savedGame = loadGames().find(g => g.id === game.id);
     if(savedGame && savedGame.world && savedGame.world.parts) loadWorld(savedGame.world);
@@ -5240,9 +5240,9 @@ function createLuaRuntime(fengari, A, preludeSrc){
     <span class="game-lb-count hidden" id="gameLbCount">0</span>
   </div>
 <div class="game-lb-panel hidden" id="gameLbPanel"></div>
-<div id="playHealth" style="display:none;position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:210px;z-index:20;pointer-events:none;text-align:center;font-family:inherit;">
-    <div id="playHealthTxt" style="font-size:11px;font-weight:700;color:#e8e8ec;text-shadow:0 1px 3px #000;margin-bottom:4px;"></div>
-    <div style="height:10px;border-radius:6px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.18);overflow:hidden;"><div id="playHealthFill" style="height:100%;width:100%;background:#3ecf6e;transition:width .15s, background .15s;"></div></div>
+<div id="playHealth" style="display:none;position:absolute;top:62px;right:16px;z-index:20;pointer-events:none;align-items:center;gap:7px;">
+    <svg viewBox="0 0 24 24" style="width:17px;height:17px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.5 1.1 4.3 2.5h2.6C14.1 6.1 15.6 5 17.6 5c3.4 0 5.5 3.4 4 6.8C19.5 16.4 12 21 12 21z" fill="#e5484d" stroke="#000" stroke-opacity=".6" stroke-width="1.2"/></svg>
+    <div style="width:150px;height:14px;border-radius:5px;background:rgba(0,0,0,.6);border:2px solid rgba(0,0,0,.85);box-shadow:0 0 0 1px rgba(255,255,255,.35);overflow:hidden;box-sizing:border-box;"><div id="playHealthFill" style="height:100%;width:100%;background:#4cc34c;box-shadow:inset 0 3px 0 rgba(255,255,255,.28);transition:width .15s;"></div></div>
   </div>
 <div class="game-chat-panel" id="gameChatPanel">
     <div class="game-chat-head">
@@ -5711,10 +5711,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const H = (LuaRT && LuaRT.running) ? LuaRT.hum : null;
     if(!H || (H.Health >= H.MaxHealth && !H.dead)){ box.style.display = "none"; return; }
     const frac = Math.max(0, Math.min(1, H.Health / H.MaxHealth));
-    box.style.display = "block";
-    document.getElementById("playHealthFill").style.width = (frac * 100) + "%";
-    document.getElementById("playHealthFill").style.background = frac > 0.6 ? "#3ecf6e" : frac > 0.3 ? "#e8b84a" : "#e5484d";
-    document.getElementById("playHealthTxt").textContent = H.dead ? "You died - respawning..." : Math.ceil(H.Health) + " / " + Math.round(H.MaxHealth);
+    box.style.display = "flex";
+    const fill = document.getElementById("playHealthFill");
+    fill.style.width = (frac * 100) + "%";
+    fill.style.background = "hsl(" + Math.round(frac * 105) + ",68%,48%)";   // green -> yellow -> red, like Roblox
   }
   function destroyPlayHud(){
     const old = document.getElementById("playHud");
@@ -6384,9 +6384,6 @@ function createLuaRuntime(fengari, A, preludeSrc){
       roText("State", () => H().state || "Running");
       roText("MoveDirection", () => fmt3(H().MoveDirection || [0, 0, 0]));
       roText("RigType", () => "R6");
-      const note = document.createElement("div"); note.className = "props-empty"; note.style.textAlign = "left";
-      note.textContent = "Like Roblox: WalkSpeed = speed, JumpPower / JumpHeight = how high you jump, Health / MaxHealth = life (0 = you die and respawn), HipHeight = lifts the character off the floor, Sit / PlatformStand = lock movement, AutoRotate = turn to face where you walk. Change them here live or in a script. Methods: TakeDamage, Move, MoveTo, GetState, ChangeState. Events: Died, HealthChanged, Running, Jumping, FreeFalling, StateChanged, MoveToFinished.";
-      body.appendChild(note);
       return;
     }
     const infoKey = key === "hrp" ? null : key;
