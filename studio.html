@@ -939,7 +939,18 @@
   #bvUpdateBtn.has-update{ border-color:#e5484d; color:var(--text-0); animation:bvRing 1.8s ease-out infinite; }
   #bvUpdateBtn.has-update .bv-dot{ display:block; }
   @keyframes bvRing{ 0%{ box-shadow:0 0 0 0 rgba(229,72,77,.55);} 100%{ box-shadow:0 0 0 10px rgba(229,72,77,0);} }
-  #editorScreen.show ~ #bvUpdateBtn{ top:7px; right:128px; }
+  #bvUpdateBtn{ display:none; }                                  /* hidden on the login page and inside a game */
+  #dashScreen.show ~ #bvUpdateBtn{ display:flex; }               /* only the dashboard shows it */
+  #bvLogoutModal{ position:fixed; inset:0; z-index:9999000; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); }
+  #bvLogoutModal.show{ display:flex; }
+  #bvLogoutModal .lg-card{ width:340px; max-width:90vw; background:var(--bg-2); border:1px solid var(--border); border-radius:14px; padding:22px 22px 18px; box-shadow:0 20px 60px rgba(0,0,0,.6); animation:fadeUp .18s ease both; }
+  #bvLogoutModal .lg-title{ font-size:16px; font-weight:800; margin-bottom:8px; }
+  #bvLogoutModal .lg-text{ font-size:13px; color:var(--text-1); line-height:1.5; margin-bottom:18px; }
+  #bvLogoutModal .lg-btns{ display:flex; gap:10px; justify-content:flex-end; }
+  #bvLogoutModal button{ padding:9px 16px; border-radius:9px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-0); font-size:13px; font-weight:600; cursor:pointer; }
+  #bvLogoutModal button:hover{ background:var(--grey-1); }
+  #bvLogoutModal button.danger{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
+  #bvLogoutModal button.danger:hover{ background:#4a2224; }
   #bvUpdating{
     position:fixed; inset:0; z-index:9999990; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px;
     background:rgba(8,8,10,.98); color:#f2f2f2; text-align:center;
@@ -2477,7 +2488,6 @@ function createLuaRuntime(fengari, A, preludeSrc){
       </button>
     </div>
     <div class="studio-spacer"></div>
-    <button class="studio-logout" id="studioLogoutBtn">Log out</button>
   </div>
   <div class="dash-main" id="gamesMain">
     <div class="dash-header">
@@ -2805,6 +2815,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
   <span class="bv-dot"></span>
 </button>
+<div id="bvLogoutModal"><div class="lg-card">
+  <div class="lg-title">Log out?</div>
+  <div class="lg-text">Logging out will kick you from this account. You can log back in if you have the password.</div>
+  <div class="lg-btns"><button type="button" id="bvLogoutCancel">Cancel</button><button type="button" id="bvLogoutOk" class="danger">Log out</button></div>
+</div></div>
 <div id="bvUpdating"><div class="sp-logo">BV</div><div class="up-title">Updating BlockVerse Studio...</div><div class="up-sub">Hang tight, restarting on the latest version.</div><div class="bv-bar"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -2957,7 +2972,16 @@ function createLuaRuntime(fengari, A, preludeSrc){
     clearLoginMsg();
     document.getElementById(prefillUsername ? "stPassword" : "stUsername").focus();
   }
-  document.getElementById("studioLogoutBtn").addEventListener("click", () => studioSignOut(""));
+  // Log out asks first: it kicks you out of this account (you can log back in with the password)
+  function confirmLogout(){
+    const m = document.getElementById("bvLogoutModal");
+    m.classList.add("show");
+    document.getElementById("bvLogoutCancel").focus();
+  }
+  document.getElementById("bvLogoutCancel").addEventListener("click", () => document.getElementById("bvLogoutModal").classList.remove("show"));
+  document.getElementById("bvLogoutOk").addEventListener("click", () => { document.getElementById("bvLogoutModal").classList.remove("show"); studioSignOut(""); });
+  document.getElementById("bvLogoutModal").addEventListener("mousedown", (e) => { if(e.target.id === "bvLogoutModal") e.target.classList.remove("show"); });
+  document.addEventListener("keydown", (e) => { if(e.key === "Escape") document.getElementById("bvLogoutModal").classList.remove("show"); });
 
   /* ---------------- Profile: character face + switch account / log out ---------------- */
   /* ---- Roblox-style headshot: the character's head + face + shoulders, in their real colors ---- */
@@ -3087,7 +3111,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(act === "switch") renderUserMenu("switch");
     else if(act === "back") renderUserMenu("main");
     else if(act === "add") studioSignOut("");
-    else if(act === "logout") studioSignOut("");
+    else if(act === "logout"){ closeUserMenu(); confirmLogout(); }
   });
   document.addEventListener("click", (e) => { if(!suCard.contains(e.target)) closeUserMenu(); });
   document.addEventListener("keydown", (e) => { if(e.key === "Escape") closeUserMenu(); });
@@ -3621,7 +3645,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       outToggle.addEventListener("click", () => setOutput(true));
       editorInited = true;
     }
-    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13 humanoid-r3)");
+    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13-r4)");
     projectNodes = [];
     const savedGame = loadGames().find(g => g.id === game.id);
     if(savedGame && savedGame.world && savedGame.world.parts) loadWorld(savedGame.world);
@@ -6897,6 +6921,7 @@ if("launchQueue" in window){
 <script>
 /* startup loading screen + update watcher */
 (function(){
+  var BV_BUILD_ID = '2026-10-13-r4';   /* bumped with every studio.html release - the page compares this to the file on the server */
   var splash=document.getElementById("bvSplash"), t0=Date.now(), hidden=false;
   function hideSplash(){ if(hidden) return; hidden=true; var wait=Math.max(0,1100-(Date.now()-t0)); setTimeout(function(){ splash.classList.add("done"); setTimeout(function(){ splash.remove(); },600); },wait); }
   if(document.readyState==="complete") hideSplash(); else window.addEventListener("load",hideSplash);
@@ -6906,22 +6931,24 @@ if("launchQueue" in window){
   function getSeen(){ try{ var v=localStorage.getItem(KEY); return v===null?null:Number(v); }catch(e){ return null; } }
   function setSeen(v){ try{ localStorage.setItem(KEY,String(v)); }catch(e){} }
   var btn=document.getElementById("bvUpdateBtn"), overlay=document.getElementById("bvUpdating");
-  var latest=null, firstRead=true, started=false, restarting=false;
+  var latest=null, remoteBuild=null, firstRead=true, started=false, restarting=false;
 
-  function restart(v){
+  function markUpdate(){ btn.classList.add("has-update"); btn.title="Update available - click to restart"; }
+  /* restart onto the newest files. The unique ?r= address skips every cache (browser, GitHub's CDN), so the new studio.html really loads */
+  function restart(v, build){
     if(restarting) return; restarting=true;
-    overlay.classList.add("show"); setSeen(v);
-    setTimeout(function(){
-      var done=function(){ location.reload(); };
-      try{ fetch(location.href.split("#")[0],{cache:"reload"}).then(done,done); }catch(e){ done(); }
-    },1600);
+    overlay.classList.add("show");
+    if(v!==null && v!==undefined) setSeen(v);
+    setTimeout(function(){ location.replace(location.pathname + "?r=" + Date.now()); },1600);
   }
   btn.addEventListener("click",function(){
-    if(latest===null||latest===getSeen()){ if(typeof window.bvToast==="function") window.bvToast("You're on the latest version"); return; }
+    if(!btn.classList.contains("has-update")){ if(typeof window.bvToast==="function") window.bvToast("You're on the latest version"); return; }
     var ed=document.getElementById("editorScreen");
     if(ed&&ed.classList.contains("show")&&!confirm("Restart Studio to update? Save your work first - unsaved changes will be lost.")) return;
     restart(latest);
   });
+
+  /* 1) the admin "Publish update" button (Firebase version number) */
   function onVersion(snap){
     var v=snap.val(), version=(v&&v.version!=null)?Number(v.version):0; latest=version;
     var seen=getSeen();
@@ -6931,13 +6958,37 @@ if("launchQueue" in window){
       if(seen!==version){ restart(version); return; }   /* opened after an update went out */
       return;
     }
-    if(version!==seen){ btn.classList.add("has-update"); btn.title="Update available - click to restart"; }
+    if(version!==seen) markUpdate();
   }
   function start(){
     if(started) return; started=true;
     try{ firebase.database().ref("blockverse_version").on("value",onVersion); }catch(e){}
   }
   try{ firebase.auth().onAuthStateChanged(function(u){ if(u) start(); }); }catch(e){}
+
+  /* 2) a new studio.html uploaded to GitHub: no need to press Publish - Studio spots it within a minute */
+  function checkBuild(atStartup){
+    if(restarting||location.protocol==="file:") return;
+    fetch(location.pathname + "?bvcheck=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(t){
+        if(!t) return;
+        var m = t.match(/BV_BUILD_ID\s*=\s*'([^']+)'/);
+        if(!m || m[1]===BV_BUILD_ID) return;
+        remoteBuild = m[1];
+        var tries = 0, tk = "bv_upd_try_" + remoteBuild;
+        try{ tries = Number(sessionStorage.getItem(tk) || 0); }catch(e){}
+        if(atStartup && tries < 2){
+          try{ sessionStorage.setItem(tk, String(tries + 1)); }catch(e){}
+          restart(null);                       /* opened while an update was waiting: update straight away */
+        }else{
+          markUpdate();                        /* running already: show the red dot and let the user choose when */
+        }
+      }).catch(function(){});
+  }
+  setTimeout(function(){ checkBuild(true); }, 1500);
+  setInterval(function(){ checkBuild(false); }, 60000);
+  window.addEventListener("focus", function(){ checkBuild(false); });
 })();
 </script>
 </body>
