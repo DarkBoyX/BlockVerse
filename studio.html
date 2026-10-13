@@ -444,6 +444,9 @@
   }
   .pp-item span{ font-size:10.5px; font-weight:600; }
 
+  .bv-palette{ display:flex; flex-wrap:wrap; gap:3px; margin:2px 0 10px; max-height:150px; overflow:auto; padding:4px; border:1px solid var(--border,#333); border-radius:6px; }
+  .bv-sw{ width:18px; height:18px; border-radius:4px; border:1px solid rgba(255,255,255,.18); padding:0; cursor:pointer; }
+  .bv-sw:hover{ outline:2px solid var(--accent,#6aa9ff); }
   /* ---- Properties: shape-change trigger below Name ---- */
   .prop-shape-btn{
     width:100%; background:var(--bg-2); border:1px dashed var(--border); border-radius:7px;
@@ -1185,6 +1188,64 @@ local Color3 = {
   end,
 }
 
+---------------------------------------------------------------- BrickColor
+local BC = {}
+local BCmethods = {}
+local BCPAL, BCBYNAME, BCBYNUM = {}, {}, {}
+BC.__index = function(t, k) return BCmethods[k] end
+BC.__eq = function(a, b) return rawget(a, "Name") == rawget(b, "Name") end
+BC.__tostring = function(a) return a.Name end
+do
+  local raw = "__BRICK_PALETTE__"
+  for item in raw:gmatch("[^;]+") do
+    local name, hex, num = item:match("^(.-)=(%x+)=(%d+)$")
+    if name then
+      local n = tonumber(hex, 16)
+      local r, g, b = ((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255
+      local e = setmetatable({ Name = name, Number = tonumber(num), r = r, g = g, b = b, Color = newC3(r, g, b) }, BC)
+      BCPAL[#BCPAL + 1] = e
+      BCBYNAME[name:lower()] = BCBYNAME[name:lower()] or e
+      BCBYNUM[e.Number] = BCBYNUM[e.Number] or e
+    end
+  end
+end
+local function bcNearest(r, g, b)
+  local best, bd = BCPAL[1], 1e9
+  for i = 1, #BCPAL do
+    local e = BCPAL[i]
+    local d = (e.r - r) ^ 2 + (e.g - g) ^ 2 + (e.b - b) ^ 2
+    if d < bd then bd = d; best = e end
+  end
+  return best
+end
+local BCALIAS = { White = "White", Gray = "Medium stone grey", DarkGray = "Dark stone grey", Black = "Black", Red = "Bright red", Blue = "Bright blue",
+  Green = "Bright green", Yellow = "Bright yellow", Orange = "Bright orange", Purple = "Bright violet", Pink = "Pink", Brown = "Reddish brown" }
+local BrickColor = setmetatable({
+  new = function(a, g, b)
+    if type(a) == "string" then
+      local e = BCBYNAME[a:lower()]
+      if not e then return BCBYNAME["medium stone grey"] end
+      return e
+    elseif type(a) == "number" and g == nil then
+      return BCBYNUM[a] or BCBYNAME["medium stone grey"]
+    elseif type(a) == "number" then
+      return bcNearest(a, g, b or 0)
+    elseif getmetatable(a) == C3 then
+      return bcNearest(a.R, a.G, a.B)
+    elseif getmetatable(a) == BC then
+      return a
+    end
+    return BCBYNAME["medium stone grey"]
+  end,
+  Random = function() return BCPAL[math.random(1, #BCPAL)] end,
+  palette = function(i) return BCPAL[((i or 0) % #BCPAL) + 1] end,
+  fromColor3 = function(c) return bcNearest(c.R, c.G, c.B) end,
+  GetNames = function() local o = {} for i = 1, #BCPAL do o[i] = BCPAL[i].Name end return o end,
+}, { __index = function(t, k)
+  local nm = BCALIAS[k]
+  if nm then local e = BCBYNAME[nm:lower()]; return function() return e end end
+end })
+
 -- CFrame: position only (rotation is not simulated yet)
 local CF = {}
 local CFmethods = {}
@@ -1243,6 +1304,7 @@ local function enc(v)
   if mt == instMT then return { __t = "I", id = rawget(v, "__id") } end
   if mt == V3 then return { __t = "V3", x = v.X, y = v.Y, z = v.Z } end
   if mt == C3 then return { __t = "C3", r = v.R, g = v.G, b = v.B } end
+  if mt == BC then return { __t = "C3", r = v.r, g = v.g, b = v.b } end
   if mt == CF then return { __t = "CF", x = v.X, y = v.Y, z = v.Z } end
   if mt == EnumItemMT then return { __t = "E", e = v.EnumType, n = v.Name } end
   local out = {}
@@ -1373,6 +1435,10 @@ end
 instMT.__index = function(self, k)
   local id = rawget(self, "__id")
   if k == "WaitForChild" then return waitForChild end
+  if k == "BrickColor" then
+    local r = host("member", { id = id, k = "Color" })
+    if r.k == "prop" and type(r.v) == "table" then return bcNearest(r.v.r, r.v.g, r.v.b) end
+  end
   local r = host("member", { id = id, k = k })
   local kind = r.k
   if kind == "prop" then return dec(r.v)
@@ -1387,6 +1453,12 @@ instMT.__index = function(self, k)
 end
 instMT.__newindex = function(self, k, v)
   local id = rawget(self, "__id")
+  if k == "BrickColor" then
+    if type(v) == "string" or type(v) == "number" then v = BrickColor.new(v) end
+    if getmetatable(v) ~= BC then error("BrickColor expected", 2) end
+    host("set", { id = id, k = "Color", v = enc(v) })
+    return
+  end
   if type(v) == "function" then
     nextHandler = nextHandler + 1
     handlers[nextHandler] = v
@@ -1574,7 +1646,7 @@ for _, name in ipairs({ "type", "tonumber", "pairs", "ipairs", "select", "error"
 end
 baseEnv.typeof = function(v)
   local mt = getmetatable(v)
-  if mt == V3 then return "Vector3" elseif mt == C3 then return "Color3" elseif mt == CF then return "CFrame"
+  if mt == V3 then return "Vector3" elseif mt == C3 then return "Color3" elseif mt == CF then return "CFrame" elseif mt == BC then return "BrickColor"
   elseif mt == instMT then return "Instance" elseif mt == EnumItemMT then return "EnumItem" end
   return type(v)
 end
@@ -1633,6 +1705,7 @@ baseEnv.spawn = function(fn, ...) return task.spawn(fn, ...) end
 baseEnv.delay = function(t, fn, ...) return task.delay(t, fn, ...) end
 baseEnv.Vector3 = Vector3
 baseEnv.Color3 = Color3
+baseEnv.BrickColor = BrickColor
 baseEnv.CFrame = CFrame
 baseEnv.Enum = Enum
 baseEnv.Instance = Instance
@@ -1973,7 +2046,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
 
   /* ---------------- part property mapping ---------------- */
-  const PART_PROPS = ["Position", "Size", "Orientation", "Rotation", "Color", "Transparency", "Reflectance", "Anchored", "CanCollide", "CanTouch", "CanQuery", "CastShadow", "Massless", "Material", "CFrame"];
+  const PART_PROPS = ["Position", "Size", "Orientation", "Rotation", "Color", "Transparency", "Reflectance", "Anchored", "CanCollide", "CanTouch", "CanQuery", "CastShadow", "Massless", "Material", "Shape", "CFrame"];
   function partGet(p, k){
     const v = A.part.get(p, k === "Rotation" ? "Orientation" : (k === "CFrame" ? "Position" : k));
     if(v === undefined) return undefined;
@@ -1981,6 +2054,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(k === "CFrame") return { __t: "CF", x: v[0], y: v[1], z: v[2] };
     if(k === "Color") return hexToC3(v);
     if(k === "Material") return { __t: "E", e: "Material", n: String(v).charAt(0).toUpperCase() + String(v).slice(1) };
+    if(k === "Shape") return { __t: "E", e: "PartType", n: String(v) };
     return v;
   }
   function partSet(p, k, val){
@@ -1989,6 +2063,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     else if(k === "CFrame"){ k = "Position"; v = [val.x, val.y, val.z]; }
     else if(k === "Color") v = c3ToHex(val);
     else if(k === "Material") v = String(val && val.n ? val.n : val).toLowerCase();
+    else if(k === "Shape") v = String(val && val.n ? val.n : val);
     if(k === "Rotation") k = "Orientation";
     if(!A.part.set(p, k, v)) throw new Error(k + " is not a valid member of Part");
   }
@@ -3487,11 +3562,17 @@ function createLuaRuntime(fengari, A, preludeSrc){
     neon:   { label:"Neon",    color:0x39ff88, roughness:0.4,  metalness:0.0, emissive:true }
   };
   const PART_KINDS = {
-    cube:     { label:"Block",    icon:'<rect x="4" y="4" width="16" height="16" rx="2"/>' },
-    wedge:    { label:"Triangle", icon:'<path d="M4 20h16L4 4v16z"/>' },
-    cylinder: { label:"Tube",     icon:'<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12a8 3 0 0 0 16 0V6"/>' },
-    ledge:    { label:"Ledge",    icon:'<rect x="3" y="9" width="18" height="6" rx="1.5"/>' }
+    cube:        { label:"Block",       icon:'<rect x="4" y="4" width="16" height="16" rx="2"/>' },
+    wedge:       { label:"Wedge",       icon:'<path d="M4 20h16L4 4v16z"/>' },
+    cornerwedge: { label:"CornerWedge", icon:'<path d="M4 20L10 5l10 15z"/><path d="M10 5v15"/>' },
+    sphere:      { label:"Ball",        icon:'<circle cx="12" cy="12" r="8"/><path d="M5 10c4 3 10 3 14 0" opacity=".5"/>' },
+    cylinder:    { label:"Cylinder",    icon:'<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12a8 3 0 0 0 16 0V6"/>' },
+    ledge:       { label:"Ledge",       icon:'<rect x="3" y="9" width="18" height="6" rx="1.5"/>' }
   };
+  const BV_SHAPE_TO_ENUM = { cube:"Block", ledge:"Block", sphere:"Ball", cylinder:"Cylinder", wedge:"Wedge", cornerwedge:"CornerWedge" };
+  const BV_ENUM_TO_SHAPE = { block:"cube", ball:"sphere", cylinder:"cylinder", wedge:"wedge", cornerwedge:"cornerwedge" };
+  const BV_BRICK_PALETTE = "White=F2F3F3=1;Grey=A1A5A2=2;Light yellow=F9E999=3;Brick yellow=D7C59A=5;Light green (Mint)=C2DAB8=6;Light reddish violet=E8BAC8=9;Pastel Blue=80BBDC=11;Light orange brown=CB8442=12;Nougat=CC8E69=18;Bright red=C4281C=21;Med. reddish violet=C470A0=22;Bright blue=0D69AC=23;Bright yellow=F5CD30=24;Earth orange=624732=25;Black=1B2A35=26;Dark grey=6D6E6C=27;Dark green=287F47=28;Medium green=7DB36D=29;Lig. Yellowich orange=F3CF9B=36;Bright green=4B974B=37;Dark orange=A05F35=38;Light bluish violet=C1CADE=39;Light blue=B4D2E4=45;Light red=FAB7A5=100;Medium red=DA867A=101;Medium blue=6E99CA=102;Light grey=E4E4DE=103;Bright violet=6B327C=104;Br. yellowish orange=E29B40=105;Bright orange=DA8541=106;Bright bluish green=008F9C=107;Earth yellow=685C43=108;Bright bluish violet=435493=110;Medium bluish violet=6874AC=112;Med. yellowish green=A3C566=115;Med. bluish green=55A5AF=116;Light bluish green=9FC3E9=118;Br. yellowish green=A4BD47=119;Lig. yellowish green=D9E4A7=120;Med. yellowish orange=E7AC58=121;Br. reddish orange=D3592B=123;Bright reddish violet=923978=124;Light orange=EAB892=125;Gold=EFB838=127;Dark nougat=AD6140=128;Silver=D4D4D4=131;Neon orange=D35A2F=133;Neon green=C0F08F=134;Sand blue=74869D=135;Sand violet=897E9F=136;Medium orange=E09864=137;Sand yellow=958A73=138;Earth blue=203A56=140;Earth green=27462D=141;Sand green=789082=151;Sand red=957977=153;Dark red=7B2E2F=154;Gun metallic=75796F=168;Curry=D3B17B=180;Fire Yellow=F6D764=190;Flame yellowish orange=FCB62D=191;Reddish brown=694028=192;Flame reddish orange=E9672D=193;Medium stone grey=A3A2A5=194;Royal blue=4667A4=195;Dark Royal blue=23478B=196;Bright reddish lilac=8E4285=198;Dark stone grey=635F62=199;Lemon metalic=828A5D=200;Light stone grey=E5E4DF=208;Dark Curry=B47B30=209;Faded green=7DBB8B=210;Turquoise=79B5B5=211;Light Royal blue=9FC3E9=212;Medium Royal blue=6B8FC8=213;Rose=E29BC0=216;Pearl=D6D2CC=217;Olive=7B7F4C=218;Institutional white=F8F8F8=1001;Mid gray=CDCDCD=1002;Really black=111111=1003;Really red=FF0000=1004;Deep orange=FFB000=1005;Alder=B480FF=1006;Dusty Rose=A34B4B=1007;New Yeller=FFFF00=1009;Really blue=0000FF=1010;Navy blue=002060=1011;Deep blue=2154B9=1012;Cyan=04AFEC=1013;CGA magenta=AA00AA=1014;Pink=FF66CC=1015;Teal=12EED4=1018;Toothpaste=00FFFF=1019;Lime green=00FF00=1020;Camo=3A7D15=1021;Grime=7F8E64=1022;Lavender=8C5B9F=1023;Pastel light blue=AFDDFF=1024;Pastel orange=FFC9C9=1025;Pastel violet=B1A7FF=1026;Pastel blue-green=9FF3E9=1027;Pastel green=CCFFCC=1028;Pastel yellow=FFFFCC=1029;Pastel brown=FFCC99=1030;Royal purple=6225D1=1031;Hot pink=FF0099=1032;Burnt Sienna=7C5C46=1008;Mint=C2DAB8=1033;Sunrise=FFD27F=1034;Sea green=2E8B57=1035;Sky blue=87CEEB=1036;Crimson=DC143C=1037;Coral=FF7F50=1038;Orchid=DA70D6=1039;Chocolate=7B3F00=1040;Slate=708090=1041";
+  const BV_BRICK_COLORS = BV_BRICK_PALETTE.split(";").map(t => { const m = t.match(/^(.*)=([0-9A-Fa-f]{6})=(\d+)$/); return m ? { name:m[1], hex:parseInt(m[2],16), num:+m[3] } : null; }).filter(Boolean);
 
   /* ---- procedural material textures (so materials actually LOOK different, not just tinted) ---- */
   const _matTextureCache = {};
@@ -3645,7 +3726,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       outToggle.addEventListener("click", () => setOutput(true));
       editorInited = true;
     }
-    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13-r4)");
+    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13-r5)");
     projectNodes = [];
     const savedGame = loadGames().find(g => g.id === game.id);
     if(savedGame && savedGame.world && savedGame.world.parts) loadWorld(savedGame.world);
@@ -4408,6 +4489,30 @@ function createLuaRuntime(fengari, A, preludeSrc){
       geo.computeVertexNormals();
       return geo;
     }
+    if(shape === "sphere"){
+      const g = new THREE.SphereGeometry(1, 28, 18);
+      g.scale(size[0]/2, size[1]/2, size[2]/2);
+      return g;
+    }
+    if(shape === "cornerwedge"){
+      // square base, apex above the (-x,-z) corner
+      const [w,h,d] = size, hw=w/2, hh=h/2, hd=d/2;
+      const A_=[-hw,-hh,-hd], B_=[hw,-hh,-hd], C_=[hw,-hh,hd], D_=[-hw,-hh,hd], T_=[-hw,hh,-hd];
+      const tris = [[A_,B_,C_],[A_,C_,D_],[A_,D_,T_],[A_,T_,B_],[B_,T_,C_],[C_,T_,D_]];
+      const cen = [(-hw+hw+hw-hw-hw)/5, (-hh*4+hh)/5, (-hd-hd+hd+hd-hd)/5];
+      const pos = [];
+      tris.forEach(t => {
+        const u=[t[1][0]-t[0][0],t[1][1]-t[0][1],t[1][2]-t[0][2]], v=[t[2][0]-t[0][0],t[2][1]-t[0][1],t[2][2]-t[0][2]];
+        const n=[u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
+        const c=[(t[0][0]+t[1][0]+t[2][0])/3-cen[0],(t[0][1]+t[1][1]+t[2][1])/3-cen[1],(t[0][2]+t[1][2]+t[2][2])/3-cen[2]];
+        const tt = (n[0]*c[0]+n[1]*c[1]+n[2]*c[2]) < 0 ? [t[0],t[2],t[1]] : t;
+        tt.forEach(q => pos.push(q[0],q[1],q[2]));
+      });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      return geo;
+    }
     if(shape === "cylinder"){
       const [w,h,d] = size;
       const r = Math.max(w,d)/2;
@@ -4880,7 +4985,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
 
   /* ---------- Lua editor: colors, squiggles, Tab suggestions ---------- */
   const LUA_KW = new Set(["and","break","do","else","elseif","end","false","for","function","if","in","local","nil","not","or","repeat","return","then","true","until","while","continue"]);
-  const LUA_GLOBALS = ["game","workspace","script","print","warn","error","wait","spawn","delay","tick","time","tostring","tonumber","typeof","type","pairs","ipairs","next","select","pcall","xpcall","assert","require","unpack","setmetatable","getmetatable","rawget","rawset","rawequal","collectgarbage","task","Instance","Vector3","Color3","CFrame","Enum","TweenInfo","Random","math","string","table","os","coroutine","Workspace","newproxy","Signal","_G","_VERSION"];
+  const LUA_GLOBALS = ["game","workspace","script","print","warn","error","wait","spawn","delay","tick","time","tostring","tonumber","typeof","type","pairs","ipairs","next","select","pcall","xpcall","assert","require","unpack","setmetatable","getmetatable","rawget","rawset","rawequal","collectgarbage","task","Instance","Vector3","Color3","BrickColor","CFrame","Enum","TweenInfo","Random","math","string","table","os","coroutine","Workspace","newproxy","Signal","_G","_VERSION"];
   const LUA_KNOWN = new Set(LUA_GLOBALS.concat(["self"]));
   const LUA_SERVICES = ["Players","Workspace","ReplicatedStorage","ServerScriptService","StarterPlayer","Lighting","RunService","UserInputService","HttpService"];
   const LUA_METHODS = ["FindFirstChild","FindFirstChildOfClass","GetChildren","GetDescendants","WaitForChild","Destroy","Clone","IsA","ClearAllChildren","GetFullName","GetAttribute","SetAttribute","GetService","Connect","Once","Wait","Disconnect"];
@@ -4890,7 +4995,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     string:["format","sub","upper","lower","len","rep","find","match","gmatch","gsub","byte","char","reverse","split"],
     table:["insert","remove","concat","sort","unpack","find","clear","clone","create"],
     task:["wait","spawn","delay","defer"],
-    Vector3:["new","zero","one"], Color3:["new","fromRGB","fromHSV"], CFrame:["new","Angles"], Instance:["new"], os:["time","clock","date"],
+    Vector3:["new","zero","one"], Color3:["new","fromRGB","fromHSV","fromHex"], BrickColor:["new","Random","palette","White","Black","Red","Blue","Green","Yellow","Orange","Gray","Purple","Pink"], CFrame:["new","Angles"], Instance:["new"], os:["time","clock","date"],
     game:["GetService","Workspace"]
   };
   const escHtml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -5134,7 +5239,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(LuaRT) return LuaRT;
     if(!window.fengari){ showToast("The Lua engine didn't load (check your internet connection) - scripts can't run"); return null; }
     try{
-      LuaRT = createLuaRuntime(window.fengari, makeLuaAdapter(), document.getElementById("bvLuaPrelude").textContent);
+      LuaRT = createLuaRuntime(window.fengari, makeLuaAdapter(), document.getElementById("bvLuaPrelude").textContent.replace("__BRICK_PALETTE__", () => BV_BRICK_PALETTE));
     }catch(e){ console.error(e); showToast("Couldn't start the Lua engine: " + e.message); LuaRT = null; }
     return LuaRT;
   }
@@ -5166,6 +5271,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
             case "CastShadow": return p.castShadow !== false;
             case "Massless": return !!p.massless;
             case "Material": return p.material;
+            case "Shape": return BV_SHAPE_TO_ENUM[o.shape] || "Block";
           }
           return undefined;
         },
@@ -5185,6 +5291,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
             case "CanQuery": p.canQuery = !!v; return true;
             case "CastShadow": p.castShadow = !!v; o.mesh.castShadow = !!v; return true;
             case "Massless": p.massless = !!v; return true;
+            case "Shape": {
+              const key = BV_ENUM_TO_SHAPE[String(v).toLowerCase()];
+              if(!key) throw new Error("Invalid Shape '" + v + "' (use Enum.PartType.Block, Ball, Cylinder, Wedge or CornerWedge)");
+              o.shape = key; o.mesh.geometry.dispose(); o.mesh.geometry = geometryForShape(key, p.size); return true;
+            }
             case "Material": {
               const key = MAT(String(v));
               if(typeof MATERIALS !== "undefined" && !MATERIALS[key]) return true;
@@ -5225,7 +5336,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     };
   }
   function snapshotPlayWorld(){
-    playSnap = { parts: sceneObjects.map(o => ({ o, name: o.name, props: JSON.parse(JSON.stringify(o.props)) })), light: { b: lightState.brightness, t: lightState.time } };
+    playSnap = { parts: sceneObjects.map(o => ({ o, name: o.name, shape: o.shape, props: JSON.parse(JSON.stringify(o.props)) })), light: { b: lightState.brightness, t: lightState.time } };
     playNodes = projectNodes.map(n => Object.assign({}, n));
   }
   function restorePlayWorld(created){
@@ -5236,7 +5347,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     playSnap.parts.forEach(s => {
       const o = s.o, pr = s.props;
       if(!o.mesh.parent) scene.add(o.mesh);
-      o.name = s.name; o.hidden = false; o.mesh.visible = true;
+      o.name = s.name; o.hidden = false; o.mesh.visible = true; if(s.shape) o.shape = s.shape;
       const mismatchMaterial = o.props.material !== pr.material;
       o.props = pr;
       o.mesh.position.set(pr.position[0], pr.position[1], pr.position[2]);
@@ -6615,8 +6726,21 @@ function createLuaRuntime(fengari, A, preludeSrc){
       input.type = "color";
       input.value = "#" + hexInt.toString(16).padStart(6,"0");
       input.addEventListener("input", () => onChange(parseInt(input.value.slice(1), 16)));
-      row.appendChild(label); row.appendChild(input);
+      const palBtn = document.createElement("button");
+      palBtn.type = "button"; palBtn.className = "prop-shape-btn"; palBtn.style.margin = "0 0 0 6px"; palBtn.textContent = "Palette";
+      row.appendChild(label); row.appendChild(input); row.appendChild(palBtn);
       body.appendChild(row);
+      const grid = document.createElement("div");
+      grid.className = "bv-palette"; grid.style.display = "none";
+      BV_BRICK_COLORS.forEach(c => {
+        const sw = document.createElement("button");
+        sw.type = "button"; sw.className = "bv-sw"; sw.title = c.name;
+        sw.style.background = "#" + c.hex.toString(16).padStart(6, "0");
+        sw.addEventListener("click", () => { input.value = sw.style.background.startsWith("#") ? sw.style.background : "#" + c.hex.toString(16).padStart(6, "0"); input.value = "#" + c.hex.toString(16).padStart(6, "0"); onChange(c.hex); });
+        grid.appendChild(sw);
+      });
+      palBtn.addEventListener("click", () => { grid.style.display = grid.style.display === "none" ? "flex" : "none"; });
+      body.appendChild(grid);
     }
     function sliderRow(labelText, value, onChange){
       const row = document.createElement("div");
@@ -6921,7 +7045,7 @@ if("launchQueue" in window){
 <script>
 /* startup loading screen + update watcher */
 (function(){
-  var BV_BUILD_ID = '2026-10-13-r4';   /* bumped with every studio.html release - the page compares this to the file on the server */
+  var BV_BUILD_ID = '2026-10-13-r5';   /* bumped with every studio.html release - the page compares this to the file on the server */
   var splash=document.getElementById("bvSplash"), t0=Date.now(), hidden=false;
   function hideSplash(){ if(hidden) return; hidden=true; var wait=Math.max(0,1100-(Date.now()-t0)); setTimeout(function(){ splash.classList.add("done"); setTimeout(function(){ splash.remove(); },600); },wait); }
   if(document.readyState==="complete") hideSplash(); else window.addEventListener("load",hideSplash);
