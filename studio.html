@@ -979,6 +979,9 @@
   .su-acct-tag{ font-size:10.5px; color:var(--text-3); }
   .su-acct-x{ background:transparent; border:none; color:var(--text-3); font-size:16px; cursor:pointer; padding:0 4px; }
   .su-acct-x:hover{ color:#ff9d9f; }
+
+  .exp-row .exp-caret{ width:12px; flex-shrink:0; font-size:10px; color:var(--text-2); text-align:center; cursor:pointer; margin-left:-2px; }
+  .exp-row .exp-caret:hover{ color:var(--text-0); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
 <script type="text/plain" id="bvLuaPrelude">
@@ -1733,10 +1736,18 @@ function createLuaRuntime(fengari, A, preludeSrc){
   const rt = {
     running: false, vms: {}, signals: new Map(), conns: new Map(), nextConn: 1,
     now: 0, tmpNodes: [], attrs: new Map(), touching: new Map(), keysDown: new Set(),
-    hum: { Health: 100, MaxHealth: 100, WalkSpeed: 16, JumpPower: 50, dead: false, deadAt: 0 },
+    hum: { Health: 100, MaxHealth: 100, WalkSpeed: 16, JumpPower: 50, HipHeight: 0, DisplayName: "", AutoRotate: true, Sit: false, PlatformStand: false, Jump: false,
+            MoveDirection: [0, 0, 0], state: "Running", lastRunSpeed: 0, moveVec: null, moveRel: false, moveUntil: 0, moveTarget: null, moveTargetUntil: 0, dead: false, deadAt: 0 },
     createdParts: new Map(), invoke: new Map(), checkVM: null
   };
   const PLAYER_ID = "player:1", CHAR_ID = "char:1", HRP_ID = "hrp:1", HUM_ID = "hum:1";
+  // the character's body parts, as real children of the character Model (so scripts can see / recolor them)
+  const BODY = [
+    { id: "head:1", name: "Head", key: "head" }, { id: "torso:1", name: "Torso", key: "torso" },
+    { id: "larm:1", name: "Left Arm", key: "lArm" }, { id: "rarm:1", name: "Right Arm", key: "rArm" },
+    { id: "lleg:1", name: "Left Leg", key: "lLeg" }, { id: "rleg:1", name: "Right Leg", key: "rLeg" }
+  ];
+  const bodyById = (id) => BODY.find(b => b.id === id) || null;
   const SERVICES = ["Workspace", "Players", "ReplicatedStorage", "ServerScriptService", "StarterPlayer", "StarterPlayerScripts", "Lighting", "RunService", "UserInputService", "HttpService"];
 
   /* ---------------- JS <-> Lua value marshalling ---------------- */
@@ -1875,7 +1886,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     else if(id === "svc:Players") out = [PLAYER_ID];
     else if(id === "svc:StarterPlayer") out = ["svc:StarterPlayerScripts"];
-    else if(id === CHAR_ID) out = [HRP_ID, HUM_ID];
+    else if(id === CHAR_ID) out = BODY.map(b => b.id).concat([HRP_ID, HUM_ID]);
     else if(id === PLAYER_ID) out = [];
     else if(id.startsWith("svc:") || isPartId(id) || findNode(id)){
       allNodes().forEach(n => { if(n.parent === id) out.push(n.id); });
@@ -1889,6 +1900,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id === CHAR_ID) return A.player.name;
     if(id === HRP_ID) return "HumanoidRootPart";
     if(id === HUM_ID) return "Humanoid";
+    if(bodyById(id)) return bodyById(id).name;
     const p = A.partById(id); if(p) return p.name;
     const n = findNode(id); return n ? n.name : "Instance";
   }
@@ -1897,7 +1909,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id.startsWith("svc:")) return id === "svc:StarterPlayerScripts" ? "StarterPlayerScripts" : id.slice(4);
     if(id === PLAYER_ID) return "Player";
     if(id === CHAR_ID) return "Model";
-    if(id === HRP_ID) return "Part";
+    if(id === HRP_ID || bodyById(id)) return "Part";
     if(id === HUM_ID) return "Humanoid";
     const p = A.partById(id); if(p) return p.className;
     const n = findNode(id); return n ? n.className : "Instance";
@@ -1910,7 +1922,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === PLAYER_ID) return "svc:Players";
     if(id === CHAR_ID) return "svc:Workspace";
-    if(id === HRP_ID || id === HUM_ID) return CHAR_ID;
+    if(id === HRP_ID || id === HUM_ID || bodyById(id)) return CHAR_ID;
     const p = A.partById(id); if(p) return p.pending && !p.attached ? null : "svc:Workspace";
     const n = findNode(id); return n ? (n.parent || null) : null;
   }
@@ -1973,17 +1985,72 @@ function createLuaRuntime(fengari, A, preludeSrc){
   /* ---------------- player / humanoid ---------------- */
   const HRP_LIFT = 2.6;
   function hrpPos(){ const p = A.player.getPos(); return [p[0], p[1] + HRP_LIFT, p[2]]; }
+  const JUMP_K = 0.00288;   // JumpHeight = JumpPower^2 * JUMP_K  (50 -> 7.2, like Roblox)
+  const humNum = (v, lo, hi) => Math.max(lo, Math.min(hi, Number(v) || 0));
+  function resetHumDefaults(){
+    const h = rt.hum;
+    h.Health = h.MaxHealth = 100; h.WalkSpeed = 16; h.JumpPower = 50; h.HipHeight = 0; h.DisplayName = ""; h.AutoRotate = true;
+    h.Sit = false; h.PlatformStand = false; h.Jump = false; h.MoveDirection = [0, 0, 0]; h.state = "Running"; h.lastRunSpeed = 0;
+    h.moveVec = null; h.moveUntil = 0; h.moveTarget = null; h.dead = false;
+  }
   function setHum(k, v){
     const h = rt.hum;
     if(k === "Health"){
-      const old = h.Health; h.Health = Math.max(0, Math.min(h.MaxHealth, Number(v)));
+      const old = h.Health; h.Health = humNum(v, 0, h.MaxHealth);
       if(h.Health !== old) fire(HUM_ID, "HealthChanged", [h.Health]);
-      if(h.Health <= 0 && !h.dead){ h.dead = true; h.deadAt = rt.now; fire(HUM_ID, "Died", []); A.log("info", A.player.name + " died", "server"); }
-    } else if(k === "MaxHealth"){ h.MaxHealth = Math.max(1, Number(v)); if(h.Health > h.MaxHealth) h.Health = h.MaxHealth; }
-    else if(k === "WalkSpeed") h.WalkSpeed = Math.max(0, Number(v));
-    else if(k === "JumpPower") h.JumpPower = Math.max(0, Number(v));
+      if(h.Health <= 0 && !h.dead){ h.dead = true; h.deadAt = rt.now; h.Jump = false; h.moveTarget = null; fire(HUM_ID, "Died", []); A.log("info", A.player.name + " died", "server"); }
+    } else if(k === "MaxHealth"){ h.MaxHealth = humNum(v, 1, 1e9); if(h.Health > h.MaxHealth){ h.Health = h.MaxHealth; fire(HUM_ID, "HealthChanged", [h.Health]); } }
+    else if(k === "WalkSpeed") h.WalkSpeed = humNum(v, 0, 1e4);
+    else if(k === "JumpPower") h.JumpPower = humNum(v, 0, 1e4);
+    else if(k === "JumpHeight") h.JumpPower = Math.sqrt(humNum(v, 0, 1e6) / JUMP_K);
+    else if(k === "HipHeight") h.HipHeight = humNum(v, 0, 200);
+    else if(k === "DisplayName") h.DisplayName = String(v == null ? "" : v).slice(0, 40);
+    else if(k === "AutoRotate") h.AutoRotate = !!v;
+    else if(k === "PlatformStand") h.PlatformStand = !!v;
+    else if(k === "Sit"){ h.Sit = !!v; if(h.Sit) h.moveTarget = null; }
+    else if(k === "Jump") h.Jump = !!v;
     else return false;
     return true;
+  }
+  const stateEnum = (n) => ({ __t: "E", e: "HumanoidStateType", n });
+  // called every frame by the play loop: works out the Humanoid state and fires Running / Jumping / StateChanged
+  function humFrame(moving, speed, onGround, vy){
+    const h = rt.hum;
+    const st = h.dead ? "Dead" : h.Sit ? "Seated" : h.PlatformStand ? "PlatformStanding" : !onGround ? (vy > 0 ? "Jumping" : "Freefall") : "Running";
+    if(st !== h.state){
+      const old = h.state; h.state = st;
+      fire(HUM_ID, "StateChanged", [stateEnum(old), stateEnum(st)]);
+      if(st === "Jumping") fire(HUM_ID, "Jumping", [true]);
+      if(st === "Freefall") fire(HUM_ID, "FreeFalling", [true]);
+    }
+    const sp = (moving && onGround && !h.dead) ? speed : 0;
+    if(sp !== 0 || h.lastRunSpeed !== 0){ fire(HUM_ID, "Running", [sp]); }
+    h.lastRunSpeed = sp;
+  }
+  function humMoveDone(reached){ const h = rt.hum; if(h.moveTarget){ h.moveTarget = null; fire(HUM_ID, "MoveToFinished", [!!reached]); } }
+  function humMethod(m, args){
+    const h = rt.hum;
+    if(m === "TakeDamage"){ if(!h.dead) setHum("Health", h.Health - Number(args[0] || 0)); return null; }
+    if(m === "GetState") return stateEnum(h.state);
+    if(m === "ChangeState"){
+      const n = String(args[0] && args[0].n || args[0] || "");
+      if(n === "Dead") setHum("Health", 0);
+      else if(n === "Jumping") h.Jump = true;
+      else if(n === "Seated") h.Sit = true;
+      else if(n === "GettingUp" || n === "Running") h.Sit = false;
+      return null;
+    }
+    if(m === "Move"){
+      const d = args[0]; if(d && typeof d === "object"){ h.moveVec = [Number(d.x) || 0, Number(d.z) || 0]; h.moveRel = !!args[1]; h.moveUntil = rt.now + 0.15; h.moveTarget = null; }
+      return null;
+    }
+    if(m === "MoveTo"){
+      const d = args[0]; if(d && typeof d === "object"){ h.moveTarget = [Number(d.x) || 0, Number(d.z) || 0]; h.moveTargetUntil = rt.now + 8; h.moveVec = null; }
+      return null;
+    }
+    if(m === "CancelMoveTo"){ h.moveTarget = null; return null; }
+    if(m === "GetAccessories" || m === "GetPlayingAnimationTracks") return [];
+    return undefined;
   }
 
   /* ---------------- host ops ---------------- */
@@ -2039,10 +2106,25 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(k === "Anchored") return { k: "prop", v: false };
       if(k === "Velocity" || k === "AssemblyLinearVelocity") return { k: "prop", v: V3([0, 0, 0]) };
     }
+    if(bodyById(id)){
+      const info = A.player.partInfo(bodyById(id).key);
+      if(k === "Position") return { k: "prop", v: V3(info.pos) };
+      if(k === "CFrame") return { k: "prop", v: { __t: "CF", x: info.pos[0], y: info.pos[1], z: info.pos[2] } };
+      if(k === "Size") return { k: "prop", v: V3(info.size) };
+      if(k === "Color") return { k: "prop", v: hexToC3(info.color) };
+      if(k === "Transparency") return { k: "prop", v: info.transparency };
+      if(k === "Anchored") return { k: "prop", v: false };
+      if(k === "CanCollide") return { k: "prop", v: true };
+    }
     if(id === HUM_ID){
-      if(k === "Health" || k === "MaxHealth" || k === "WalkSpeed" || k === "JumpPower") return { k: "prop", v: rt.hum[k] };
-      if(k === "Died" || k === "HealthChanged") return { k: "signal" };
-      if(k === "TakeDamage") return { k: "method" };
+      if(k === "Health" || k === "MaxHealth" || k === "WalkSpeed" || k === "JumpPower" || k === "HipHeight" || k === "AutoRotate" || k === "Sit" || k === "PlatformStand" || k === "Jump") return { k: "prop", v: rt.hum[k] };
+      if(k === "JumpHeight") return { k: "prop", v: rt.hum.JumpPower * rt.hum.JumpPower * JUMP_K };
+      if(k === "DisplayName") return { k: "prop", v: rt.hum.DisplayName || A.player.name };
+      if(k === "MoveDirection") return { k: "prop", v: V3(rt.hum.MoveDirection) };
+      if(k === "RigType") return { k: "prop", v: { __t: "E", e: "HumanoidRigType", n: "R6" } };
+      if(k === "FloorMaterial") return { k: "prop", v: { __t: "E", e: "Material", n: "Plastic" } };
+      if(k === "Died" || k === "HealthChanged" || k === "Running" || k === "Jumping" || k === "FreeFalling" || k === "StateChanged" || k === "MoveToFinished") return { k: "signal" };
+      if(k === "TakeDamage" || k === "GetState" || k === "ChangeState" || k === "Move" || k === "MoveTo" || k === "CancelMoveTo" || k === "GetAccessories" || k === "GetPlayingAnimationTracks") return { k: "method" };
     }
     const part = A.partById(id);
     if(part){
@@ -2104,7 +2186,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       case "GetDescendants": {
         const out = []; const walk = (x) => childrenOf(vm, x).forEach(c => { out.push(I(c)); walk(c); }); walk(id); return out;
       }
-      case "ClearAllChildren": childrenOf(vm, id).forEach(c => { if(c !== CHAR_ID && c !== HRP_ID && c !== HUM_ID) destroyId(c); }); return null;
+      case "ClearAllChildren": childrenOf(vm, id).forEach(c => { if(c !== CHAR_ID && c !== HRP_ID && c !== HUM_ID && !bodyById(c)) destroyId(c); }); return null;
       case "FindFirstChild": {
         const name = args[0], rec = !!args[1];
         const search = (x) => {
@@ -2128,7 +2210,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === "svc:Players"){
       if(m === "GetPlayers") return [I(PLAYER_ID)];
-      if(m === "GetPlayerFromCharacter"){ return args[0] && (args[0].id === CHAR_ID || args[0].id === HRP_ID) ? I(PLAYER_ID) : null; }
+      if(m === "GetPlayerFromCharacter"){ return args[0] && (args[0].id === CHAR_ID || args[0].id === HRP_ID || bodyById(args[0].id)) ? I(PLAYER_ID) : null; }
       if(m === "GetPlayerByUserId") return args[0] === 1 ? I(PLAYER_ID) : null;
     }
     if(id === "svc:RunService"){
@@ -2144,13 +2226,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === PLAYER_ID){
       if(m === "Kick"){ A.log("warn", "Player kicked: " + (args[0] || ""), vm.name); A.kick && A.kick(args[0]); return null; }
-      if(m === "LoadCharacter"){ A.respawn(); rt.hum.Health = rt.hum.MaxHealth; rt.hum.dead = false; return null; }
+      if(m === "LoadCharacter"){ A.respawn(); rt.hum.Health = rt.hum.MaxHealth; rt.hum.dead = false; rt.hum.Sit = false; rt.hum.PlatformStand = false; rt.hum.moveTarget = null; return null; }
     }
     if(id === CHAR_ID){
       if(m === "MoveTo" || m === "PivotTo"){ const p = args[0]; if(p){ A.player.setPos([p.x, p.y - (m === "PivotTo" ? HRP_LIFT : 0), p.z]); } return null; }
       if(m === "GetPivot"){ const p = hrpPos(); return { __t: "CF", x: p[0], y: p[1], z: p[2] }; }
     }
-    if(id === HUM_ID && m === "TakeDamage"){ setHum("Health", rt.hum.Health - Number(args[0] || 0)); return null; }
+    if(id === HUM_ID){ const r = humMethod(m, args); if(r !== undefined) return r; }
     const node = findNode(id);
     if(node && node.className === "RemoteEvent"){
       if(m === "FireServer"){
@@ -2191,6 +2273,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id === HRP_ID){
       if(k === "Position" || k === "CFrame"){ A.player.setPos([v.x, v.y - HRP_LIFT, v.z]); return; }
       throw new Error(k + " cannot be set on HumanoidRootPart");
+    }
+    if(bodyById(id)){
+      if(k === "Color"){ A.player.setPartColor(bodyById(id).key, c3ToHex(v)); return; }
+      if(k === "Transparency"){ A.player.setPartTransparency(bodyById(id).key, Math.max(0, Math.min(1, Number(v)))); return; }
+      throw new Error(k + " cannot be set on " + bodyById(id).name + " (only Color and Transparency can)");
     }
     if(id === "svc:Lighting"){ if(k === "ClockTime" || k === "Brightness"){ A.lighting.set(k, Number(v)); return; } }
     const part = A.partById(id);
@@ -2252,7 +2339,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   function start(){
     stop();
     rt.running = true; rt.now = 0; rt.tmpNodes = []; rt.attrs.clear(); rt.signals.clear(); rt.conns.clear(); rt.touching.clear(); rt.invoke.clear();
-    rt.hum.Health = rt.hum.MaxHealth = 100; rt.hum.WalkSpeed = 16; rt.hum.JumpPower = 50; rt.hum.dead = false;
+    resetHumDefaults();
     rt.vms.server = makeVM("server");
     const servers = scriptsFor("server");
     servers.forEach(n => callLua(rt.vms.server, "__start", [n.id, n.name, luauToLua(n.source || "")], false));
@@ -2303,7 +2390,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
     updateTouches();
     // respawn a few seconds after dying
     if(rt.hum.dead && rt.now - rt.hum.deadAt > 3){
-      rt.hum.dead = false; rt.hum.Health = rt.hum.MaxHealth;
+      rt.hum.dead = false; rt.hum.Health = rt.hum.MaxHealth; rt.hum.Sit = false; rt.hum.PlatformStand = false; rt.hum.moveTarget = null;
+      fire(HUM_ID, "HealthChanged", [rt.hum.Health]);
       A.respawn();
       fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)]);
     }
@@ -2324,7 +2412,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }catch(e){ return null; }
   }
   rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.checkSyntax = checkSyntax;
-  rt.setHum = setHum; rt.markCreated = (p) => rt.createdParts.set(p.id, p);
+  rt.setHum = setHum; rt.humFrame = humFrame; rt.humMoveDone = humMoveDone; rt.JUMP_K = JUMP_K; rt.markCreated = (p) => rt.createdParts.set(p.id, p);
   return rt;
 }
 
@@ -3533,7 +3621,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       outToggle.addEventListener("click", () => setOutput(true));
       editorInited = true;
     }
-    logOutput("BlockVerse Studio ready - " + game.name);
+    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13 humanoid-r2)");
     projectNodes = [];
     const savedGame = loadGames().find(g => g.id === game.id);
     if(savedGame && savedGame.world && savedGame.world.parts) loadWorld(savedGame.world);
@@ -4015,32 +4103,54 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const flatForward = new THREE.Vector3(-Math.sin(playMode.camYaw), 0, -Math.cos(playMode.camYaw));
     const flatRight = new THREE.Vector3(-flatForward.z, 0, flatForward.x);
     const moveDir = new THREE.Vector3();
-    const inputOn = !playMode.menuOpen && !(LuaRT && LuaRT.running && LuaRT.hum.dead);
+    const HM = (LuaRT && LuaRT.running) ? LuaRT.hum : null;     // the Humanoid (scripts and the Properties panel change this live)
+    const inputOn = !playMode.menuOpen && !(HM && (HM.dead || HM.Sit || HM.PlatformStand));
     if(inputOn && keysDown["w"]) moveDir.add(flatForward);
     if(inputOn && keysDown["s"]) moveDir.sub(flatForward);
     if(inputOn && keysDown["d"]) moveDir.add(flatRight);
     if(inputOn && keysDown["a"]) moveDir.sub(flatRight);
+    // scripts: Humanoid:Move(dir, relativeToCamera) and Humanoid:MoveTo(position)
+    if(HM && !HM.dead && !HM.Sit && !HM.PlatformStand){
+      if(HM.moveVec && LuaRT.now < HM.moveUntil){
+        const mv = HM.moveVec;
+        if(HM.moveRel){ moveDir.addScaledVector(flatRight, mv[0]); moveDir.addScaledVector(flatForward, -mv[1]); }
+        else { moveDir.x += mv[0]; moveDir.z += mv[1]; }
+      }
+      if(HM.moveTarget){
+        const dx = HM.moveTarget[0] - rig.position.x, dz = HM.moveTarget[1] - rig.position.z;
+        if(dx * dx + dz * dz < 1.44) LuaRT.humMoveDone(true);
+        else if(LuaRT.now > HM.moveTargetUntil) LuaRT.humMoveDone(false);
+        else if(moveDir.lengthSq() === 0) moveDir.set(dx, 0, dz);
+      }
+    }
 
     const isMoving = moveDir.lengthSq() > 0;
     if(isMoving) playMode.emote = null;                 // walking cancels a dance
     if(isMoving){
       moveDir.normalize();
-      rig.position.addScaledVector(moveDir, 7 * ((LuaRT && LuaRT.running ? LuaRT.hum.WalkSpeed : 16) / 16) * dt);
-      const targetAngle = Math.atan2(moveDir.x, moveDir.z);
-      rig.rotation.y += ((((targetAngle - rig.rotation.y + Math.PI) % (Math.PI*2)) + Math.PI*2) % (Math.PI*2) - Math.PI) * Math.min(1, dt*10);
+      rig.position.addScaledVector(moveDir, 7 * ((HM ? HM.WalkSpeed : 16) / 16) * dt);
+      if(!HM || HM.AutoRotate){
+        const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+        rig.rotation.y += ((((targetAngle - rig.rotation.y + Math.PI) % (Math.PI*2)) + Math.PI*2) % (Math.PI*2) - Math.PI) * Math.min(1, dt*10);
+      }
     }
+    if(HM) HM.MoveDirection = isMoving ? [moveDir.x, 0, moveDir.z] : [0, 0, 0];
 
     // gravity + jump, colliding against whatever part/platform is directly beneath the rig (not just the baseplate)
-    if(inputOn && keysDown[" "] && playMode.onGround){
+    const wantJump = inputOn && (keysDown[" "] || (HM && HM.Jump));
+    if(HM && HM.Jump && playMode.onGround) HM.Jump = false;   // like Roblox: Jump flips back to false once the jump happens
+    if(wantJump && playMode.onGround && (!HM || HM.JumpPower > 0)){
       playMode.emote = null;                             // jumping cancels a dance too
-      playMode.velocityY = 10 * ((LuaRT && LuaRT.running ? LuaRT.hum.JumpPower : 50) / 50);
+      playMode.velocityY = 10 * ((HM ? HM.JumpPower : 50) / 50);
       playMode.onGround = false;
       playJumpSound();
     }
     playMode.velocityY -= 28 * dt;
     rig.position.y += playMode.velocityY * dt;
 
-    const standY = groundHeightBelow(rig.position.x, rig.position.z, rig.position.y + 3);
+    const hip = HM ? HM.HipHeight : 0;
+    const floorY = groundHeightBelow(rig.position.x, rig.position.z, rig.position.y + 3 + hip);
+    const standY = floorY === null ? null : floorY + hip;
     if(standY !== null && rig.position.y <= standY){
       rig.position.y = standY;
       if(playMode.velocityY < 0) playMode.velocityY = 0;
@@ -4058,9 +4168,12 @@ function createLuaRuntime(fengari, A, preludeSrc){
       rig.position.set(spawnPos.x, playMode.groundY, spawnPos.z);
       playMode.velocityY = 0;
       playMode.onGround = true;
+      if(HM && !HM.dead) LuaRT.setHum("Health", 0);   // falling into the void kills you, so Humanoid.Died fires like in Roblox
     }
 
     rig.userData.vy = playMode.velocityY;
+    if(HM) LuaRT.humFrame(isMoving, 7 * (HM.WalkSpeed / 16) * 2.3, playMode.onGround, playMode.velocityY);
+    updatePlayHealthBar();
     animateRig(rig, isMoving, !playMode.onGround, dt, playMode.emote === "dance");
     if(LuaRT && LuaRT.running) LuaRT.step(dt);
     updateChatBubblePosition();
@@ -4414,10 +4527,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
     pos.needsUpdate = true; nor.needsUpdate = true;
     return g;
   }
-  function makeStudioFaceTexture(){
+  function makeStudioFaceTexture(skinCss){
     const c = document.createElement("canvas"); c.width = 128; c.height = 128;
     const x = c.getContext("2d");
-    x.fillStyle = "#f0c090"; x.fillRect(0, 0, 128, 128);
+    x.fillStyle = skinCss || "#f0c090"; x.fillRect(0, 0, 128, 128);
     x.fillStyle = "#1c1c1c";
     x.beginPath(); x.ellipse(44, 56, 6, 10.5, 0, 0, Math.PI*2); x.fill();
     x.beginPath(); x.ellipse(84, 56, 6, 10.5, 0, 0, Math.PI*2); x.fill();
@@ -4459,6 +4572,29 @@ function createLuaRuntime(fengari, A, preludeSrc){
       }catch(err){ console.error("Studio: couldn't load avatar for play test:", err); }
     }
     return { avatar: normalizeStudioAvatar(raw), found: !!raw };
+  }
+
+  /* ---------------- the character model: live info for scripts + the Explorer ---------------- */
+  function charPartInfo(key){
+    const rig = playRigGroup, mesh = rig && rig.userData.meshes && rig.userData.meshes[key];
+    if(!mesh) return { pos: [0, 0, 0], size: [1, 1, 1], color: 0xffffff, transparency: 0 };
+    rig.updateWorldMatrix(true, true);
+    const bb = new THREE.Box3().setFromObject(mesh), c = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
+    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    const r2 = (n) => Math.round(n * 100) / 100;
+    return { pos: [r2(c.x), r2(c.y), r2(c.z)], size: [r2(sz.x), r2(sz.y), r2(sz.z)], color: mat.color.getHex(), transparency: mat.transparent ? r2(1 - mat.opacity) : 0 };
+  }
+  function charSetColor(key, hex){
+    const rig = playRigGroup, mesh = rig && rig.userData.meshes && rig.userData.meshes[key]; if(!mesh) return;
+    if(key === "head"){
+      rig.userData.skin.color.setHex(hex);
+      const fm = rig.userData.faceMat;
+      if(fm){ if(fm.map) fm.map.dispose(); fm.map = makeStudioFaceTexture("#" + ("000000" + hex.toString(16)).slice(-6)); fm.needsUpdate = true; }
+    }else{ mesh.material.color.setHex(hex); }
+  }
+  function charSetTransparency(key, t){
+    const rig = playRigGroup, mesh = rig && rig.userData.meshes && rig.userData.meshes[key]; if(!mesh) return;
+    (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(m => { m.transparent = t > 0; m.opacity = 1 - t; m.needsUpdate = true; });
   }
 
   function buildRig(avatar){
@@ -4503,6 +4639,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const S = 0.86 * K;
     grp.scale.set(S, S * c.heightScale, S);
     grp.userData.parts = { lArm, rArm, lLeg, rLeg, head };
+    grp.userData.meshes = { head, torso, lArm: lArm.children[0], rArm: rArm.children[0], lLeg: lLeg.children[0], rLeg: rLeg.children[0] };
+    grp.userData.skin = skin; grp.userData.faceMat = faceMat;
     grp.userData.bubbleY = (headY + headSize/2 + 0.27) * S * c.heightScale + 0.7;
     return grp;
   }
@@ -5050,6 +5188,9 @@ function createLuaRuntime(fengari, A, preludeSrc){
         get name(){ return currentUsername || "Player"; },
         getPos(){ const r = playRigGroup ? playRigGroup.position : { x: 0, y: 0, z: 0 }; return [r.x, r.y, r.z]; },
         setPos(p){ if(playRigGroup){ playRigGroup.position.set(p[0], p[1], p[2]); playMode.velocityY = 0; } },
+        partInfo: (key) => charPartInfo(key),
+        setPartColor: (key, hex) => charSetColor(key, hex),
+        setPartTransparency: (key, t) => charSetTransparency(key, t),
         getBox(){ if(!playRigGroup) return null; const r = playRigGroup.position; return { min: [r.x - 1.2, r.y, r.z - 1.2], max: [r.x + 1.2, r.y + 5, r.z + 1.2] }; }
       },
       lighting: {
@@ -5099,6 +5240,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
     <span class="game-lb-count hidden" id="gameLbCount">0</span>
   </div>
 <div class="game-lb-panel hidden" id="gameLbPanel"></div>
+<div id="playHealth" style="display:none;position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:210px;z-index:20;pointer-events:none;text-align:center;font-family:inherit;">
+    <div id="playHealthTxt" style="font-size:11px;font-weight:700;color:#e8e8ec;text-shadow:0 1px 3px #000;margin-bottom:4px;"></div>
+    <div style="height:10px;border-radius:6px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.18);overflow:hidden;"><div id="playHealthFill" style="height:100%;width:100%;background:#3ecf6e;transition:width .15s, background .15s;"></div></div>
+  </div>
 <div class="game-chat-panel" id="gameChatPanel">
     <div class="game-chat-head">
       <span>Chat</span>
@@ -5560,6 +5705,17 @@ function createLuaRuntime(fengari, A, preludeSrc){
     phRenderPlayers();
     phAddChat("", "Play test started. Press Enter to chat, type /dance to dance.", true);
   }
+  // Roblox-style health bar: appears only once you're hurt
+  function updatePlayHealthBar(){
+    const box = document.getElementById("playHealth"); if(!box) return;
+    const H = (LuaRT && LuaRT.running) ? LuaRT.hum : null;
+    if(!H || (H.Health >= H.MaxHealth && !H.dead)){ box.style.display = "none"; return; }
+    const frac = Math.max(0, Math.min(1, H.Health / H.MaxHealth));
+    box.style.display = "block";
+    document.getElementById("playHealthFill").style.width = (frac * 100) + "%";
+    document.getElementById("playHealthFill").style.background = frac > 0.6 ? "#3ecf6e" : frac > 0.3 ? "#e8b84a" : "#e5484d";
+    document.getElementById("playHealthTxt").textContent = H.dead ? "You died - respawning..." : Math.ceil(H.Health) + " / " + Math.round(H.MaxHealth);
+  }
   function destroyPlayHud(){
     const old = document.getElementById("playHud");
     if(old) old.remove();
@@ -5634,6 +5790,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(gizmoGroup){ scene.remove(gizmoGroup); gizmoGroup = null; }
       closeObjCtxMenu();
       hidePartsPicker();
+      playSelKey = null; stopLiveProps();
       selectObject(null);
       setRibbonForPlay(true);
       document.getElementById("addPartBtn").disabled = true;
@@ -5644,6 +5801,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       btn.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
       showToast(loaded.found ? "Playing with your BlockVerse character" : "Playing (no saved character found, using the default look)");
       logOutput("Play test started");
+      logOutput("Workspace." + (currentUsername || "Player") + " is your character: Head, Torso, Left/Right Arm, Left/Right Leg, HumanoidRootPart and a Humanoid (WalkSpeed, JumpPower, Health, MaxHealth)");
     }catch(err){
       console.error("Studio: error while starting play test (recovered, not stuck):", err);
       showToast("Couldn't start play test - try again");
@@ -5681,6 +5839,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
       document.getElementById("addPartBtn").disabled = false;
       const panel = document.getElementById("propsBody");
       if(panel) panel.closest(".props-panel").style.pointerEvents = "";
+      playSelKey = null; stopLiveProps(); playMode.active = false;
+      renderExplorer(); renderProperties();
 
       const btn = document.getElementById("editorPlayBtn");
       btn.classList.remove("playing");
@@ -6140,6 +6300,115 @@ function createLuaRuntime(fengari, A, preludeSrc){
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>';
   }
 
+  /* ---------- your character (Model + Humanoid) while play testing ---------- */
+  let playSelKey = null, charExpanded = true, liveTimer = null, liveFns = [];
+  const CHAR_ROWS = [
+    ["head", "Head", "Part"], ["torso", "Torso", "Part"], ["lArm", "Left Arm", "Part"], ["rArm", "Right Arm", "Part"],
+    ["lLeg", "Left Leg", "Part"], ["rLeg", "Right Leg", "Part"], ["hrp", "HumanoidRootPart", "Part"], ["hum", "Humanoid", "Humanoid"]
+  ];
+  const ICON_MODEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5 3 7v10l9 4.5 9-4.5V7l-9-4.5z"/><path d="M3 7l9 4.5 9-4.5"/><path d="M12 11.5V21"/></svg>';
+  const ICON_HUM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="7" r="3.2"/><path d="M5 21c0-4.2 3.1-7 7-7s7 2.8 7 7"/></svg>';
+  function stopLiveProps(){ if(liveTimer){ clearInterval(liveTimer); liveTimer = null; } liveFns = []; }
+  function selectPlayNode(key){
+    playSelKey = key;
+    stopLiveProps();                       // clear the old timer first - doing it after rendering wiped the new live fields
+    renderExplorer(); renderProperties();
+    const panel = document.getElementById("propsBody");
+    if(panel) panel.closest(".props-panel").style.pointerEvents = "";   // the character's live values are editable during play
+    liveTimer = setInterval(() => { if(!playMode.active){ stopLiveProps(); return; } liveFns.forEach(f => f()); }, 250);
+    liveFns.forEach(f => f());
+  }
+  function appendPlayerModelRows(container){
+    if(!playMode.active || !playRigGroup) return;
+    const mk = (key, label, icon, extra) => {
+      const row = document.createElement("div");
+      row.className = "exp-row" + (playSelKey === key ? " selected" : "");
+      row.innerHTML = (extra || "") + '<span class="exp-icon">' + icon + '</span><span></span>';
+      row.querySelector("span:last-child").textContent = label;
+      row.addEventListener("click", () => selectPlayNode(key));
+      return row;
+    };
+    const caret = '<span class="exp-caret">' + (charExpanded ? "&#9662;" : "&#9656;") + '</span>';
+    const top = mk("char", currentUsername || "Player", ICON_MODEL, caret);
+    top.querySelector(".exp-caret").addEventListener("click", (e) => { e.stopPropagation(); charExpanded = !charExpanded; renderExplorer(); });
+    top.title = "Your character - its Humanoid controls WalkSpeed, JumpPower, Health and more";
+    container.appendChild(top);
+    if(!charExpanded) return;
+    const sub = document.createElement("div"); sub.className = "exp-nested"; container.appendChild(sub);
+    CHAR_ROWS.forEach(([key, label, cls]) => sub.appendChild(mk(key, label, cls === "Humanoid" ? ICON_HUM : iconSvg("Part"))));
+  }
+  function renderPlayProps(body){
+    liveFns = [];
+    const key = playSelKey, name = currentUsername || "Player";
+    const def = CHAR_ROWS.find(r => r[0] === key);
+    const label = (t) => { const g = document.createElement("div"); g.className = "prop-group-label"; g.textContent = t; body.appendChild(g); };
+    const mkRow = (lbl, input) => { const r = document.createElement("div"); r.className = "prop-row"; const l = document.createElement("label"); l.textContent = lbl; r.appendChild(l); r.appendChild(input); body.appendChild(r); return r; };
+    const roText = (lbl, getter) => { const i = document.createElement("input"); i.type = "text"; i.disabled = true; mkRow(lbl, i); liveFns.push(() => { i.value = getter(); }); i.value = getter(); };
+    const fmt3 = (a) => a.map(n => Math.round(n * 100) / 100).join(", ");
+    label("Identity");
+    roText("Name", () => key === "char" ? name : def[1]);
+    roText("ClassName", () => key === "char" ? "Model" : def[2]);
+    roText("Parent", () => key === "char" ? "Workspace" : name);
+    if(key === "char"){
+      label("Info");
+      const note = document.createElement("div"); note.className = "props-empty"; note.style.textAlign = "left";
+      note.textContent = "This is your character while play testing. Open it to see its body parts and its Humanoid. In a script: workspace[\"" + name + "\"].Humanoid";
+      body.appendChild(note); return;
+    }
+    if(key === "hum"){
+      const H = () => (LuaRT && LuaRT.hum) || { WalkSpeed: 16, JumpPower: 50, Health: 100, MaxHealth: 100, HipHeight: 0, DisplayName: "", AutoRotate: true, Sit: false, PlatformStand: false, MoveDirection: [0, 0, 0], state: "Running" };
+      const K = (LuaRT && LuaRT.JUMP_K) || 0.00288;
+      const getV = (k) => k === "JumpHeight" ? H().JumpPower * H().JumpPower * K : H()[k];
+      const setV = (k, v) => { if(LuaRT && LuaRT.running) LuaRT.setHum(k, v); };
+      label("Health");
+      [["Health"], ["MaxHealth"]].forEach(([k]) => {
+        const i = document.createElement("input"); i.type = "number"; i.step = "any";
+        i.addEventListener("change", () => { setV(k, Number(i.value)); i.value = Math.round(getV(k) * 100) / 100; });
+        mkRow(k, i); liveFns.push(() => { if(document.activeElement !== i) i.value = Math.round(getV(k) * 100) / 100; });
+      });
+      label("Movement");
+      [["WalkSpeed"], ["JumpPower"], ["JumpHeight"], ["HipHeight"]].forEach(([k]) => {
+        const i = document.createElement("input"); i.type = "number"; i.step = "any"; i.min = 0;
+        i.addEventListener("change", () => { setV(k, Number(i.value)); i.value = Math.round(getV(k) * 100) / 100; });
+        mkRow(k, i); liveFns.push(() => { if(document.activeElement !== i) i.value = Math.round(getV(k) * 100) / 100; });
+      });
+      [["AutoRotate"], ["Sit"], ["PlatformStand"]].forEach(([k]) => {
+        const i = document.createElement("input"); i.type = "checkbox";
+        i.addEventListener("change", () => { setV(k, i.checked); i.checked = !!getV(k); });
+        mkRow(k, i); liveFns.push(() => { i.checked = !!getV(k); });
+      });
+      label("Info");
+      const dn = document.createElement("input"); dn.type = "text"; dn.maxLength = 40; dn.placeholder = currentUsername || "Player";
+      dn.addEventListener("change", () => setV("DisplayName", dn.value));
+      mkRow("DisplayName", dn);
+      roText("State", () => H().state || "Running");
+      roText("MoveDirection", () => fmt3(H().MoveDirection || [0, 0, 0]));
+      roText("RigType", () => "R6");
+      const note = document.createElement("div"); note.className = "props-empty"; note.style.textAlign = "left";
+      note.textContent = "Like Roblox: WalkSpeed = speed, JumpPower / JumpHeight = how high you jump, Health / MaxHealth = life (0 = you die and respawn), HipHeight = lifts the character off the floor, Sit / PlatformStand = lock movement, AutoRotate = turn to face where you walk. Change them here live or in a script. Methods: TakeDamage, Move, MoveTo, GetState, ChangeState. Events: Died, HealthChanged, Running, Jumping, FreeFalling, StateChanged, MoveToFinished.";
+      body.appendChild(note);
+      return;
+    }
+    const infoKey = key === "hrp" ? null : key;
+    if(infoKey){
+      label("Appearance");
+      const ci = document.createElement("input"); ci.type = "color";
+      ci.addEventListener("input", () => charSetColor(infoKey, parseInt(ci.value.slice(1), 16)));
+      mkRow("Color", ci); liveFns.push(() => { if(document.activeElement !== ci) ci.value = "#" + ("000000" + charPartInfo(infoKey).color.toString(16)).slice(-6); });
+      const ti = document.createElement("input"); ti.type = "number"; ti.min = 0; ti.max = 1; ti.step = 0.1;
+      ti.addEventListener("change", () => charSetTransparency(infoKey, Math.max(0, Math.min(1, Number(ti.value) || 0))));
+      mkRow("Transparency", ti); liveFns.push(() => { if(document.activeElement !== ti) ti.value = charPartInfo(infoKey).transparency; });
+    }
+    label("Coordinates");
+    if(infoKey){
+      roText("Position", () => fmt3(charPartInfo(infoKey).pos));
+      roText("Size", () => fmt3(charPartInfo(infoKey).size));
+    }else{
+      roText("Position", () => { const p = playRigGroup ? playRigGroup.position : { x: 0, y: 0, z: 0 }; return fmt3([p.x, p.y + 2.6, p.z]); });
+      roText("Size", () => "2, 2, 1");
+    }
+  }
+
   function renderExplorer(){
     const body = document.getElementById("explorerBody");
     body.innerHTML = "";
@@ -6178,6 +6447,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(projectNodes.some(n => n.parent === o.id)){ const sub = document.createElement("div"); sub.className = "exp-nested"; children.appendChild(sub); appendNodeRows(sub, o.id); }
     });
     appendNodeRows(children, "svc:Workspace");
+    appendPlayerModelRows(children);
     body.appendChild(children);
 
     // real service folders: put scripts, modules, remotes and values inside them (right-click or the + button)
@@ -6217,6 +6487,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   function renderProperties(){
     const body = document.getElementById("propsBody");
     body.innerHTML = "";
+    if(playMode.active && playSelKey){ renderPlayProps(body); return; }
     const _node = nodeById(selectedId);
     if(_node){ renderNodeProperties(body, _node); return; }
 
