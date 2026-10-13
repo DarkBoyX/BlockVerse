@@ -776,7 +776,7 @@
           });
           await db.ref("game_requests/" + r.id).remove();
         }catch(err){
-          alert("Couldn't publish that game - check your connection and try again.");
+          console.error("publish failed", err); alert("Couldn't publish that game.\n\nReason: " + ((err && (err.code || err.message)) || err));
           e.target.disabled = false; e.target.textContent = "Accept & Publish";
         }
       });
@@ -788,7 +788,7 @@
           // once the creator's studio page has had a chance to pick up the denial
           setTimeout(() => db.ref("game_requests/" + r.id).remove().catch(()=>{}), 4000);
         }catch(err){
-          alert("Couldn't deny that game - check your connection and try again.");
+          console.error("deny failed", err); alert("Couldn't deny that game.\n\nReason: " + ((err && (err.code || err.message)) || err));
         }
       });
     });
