@@ -1246,27 +1246,54 @@ local BrickColor = setmetatable({
   if nm then local e = BCBYNAME[nm:lower()]; return function() return e end end
 end })
 
--- CFrame: position only (rotation is not simulated yet)
+-- CFrame: position + yaw (rotation around the Y axis). LookVector / RightVector / UpVector work.
 local CF = {}
 local CFmethods = {}
-local function newCF(x, y, z) return setmetatable({ X = x, Y = y, Z = z }, CF) end
+local msin2, mcos2, matan2 = math.sin, math.cos, math.atan
+local function newCF(x, y, z, ry) return setmetatable({ X = x, Y = y, Z = z, Ry = ry or 0 }, CF) end
+local function rotY(ry, v) -- rotate a Vector3 around Y (same convention as the editor: look = (-sin, 0, -cos))
+  local c, s = mcos2(ry), msin2(ry)
+  return newV3(c * v.X + s * v.Z, v.Y, -s * v.X + c * v.Z)
+end
+local function yawFromDir(dx, dz) if dx == 0 and dz == 0 then return 0 end return matan2(-dx, -dz) end
 CF.__index = function(t, k)
   if k == "Position" then return newV3(t.X, t.Y, t.Z) end
+  if k == "p" then return newV3(t.X, t.Y, t.Z) end
+  if k == "LookVector" then return newV3(-msin2(t.Ry), 0, -mcos2(t.Ry)) end
+  if k == "RightVector" then return newV3(mcos2(t.Ry), 0, -msin2(t.Ry)) end
+  if k == "UpVector" then return newV3(0, 1, 0) end
   return CFmethods[k]
 end
-CF.__add = function(a, b) return newCF(a.X + b.X, a.Y + b.Y, a.Z + b.Z) end
-CF.__sub = function(a, b) return newCF(a.X - b.X, a.Y - b.Y, a.Z - b.Z) end
+CF.__add = function(a, b) return newCF(a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.Ry) end
+CF.__sub = function(a, b) return newCF(a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.Ry) end
 CF.__mul = function(a, b)
-  if getmetatable(b) == V3 then return newV3(a.X + b.X, a.Y + b.Y, a.Z + b.Z) end
-  return newCF(a.X + b.X, a.Y + b.Y, a.Z + b.Z)
+  if getmetatable(b) == V3 then local r = rotY(a.Ry, b); return newV3(a.X + r.X, a.Y + r.Y, a.Z + r.Z) end
+  local r = rotY(a.Ry, newV3(b.X, b.Y, b.Z))
+  return newCF(a.X + r.X, a.Y + r.Y, a.Z + r.Z, a.Ry + b.Ry)
 end
 CF.__tostring = function(a) return fmtnum(a.X) .. ", " .. fmtnum(a.Y) .. ", " .. fmtnum(a.Z) end
+function CFmethods.PointToWorldSpace(a, v) return a * v end
+function CFmethods.VectorToWorldSpace(a, v) return rotY(a.Ry, v) end
+function CFmethods.ToWorldSpace(a, b) return a * b end
+function CFmethods.Inverse(a)
+  local r = rotY(-a.Ry, newV3(-a.X, -a.Y, -a.Z))
+  return newCF(r.X, r.Y, r.Z, -a.Ry)
+end
+function CFmethods.ToOrientation(a) return 0, a.Ry, 0 end
+CFmethods.ToEulerAnglesYXZ = function(a) return 0, a.Ry, 0 end
+function CFmethods.Lerp(a, b, t) return newCF(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, a.Z + (b.Z - a.Z) * t, a.Ry + (b.Ry - a.Ry) * t) end
 local CFrame = {
   new = function(x, y, z)
-    if getmetatable(x) == V3 then return newCF(x.X, x.Y, x.Z) end
+    if getmetatable(x) == V3 then
+      if getmetatable(y) == V3 then return newCF(x.X, x.Y, x.Z, yawFromDir(y.X - x.X, y.Z - x.Z)) end
+      return newCF(x.X, x.Y, x.Z)
+    end
     return newCF(x or 0, y or 0, z or 0)
   end,
-  Angles = function() return newCF(0, 0, 0) end,
+  lookAt = function(a, b) return newCF(a.X, a.Y, a.Z, yawFromDir(b.X - a.X, b.Z - a.Z)) end,
+  Angles = function(rx, ry, rz) return newCF(0, 0, 0, ry or 0) end,
+  fromEulerAnglesYXZ = function(rx, ry, rz) return newCF(0, 0, 0, ry or 0) end,
+  fromOrientation = function(rx, ry, rz) return newCF(0, 0, 0, ry or 0) end,
 }
 CFrame.identity = newCF(0, 0, 0)
 
@@ -1305,7 +1332,7 @@ local function enc(v)
   if mt == V3 then return { __t = "V3", x = v.X, y = v.Y, z = v.Z } end
   if mt == C3 then return { __t = "C3", r = v.R, g = v.G, b = v.B } end
   if mt == BC then return { __t = "C3", r = v.r, g = v.g, b = v.b } end
-  if mt == CF then return { __t = "CF", x = v.X, y = v.Y, z = v.Z } end
+  if mt == CF then return { __t = "CF", x = v.X, y = v.Y, z = v.Z, ry = v.Ry } end
   if mt == EnumItemMT then return { __t = "E", e = v.EnumType, n = v.Name } end
   local out = {}
   for k, x in pairs(v) do out[k] = enc(x) end
@@ -1318,7 +1345,7 @@ local function dec(v)
   if tag == "I" then return wrap(v.id)
   elseif tag == "V3" then return newV3(v.x, v.y, v.z)
   elseif tag == "C3" then return newC3(v.r, v.g, v.b)
-  elseif tag == "CF" then return newCF(v.x, v.y, v.z)
+  elseif tag == "CF" then return newCF(v.x, v.y, v.z, v.ry or 0)
   elseif tag == "E" then return enumItem(v.e, v.n)
   elseif tag == "Input" then
     return { KeyCode = enumItem("KeyCode", v.key), UserInputType = enumItem("UserInputType", "Keyboard"), UserInputState = enumItem("UserInputState", v.state or "Begin") }
@@ -2051,7 +2078,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const v = A.part.get(p, k === "Rotation" ? "Orientation" : (k === "CFrame" ? "Position" : k));
     if(v === undefined) return undefined;
     if(k === "Position" || k === "Size" || k === "Orientation" || k === "Rotation") return V3(v);
-    if(k === "CFrame") return { __t: "CF", x: v[0], y: v[1], z: v[2] };
+    if(k === "CFrame"){ const o = A.part.get(p, "Orientation"); return { __t: "CF", x: v[0], y: v[1], z: v[2], ry: (o ? o[1] : 0) * Math.PI / 180 }; }
     if(k === "Color") return hexToC3(v);
     if(k === "Material") return { __t: "E", e: "Material", n: String(v).charAt(0).toUpperCase() + String(v).slice(1) };
     if(k === "Shape") return { __t: "E", e: "PartType", n: String(v) };
@@ -2060,7 +2087,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
   function partSet(p, k, val){
     let v = val;
     if(k === "Position" || k === "Size" || k === "Orientation" || k === "Rotation") v = [val.x, val.y, val.z];
-    else if(k === "CFrame"){ k = "Position"; v = [val.x, val.y, val.z]; }
+    else if(k === "CFrame"){
+      const o = A.part.get(p, "Orientation") || [0, 0, 0];
+      if(val.ry !== undefined) A.part.set(p, "Orientation", [o[0], (val.ry || 0) * 180 / Math.PI, o[2]]);
+      k = "Position"; v = [val.x, val.y, val.z];
+    }
     else if(k === "Color") v = c3ToHex(val);
     else if(k === "Material") v = String(val && val.n ? val.n : val).toLowerCase();
     else if(k === "Shape") v = String(val && val.n ? val.n : val);
@@ -2187,7 +2218,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === HRP_ID){
       if(k === "Position") return { k: "prop", v: V3(hrpPos()) };
-      if(k === "CFrame"){ const p = hrpPos(); return { k: "prop", v: { __t: "CF", x: p[0], y: p[1], z: p[2] } }; }
+      if(k === "CFrame"){ const p = hrpPos(); return { k: "prop", v: { __t: "CF", x: p[0], y: p[1], z: p[2], ry: A.player.getYaw ? A.player.getYaw() : 0 } }; }
       if(k === "Size") return { k: "prop", v: V3([2, 2, 1]) };
       if(k === "Anchored") return { k: "prop", v: false };
       if(k === "Velocity" || k === "AssemblyLinearVelocity") return { k: "prop", v: V3([0, 0, 0]) };
@@ -2195,7 +2226,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(bodyById(id)){
       const info = A.player.partInfo(bodyById(id).key);
       if(k === "Position") return { k: "prop", v: V3(info.pos) };
-      if(k === "CFrame") return { k: "prop", v: { __t: "CF", x: info.pos[0], y: info.pos[1], z: info.pos[2] } };
+      if(k === "CFrame") return { k: "prop", v: { __t: "CF", x: info.pos[0], y: info.pos[1], z: info.pos[2], ry: A.player.getYaw ? A.player.getYaw() : 0 } };
       if(k === "Size") return { k: "prop", v: V3(info.size) };
       if(k === "Color") return { k: "prop", v: hexToC3(info.color) };
       if(k === "Transparency") return { k: "prop", v: info.transparency };
@@ -2316,7 +2347,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === CHAR_ID){
       if(m === "MoveTo" || m === "PivotTo"){ const p = args[0]; if(p){ A.player.setPos([p.x, p.y - (m === "PivotTo" ? HRP_LIFT : 0), p.z]); } return null; }
-      if(m === "GetPivot"){ const p = hrpPos(); return { __t: "CF", x: p[0], y: p[1], z: p[2] }; }
+      if(m === "GetPivot"){ const p = hrpPos(); return { __t: "CF", x: p[0], y: p[1], z: p[2], ry: A.player.getYaw ? A.player.getYaw() : 0 }; }
     }
     if(id === HUM_ID){ const r = humMethod(m, args); if(r !== undefined) return r; }
     const node = findNode(id);
@@ -2357,7 +2388,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === HUM_ID){ if(setHum(k, v)) return; throw new Error(k + " is not a valid member of Humanoid"); }
     if(id === HRP_ID){
-      if(k === "Position" || k === "CFrame"){ A.player.setPos([v.x, v.y - HRP_LIFT, v.z]); return; }
+      if(k === "Position" || k === "CFrame"){ A.player.setPos([v.x, v.y - HRP_LIFT, v.z]); if(k === "CFrame" && v.ry !== undefined && A.player.setYaw) A.player.setYaw(v.ry); return; }
       throw new Error(k + " cannot be set on HumanoidRootPart");
     }
     if(bodyById(id)){
@@ -3726,7 +3757,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       outToggle.addEventListener("click", () => setOutput(true));
       editorInited = true;
     }
-    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13-r5)");
+    logOutput("BlockVerse Studio ready - " + game.name + "  (build 2026-10-13-r6)");
     projectNodes = [];
     const savedGame = loadGames().find(g => g.id === game.id);
     if(savedGame && savedGame.world && savedGame.world.parts) loadWorld(savedGame.world);
@@ -5323,6 +5354,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
         get name(){ return currentUsername || "Player"; },
         getPos(){ const r = playRigGroup ? playRigGroup.position : { x: 0, y: 0, z: 0 }; return [r.x, r.y, r.z]; },
         setPos(p){ if(playRigGroup){ playRigGroup.position.set(p[0], p[1], p[2]); playMode.velocityY = 0; } },
+        getYaw(){ return playRigGroup ? playRigGroup.rotation.y : 0; },
+        setYaw(a){ if(playRigGroup) playRigGroup.rotation.y = a; },
         partInfo: (key) => charPartInfo(key),
         setPartColor: (key, hex) => charSetColor(key, hex),
         setPartTransparency: (key, t) => charSetTransparency(key, t),
@@ -6918,15 +6951,6 @@ function createLuaRuntime(fengari, A, preludeSrc){
         // compatibility but doesn't change behavior until that lands
       });
 
-      groupLabel("Scripting");
-      const scriptRow = document.createElement("div");
-      scriptRow.className = "prop-row";
-      const scriptBtn = document.createElement("button");
-      scriptBtn.className = "prop-script-btn";
-      scriptBtn.textContent = obj.script ? "Edit Script" : "Add Script";
-      scriptBtn.addEventListener("click", () => openScriptEditor(obj));
-      scriptRow.appendChild(scriptBtn);
-      body.appendChild(scriptRow);
     }
   }
 
@@ -7045,7 +7069,7 @@ if("launchQueue" in window){
 <script>
 /* startup loading screen + update watcher */
 (function(){
-  var BV_BUILD_ID = '2026-10-13-r5';   /* bumped with every studio.html release - the page compares this to the file on the server */
+  var BV_BUILD_ID = '2026-10-13-r6';   /* bumped with every studio.html release - the page compares this to the file on the server */
   var splash=document.getElementById("bvSplash"), t0=Date.now(), hidden=false;
   function hideSplash(){ if(hidden) return; hidden=true; var wait=Math.max(0,1100-(Date.now()-t0)); setTimeout(function(){ splash.classList.add("done"); setTimeout(function(){ splash.remove(); },600); },wait); }
   if(document.readyState==="complete") hideSplash(); else window.addEventListener("load",hideSplash);
