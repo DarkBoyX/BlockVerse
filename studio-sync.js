@@ -28,14 +28,14 @@
       var parts = (w.parts || []).map(function(p){
         var pr = p.props || {};
         return {
-          n: p.name, c: p.className, s: p.shape,
+          i: p.id, n: p.name, c: p.className, s: p.shape,
           p: pr.position, r: pr.rotation, z: pr.size,
           k: pr.color, m: pr.material, t: pr.transparency || 0,
           cc: pr.canCollide === false ? 0 : 1,
           cs: pr.castShadow === false ? 0 : 1
         };
       });
-      return JSON.stringify({ v: 1, parts: parts, light: w.light || null });
+      return JSON.stringify({ v: 1, parts: parts, nodes: w.nodes || [], light: w.light || null });
     }
 
     // a game that was never opened in the editor has no saved world yet: it is just Studio's default scene
