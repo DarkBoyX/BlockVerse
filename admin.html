@@ -641,7 +641,7 @@
       '<div class="acct-row">' +
         '<div>' +
           '<div class="acct-name">' + escapeHtml(r.reporterName || "Unknown") + ' &rarr; ' + escapeHtml(r.targetName || "Unknown") + '</div>' +
-          '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + '</div>' +
+          '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + (r.gameId && r.gameId !== "baseplate" ? ' &middot; in game ' + escapeHtml(r.gameId) : "") + '</div>' +
         '</div>' +
         '<div class="acct-key" style="text-align:right; flex:none;">' + (r.ts ? new Date(r.ts).toLocaleString() : "-") + '</div>' +
       '</div>'
