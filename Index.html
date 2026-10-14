@@ -6331,6 +6331,10 @@
     let worldGroup = null;          // meshes of the loaded world
     let worldBoxes = [];            // collision boxes of the loaded world
     let worldSpawn = [0, 0, 0];
+    let worldParts = [];            // the parts of the loaded world (scripts see these)
+    let worldNodes = [];            // scripts / folders / values of the loaded world
+    let boxesDirty = false;         // a script moved something: rebuild the collision boxes before the next step
+    let luaRt = null, luaEngine = null, luaKeyDown = null, luaKeyUp = null, lastHumHealth = 100, luaErrAt = 0;
     const envObjects = [];          // grass field / mountains / trees / etc. (hidden inside a custom world)
     let animId = null;
     let sunLight = null, hemiLight = null, fillLight = null, moonLight = null, moonMesh = null, sunMesh = null, starField = null;
@@ -8506,6 +8510,26 @@
       }
       inputForward += -move.z; // joystick: pushing up (negative z) = forward
       inputRight += move.x;
+      {
+        const hm = luaRt && luaRt.running ? luaRt.hum : null;
+        if(hm && !hm.dead && !hm.Sit && !hm.PlatformStand){
+          const fx0 = -Math.sin(smYaw), fz0 = -Math.cos(smYaw), rx0 = Math.cos(smYaw), rz0 = -Math.sin(smYaw);
+          if(hm.moveVec && luaRt.now < hm.moveUntil){
+            if(hm.moveRel){ inputRight += hm.moveVec[0]; inputForward += -hm.moveVec[1]; }
+            else { inputForward += hm.moveVec[0] * fx0 + hm.moveVec[1] * fz0; inputRight += hm.moveVec[0] * rx0 + hm.moveVec[1] * rz0; }
+          }
+          if(hm.moveTarget){
+            const dx = hm.moveTarget[0] - character.position.x, dz = hm.moveTarget[1] - character.position.z;
+            if(dx * dx + dz * dz < 1.44) luaRt.humMoveDone(true);
+            else if(luaRt.now > hm.moveTargetUntil) luaRt.humMoveDone(false);
+            else if(inputForward === 0 && inputRight === 0){
+              const l = Math.hypot(dx, dz) || 1, wx = dx / l, wz = dz / l;
+              inputForward += wx * fx0 + wz * fz0; inputRight += wx * rx0 + wz * rz0;
+            }
+          }
+          hm.MoveDirection = [0, 0, 0];
+        }
+      }
 
       if(!menuOpen){
         const gpInput = pollGamepad();
@@ -8535,8 +8559,9 @@
         const rx = Math.cos(smYaw), rz = -Math.sin(smYaw);
         const worldX = nf*fx + nr*rx;
         const worldZ = nf*fz + nr*rz;
-        targetVelX = worldX * MOVE_SPEED;
-        targetVelZ = worldZ * MOVE_SPEED;
+        const wsc = humScale().walk;
+        targetVelX = worldX * MOVE_SPEED * wsc;
+        targetVelZ = worldZ * MOVE_SPEED * wsc;
       }
 
       // smooth acceleration / deceleration so movement doesn't feel snappy
@@ -8707,55 +8732,81 @@
     const WORLD_MATS = { wood:[0.85,0], stone:[0.95,0], ice:[0.06,0], snow:[0.9,0], metal:[0.28,0.85], plastic:[0.35,0], neon:[0.4,0] };
     function clearWorld(){
       if(worldGroup){ scene.remove(worldGroup); disposeObject3D(worldGroup); worldGroup = null; }
+      worldBoxes = []; worldParts = []; worldNodes = []; boxesDirty = false;
+    }
+    function styleWorldMaterial(rec){
+      const m = rec.mesh.material, p = rec.props;
+      const mk = WORLD_MATS[p.material] || WORLD_MATS.plastic;
+      const ice = p.material === "ice", neon = p.material === "neon";
+      m.roughness = mk[0]; m.metalness = mk[1];
+      m.color.setHex(p.color);
+      m.transparent = p.transparency > 0 || ice;
+      m.opacity = Math.max(0.15, 1 - p.transparency - (ice ? 0.25 : 0));
+      m.emissive.setHex(neon ? p.color : 0x000000);
+      m.emissiveIntensity = neon ? 0.7 : 0;
+      m.needsUpdate = true;
+    }
+    function syncWorldMesh(rec){
+      const p = rec.props;
+      rec.mesh.position.set(p.position[0], p.position[1], p.position[2]);
+      rec.mesh.rotation.set(p.rotation[0], p.rotation[1], p.rotation[2]);
+      rec.mesh.visible = !rec.hidden;
+    }
+    function newWorldPart(d, index){
+      const size = (d.z || [4, 1, 2]).map(v => Math.max(0.05, +v || 0.05));
+      const rec = {
+        id: d.i || ("p" + index), name: d.n || "Part", className: d.c || "Part", shape: d.s || "cube",
+        props: {
+          position: (d.p || [0, 0, 0]).slice(), rotation: (d.r || [0, 0, 0]).slice(), size,
+          color: d.k != null ? d.k : 0xa3a2a5, material: d.m || "plastic", transparency: +d.t || 0,
+          anchored: true, canCollide: d.cc !== 0, canTouch: true, canQuery: true, castShadow: d.cs !== 0, reflectance: 0, massless: false
+        },
+        mesh: null, hidden: false, attached: true
+      };
+      rec.mesh = new THREE.Mesh(worldGeometry(rec.shape, size), new THREE.MeshStandardMaterial({ color: rec.props.color }));
+      rec.mesh.castShadow = !window.BV_IS_TOUCH && rec.props.castShadow;
+      rec.mesh.receiveShadow = true;
+      styleWorldMaterial(rec);
+      syncWorldMesh(rec);
+      return rec;
+    }
+    function rebuildWorldBoxes(){
       worldBoxes = [];
+      worldParts.forEach(rec => {
+        if(rec.hidden || rec.pending || rec.attached === false || rec.className === "SpawnLocation" || rec.props.canCollide === false) return;
+        const p = rec.props, pos = p.position, rot = p.rotation;
+        const hx = p.size[0] / 2, hy = p.size[1] / 2, hz = p.size[2] / 2;
+        if(Math.abs(rot[0]) < 1e-3 && Math.abs(rot[2]) < 1e-3){
+          worldBoxes.push({ cx: pos[0], cy: pos[1], cz: pos[2], hx, hy, hz, cos: Math.cos(rot[1]), sin: Math.sin(rot[1]), wedge: rec.shape === "wedge" });
+        }else{
+          const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], "XYZ")).elements;   // column-major
+          worldBoxes.push({
+            cx: pos[0], cy: pos[1], cz: pos[2],
+            hx: Math.abs(m[0])*hx + Math.abs(m[4])*hy + Math.abs(m[8])*hz,
+            hy: Math.abs(m[1])*hx + Math.abs(m[5])*hy + Math.abs(m[9])*hz,
+            hz: Math.abs(m[2])*hx + Math.abs(m[6])*hy + Math.abs(m[10])*hz,
+            cos: 1, sin: 0, wedge: false
+          });
+        }
+      });
+      boxesDirty = false;
     }
     function applyWorld(world){
+      stopLua();
       clearWorld();
       worldMode = !!(world && world.parts && world.parts.length);
       envObjects.forEach(o => { o.visible = !worldMode; });
       if(!worldMode){ worldSpawn = [0, 0, 0]; return; }
-      const LOWFX = !!window.BV_IS_TOUCH;
       worldGroup = new THREE.Group();
-      let spawn = null;
-      world.parts.forEach(p => {
-        const size = (p.z || [4, 1, 2]).map(v => Math.max(0.05, +v || 0.05));
-        const pos = p.p || [0, 0, 0], rot = p.r || [0, 0, 0];
-        const mk = WORLD_MATS[p.m] || WORLD_MATS.plastic;
-        const trans = +p.t || 0;
-        const mat = new THREE.MeshStandardMaterial({
-          color: (p.k != null ? p.k : 0xa3a2a5), roughness: mk[0], metalness: mk[1],
-          transparent: trans > 0 || p.m === "ice", opacity: Math.max(0.15, 1 - trans - (p.m === "ice" ? 0.25 : 0))
-        });
-        if(p.m === "neon"){ mat.emissive = new THREE.Color(p.k != null ? p.k : 0x39ff88); mat.emissiveIntensity = 0.7; }
-        const mesh = new THREE.Mesh(worldGeometry(p.s, size), mat);
-        mesh.position.set(pos[0], pos[1], pos[2]);
-        mesh.rotation.set(rot[0], rot[1], rot[2]);
-        mesh.castShadow = !LOWFX && p.cs !== 0;
-        mesh.receiveShadow = true;
-        worldGroup.add(mesh);
-        if(p.c === "SpawnLocation"){ if(!spawn) spawn = { pos, size }; return; }   // like Studio: you walk over the pad
-        if(p.cc === 0) return;                                                   // CanCollide off
-        const hx = size[0]/2, hy = size[1]/2, hz = size[2]/2;
-        const yawOnly = Math.abs(rot[0]) < 1e-3 && Math.abs(rot[2]) < 1e-3;
-        if(yawOnly){
-          worldBoxes.push({ cx: pos[0], cy: pos[1], cz: pos[2], hx, hy, hz, cos: Math.cos(rot[1]), sin: Math.sin(rot[1]), wedge: p.s === "wedge" });
-        }else{
-          const e = new THREE.Euler(rot[0], rot[1], rot[2], "XYZ");
-          const m = new THREE.Matrix4().makeRotationFromEuler(e).elements;   // column-major
-          const ax = Math.abs(m[0])*hx + Math.abs(m[4])*hy + Math.abs(m[8])*hz;
-          const ay = Math.abs(m[1])*hx + Math.abs(m[5])*hy + Math.abs(m[9])*hz;
-          const az = Math.abs(m[2])*hx + Math.abs(m[6])*hy + Math.abs(m[10])*hz;
-          worldBoxes.push({ cx: pos[0], cy: pos[1], cz: pos[2], hx: ax, hy: ay, hz: az, cos: 1, sin: 0, wedge: false });
-        }
-      });
+      worldParts = world.parts.map(newWorldPart);
+      worldParts.forEach(rec => worldGroup.add(rec.mesh));
+      worldNodes = (world.nodes || []).map(n => Object.assign({}, n));
       scene.add(worldGroup);
-      if(spawn){
-        const top = worldGroundAt(spawn.pos[0], spawn.pos[2], 1e6);
-        worldSpawn = [spawn.pos[0], top > -1e8 ? top : spawn.pos[1] + spawn.size[1] / 2, spawn.pos[2]];
-      }else{
-        const top = worldGroundAt(0, 0, 1e6);
-        worldSpawn = [0, top > -1e8 ? top : 0, 0];
-      }
+      rebuildWorldBoxes();
+      const sp = worldParts.find(r => r.className === "SpawnLocation");
+      const sx = sp ? sp.props.position[0] : 0, sz = sp ? sp.props.position[2] : 0;
+      const top = worldGroundAt(sx, sz, 1e6);
+      worldSpawn = [sx, top > -1e8 ? top : (sp ? sp.props.position[1] + sp.props.size[1] / 2 : 0), sz];
     }
     // highest walkable surface under (x, z) that is no more than one step above the player's feet
     function worldGroundAt(x, z, feetY){
@@ -8802,6 +8853,192 @@
       character.position.x = Math.max(-495, Math.min(495, character.position.x));
       character.position.z = Math.max(-495, Math.min(495, character.position.z));
     }
+
+    /* ---------- Lua scripts inside published worlds ----------
+       The Lua engine is the exact same one Studio uses: it's read from studio.html when a game with scripts
+       starts, so a fix made in Studio's runtime reaches the home page automatically. Scripts run on each
+       player's own device (server scripts and local scripts both run here). */
+    async function ensureLuaEngine(){
+      if(luaEngine) return luaEngine;
+      if(!window.fengari){
+        await new Promise((res, rej) => {
+          const sc = document.createElement("script");
+          sc.src = "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js";
+          sc.onload = res; sc.onerror = () => rej(new Error("The Lua engine didn't load - check your internet connection"));
+          document.head.appendChild(sc);
+        });
+      }
+      const html = await (await fetch("studio.html", { cache: "no-cache" })).text();
+      const rtm = html.match(/<script>\s*(\/\* =+ BlockVerse Studio Lua runtime[\s\S]*?)<\/script>/);
+      const prm = html.match(/<script type="text\/plain" id="bvLuaPrelude">([\s\S]*?)<\/script>/);
+      const pal = html.match(/const BV_BRICK_PALETTE = ("(?:[^"\\]|\\.)*");/);
+      if(!rtm || !prm || !pal) throw new Error("Couldn't read the Lua runtime from studio.html");
+      const factory = new Function(rtm[1] + "\nreturn createLuaRuntime;");
+      luaEngine = { create: factory(), prelude: prm[1].replace("__BRICK_PALETTE__", () => JSON.parse(pal[1])) };
+      return luaEngine;
+    }
+    const SHAPE_TO_ENUM = { cube:"Block", ledge:"Block", sphere:"Ball", cylinder:"Cylinder", wedge:"Wedge", cornerwedge:"CornerWedge" };
+    const ENUM_TO_SHAPE = { block:"cube", ball:"sphere", cylinder:"cylinder", wedge:"wedge", cornerwedge:"cornerwedge" };
+    function luaToast(msg){
+      const now = Date.now(); if(now - luaErrAt < 2500) return; luaErrAt = now;
+      if(typeof showToast === "function") showToast(msg);
+    }
+    function makeWorldAdapter(){
+      const dirty = () => { boxesDirty = true; };
+      const addRec = (cn) => {
+        const rec = newWorldPart({ i: "rt" + Math.random().toString(36).slice(2, 9), n: cn, c: cn === "SpawnLocation" ? "SpawnLocation" : "Part", s: "cube", p: [0, 5, 0], z: [4, 1, 2], k: 0xa3a2a5, m: "plastic", t: 0, cc: 1, cs: 1 }, 0);
+        rec.runtime = true; rec.hidden = true; rec.mesh.visible = false;
+        worldGroup.add(rec.mesh); worldParts.push(rec);
+        return rec;
+      };
+      return {
+        log(kind, text, vm){
+          const tag = vm === "server" ? "[Server] " : vm === "client" ? "[Client] " : "";
+          if(kind === "error"){ console.error(tag + text); luaToast("Script error: " + String(text).slice(0, 120)); }
+          else if(kind === "warn") console.warn(tag + text); else console.log(tag + text);
+        },
+        parts: () => worldParts,
+        partById: (id) => worldParts.find(o => o.id === id) || null,
+        nodes: () => worldNodes,
+        removeNode(id){ worldNodes = worldNodes.filter(n => n.id !== id); },
+        part: {
+          get(o, k){
+            const p = o.props;
+            switch(k){
+              case "Name": return o.name;
+              case "ClassName": return o.className;
+              case "Position": return p.position.slice();
+              case "Size": return p.size.slice();
+              case "Orientation": return p.rotation.map(r => r * 180 / Math.PI);
+              case "Color": return p.color;
+              case "Transparency": return p.transparency || 0;
+              case "Reflectance": return p.reflectance || 0;
+              case "Anchored": return p.anchored !== false;
+              case "CanCollide": return p.canCollide !== false;
+              case "CanTouch": return p.canTouch !== false;
+              case "CanQuery": return p.canQuery !== false;
+              case "CastShadow": return p.castShadow !== false;
+              case "Massless": return !!p.massless;
+              case "Material": return p.material;
+              case "Shape": return SHAPE_TO_ENUM[o.shape] || "Block";
+            }
+            return undefined;
+          },
+          set(o, k, v){
+            const p = o.props;
+            switch(k){
+              case "Name": o.name = String(v); return true;
+              case "Position": p.position = [v[0], v[1], v[2]]; o.mesh.position.set(v[0], v[1], v[2]); dirty(); return true;
+              case "Size": p.size = [Math.max(0.05, v[0]), Math.max(0.05, v[1]), Math.max(0.05, v[2])]; o.mesh.geometry.dispose(); o.mesh.geometry = worldGeometry(o.shape, p.size); dirty(); return true;
+              case "Orientation": p.rotation = [v[0] * Math.PI / 180, v[1] * Math.PI / 180, v[2] * Math.PI / 180]; o.mesh.rotation.set(p.rotation[0], p.rotation[1], p.rotation[2]); dirty(); return true;
+              case "Color": p.color = v; styleWorldMaterial(o); return true;
+              case "Transparency": p.transparency = Math.max(0, Math.min(1, Number(v))); styleWorldMaterial(o); return true;
+              case "Reflectance": p.reflectance = Number(v); return true;
+              case "Anchored": p.anchored = !!v; return true;
+              case "CanCollide": p.canCollide = !!v; dirty(); return true;
+              case "CanTouch": p.canTouch = !!v; return true;
+              case "CanQuery": p.canQuery = !!v; return true;
+              case "CastShadow": p.castShadow = !!v; o.mesh.castShadow = !!v && !window.BV_IS_TOUCH; return true;
+              case "Massless": p.massless = !!v; return true;
+              case "Shape": {
+                const key = ENUM_TO_SHAPE[String(v).toLowerCase()];
+                if(!key) throw new Error("Invalid Shape '" + v + "' (use Enum.PartType.Block, Ball, Cylinder, Wedge or CornerWedge)");
+                o.shape = key; o.mesh.geometry.dispose(); o.mesh.geometry = worldGeometry(key, p.size); dirty(); return true;
+              }
+              case "Material": {
+                const key = String(v);
+                if(!WORLD_MATS[key]) return true;
+                p.material = key; styleWorldMaterial(o); return true;
+              }
+            }
+            return false;
+          },
+          create(cn){ return addRec(cn); },
+          attach(o, on){ o.attached = !!on; o.hidden = !on; o.mesh.visible = !!on; dirty(); },
+          destroy(o){
+            if(worldGroup) worldGroup.remove(o.mesh);
+            const i = worldParts.indexOf(o); if(i >= 0) worldParts.splice(i, 1);
+            try{ o.mesh.geometry.dispose(); o.mesh.material.dispose(); }catch(e){}
+            dirty();
+          },
+          clone(o){
+            const c = addRec(o.className);
+            c.name = o.name; c.shape = o.shape;
+            c.props = JSON.parse(JSON.stringify(o.props));
+            c.mesh.geometry.dispose(); c.mesh.geometry = worldGeometry(c.shape, c.props.size);
+            styleWorldMaterial(c); syncWorldMesh(c); c.hidden = true; c.mesh.visible = false;
+            return c;
+          }
+        },
+        player: {
+          get name(){ return currentUsername ? currentUsername() : "Player"; },
+          getPos(){ return [character.position.x, character.position.y, character.position.z]; },
+          setPos(p){ character.position.set(p[0], p[1], p[2]); vy = 0; },
+          getYaw(){ return character.rotation.y; },
+          setYaw(y){ character.rotation.y = y; },
+          partInfo(key){
+            // approximate body-part boxes around the character (the home-page character is built differently from Studio's)
+            const c = character.position, S = 1.6;
+            const T = { head: [0, 2.7, 0, 1.2, 1.2, 1.2], torso: [0, 1.8, 0, 2, 2, 1], leftarm: [-1.5, 1.8, 0, 1, 2, 1], rightarm: [1.5, 1.8, 0, 1, 2, 1], leftleg: [-0.5, 0.5, 0, 1, 2, 1], rightleg: [0.5, 0.5, 0, 1, 2, 1] };
+            const t = T[String(key).toLowerCase()] || [0, 1.5, 0, 2, 2, 1];
+            return { pos: [c.x + t[0], c.y + t[1], c.z + t[2]], size: [t[3], t[4], t[5]], color: 0xe0b48c, transparency: 0 };
+          },
+          setPartColor(){}, setPartTransparency(){},
+          getBox(){ const r = character.position; return { min: [r.x - 1.2, r.y, r.z - 1.2], max: [r.x + 1.2, r.y + 3.2, r.z + 1.2] }; }
+        },
+        lighting: {
+          get(k){ return k === "ClockTime" ? 14 : 1; },
+          set(){ /* the home page runs its own day/night cycle */ }
+        },
+        respawn(){ placeAtSpawn(); vy = 0; onGround = true; }
+      };
+    }
+    function lookupKey(e){ return e.key; }
+    async function startLua(){
+      const hasScripts = worldNodes.some(n => (n.className === "Script" || n.className === "LocalScript") && !n.disabled);
+      if(!hasScripts) return;
+      try{
+        const eng = await ensureLuaEngine();
+        if(!worldMode || !running) return;                 // left the game while the engine was loading
+        luaRt = eng.create(window.fengari, makeWorldAdapter(), eng.prelude);
+        const info = luaRt.start();
+        lastHumHealth = luaRt.hum ? luaRt.hum.Health : 100;
+        console.log("Lua: running " + info.server + " server script(s) and " + info.client + " local script(s)");
+        luaKeyDown = (e) => { if(!isTypingField() && !e.repeat) luaRt && luaRt.running && luaRt.keyEvent(e.key, true); };
+        luaKeyUp = (e) => { luaRt && luaRt.running && luaRt.keyEvent(e.key, false); };
+        window.addEventListener("keydown", luaKeyDown);
+        window.addEventListener("keyup", luaKeyUp);
+      }catch(err){
+        console.error("Scripts couldn't start:", err);
+        luaRt = null;
+        luaToast("This game's scripts couldn't start: " + (err && err.message ? err.message : err));
+      }
+    }
+    function isTypingField(){
+      const a = document.activeElement;
+      return !!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"));
+    }
+    function stopLua(){
+      if(luaKeyDown){ window.removeEventListener("keydown", luaKeyDown); luaKeyDown = null; }
+      if(luaKeyUp){ window.removeEventListener("keyup", luaKeyUp); luaKeyUp = null; }
+      if(luaRt){ try{ luaRt.stop(); }catch(e){ console.error(e); } luaRt = null; }
+    }
+    // run once per frame: advance the scripts, then let them change how the character moves / how healthy it is
+    function stepLua(dt){
+      if(boxesDirty) rebuildWorldBoxes();
+      if(!luaRt || !luaRt.running) return;
+      try{ luaRt.step(dt); }catch(e){ console.error(e); }
+      if(boxesDirty) rebuildWorldBoxes();
+      const hm = luaRt.hum; if(!hm) return;
+      const maxH = hm.MaxHealth || 100;
+      if(Math.abs(hm.Health - lastHumHealth) > 0.01){ setHp(hm.Health * 100 / maxH); }
+      else {
+        const want = hp * maxH / 100;
+        if(Math.abs(want - hm.Health) > 0.01) luaRt.setHum("Health", want);
+      }
+      lastHumHealth = hm.Health;
+    }
+    function humScale(){ const hm = luaRt && luaRt.running ? luaRt.hum : null; return { walk: hm ? hm.WalkSpeed / 16 : 1, jump: hm ? hm.JumpPower / 50 : 1, hm }; }
 
     const PLAYER_RADIUS = 0.5;
     function resolveTreeCollisions(){
@@ -9048,7 +9285,9 @@
     function doJump(){
       if(onGround){
         if(myEmote) stopDance(); // jumping always cancels an emote
-        vy = JUMP_VELOCITY; onGround = false;
+        const hs = humScale();
+        if(hs.hm && hs.hm.JumpPower <= 0) return;
+        vy = JUMP_VELOCITY * hs.jump; onGround = false;
         playJumpSound();
       }
     }
@@ -9159,6 +9398,7 @@
       const rawDt = clock.getDelta();
       const dt = Math.min(rawDt, 0.05);
       if(window.BV_IS_TOUCH && rawDt > 0) adaptQuality(rawDt);
+      stepLua(dt);
       if(!ragdoll) updateMovement(dt);
       updateGrassField(false);
       updateRemotePlayers(dt);
@@ -9992,6 +10232,7 @@
       placeAtSpawn();
       vy = 0; onGround = true; camYaw = Math.PI; camPitch = 0.28;
       updateCamera();
+      if(worldMode) startLua();
       renderer.render(scene, camera);
       wireOrientationPrompt();
       startAmbientAir();
