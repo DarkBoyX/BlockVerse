@@ -1213,6 +1213,8 @@
 
   /* ---------- Home dashboard: friends strip ---------- */
   .home-friends-section{ margin:22px 0 28px; }
+  .home-games-section{ margin:0 0 28px; }
+  .home-games-count{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:var(--bg-1); border:1px solid var(--border-soft); font-size:11px; letter-spacing:0; color:var(--text-2); vertical-align:1px; }
   .home-friends-title{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-2); margin-bottom:12px; }
   .home-friends-strip{ display:flex; gap:16px; flex-wrap:wrap; }
   .hf-item{ display:flex; flex-direction:column; align-items:center; gap:6px; width:64px; position:relative; }
@@ -1869,6 +1871,8 @@
         <div class="home-friends-strip" id="homeFriendsStrip"></div>
       </div>
 
+      <div class="home-games-section">
+      <div class="home-friends-title"><span data-i18n="homeGames">Games</span><span class="home-games-count" id="homeGamesCount">1</span></div>
       <div class="game-grid" id="homeGameGrid">
         <div class="game-card" id="playBaseplateBtn" data-game-id="baseplate">
           <div class="game-card-thumb">
@@ -1884,6 +1888,7 @@
             <div class="game-card-sub" data-i18n="baseplateSub">Run, jump and look around.</div>
           </div>
         </div>
+      </div>
       </div>
     </div>
 
@@ -2555,7 +2560,7 @@
       usernameChoosePh:"Choose a username", passwordChoosePh:"Choose a password",
       confirmPh:"Re-enter your password",
       gender:"Gender", male:"Male", female:"Female", createAccount:"Create account",
-      online:"Online", menu:"Menu", home:"Home", discover:"Discover", friends:"Friends",
+      online:"Online", menu:"Menu", home:"Home", discover:"Discover", friends:"Friends", homeGames:"Games",
       settings:"Settings", logout:"Log out",
       welcomeBack:"Welcome back", homeSub:"Here's what's happening in your BlockVerse.",
       noGamesTitle:"No games yet", noGamesSub:"Games will show up here once they're added.",
@@ -5736,6 +5741,8 @@
       card.addEventListener("click", () => openGamePanel(g.id));
       grid.appendChild(card);
     });
+    const cnt = document.getElementById("homeGamesCount");
+    if(cnt) cnt.textContent = String(1 + publishedList.length);   // Baseplate + every published game
   }
 
   function watchPublishedGames(){
