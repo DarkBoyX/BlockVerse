@@ -15,20 +15,23 @@
   })();
 
   var noteEl = null, noteTimer = null;
+  function hideNote(){
+    clearTimeout(noteTimer); noteTimer = null;
+    if(noteEl){ try{ noteEl.remove(); }catch(e){} noteEl = null; }
+  }
   function note(msg, bad){
     try{ (bad ? console.warn : console.log)("[studio-sync] " + msg); }catch(e){}
     try{
-      if(!noteEl){
-        noteEl = document.createElement("div");
-        noteEl.style.cssText = "position:fixed;left:14px;bottom:14px;z-index:2147483000;max-width:380px;padding:9px 13px;border-radius:9px;font:12px/1.4 'Segoe UI',system-ui,sans-serif;color:#fff;box-shadow:0 8px 22px rgba(0,0,0,.5);pointer-events:none";
-        document.body.appendChild(noteEl);
-      }
-      noteEl.textContent = msg;
+      hideNote();
+      noteEl = document.createElement("div");
+      noteEl.style.cssText = "position:fixed;left:14px;bottom:14px;z-index:2147483000;max-width:380px;padding:9px 13px;border-radius:9px;font:12px/1.4 'Segoe UI',system-ui,sans-serif;color:#fff;box-shadow:0 8px 22px rgba(0,0,0,.5);cursor:pointer";
+      noteEl.title = "Click to dismiss";
       noteEl.style.background = bad ? "#7a2a2a" : "#1f5a37";
       noteEl.style.border = "1px solid " + (bad ? "#d4504f" : "#3ecf6e");
-      noteEl.style.display = "block";
-      clearTimeout(noteTimer);
-      noteTimer = setTimeout(function(){ noteEl.style.display = "none"; }, bad ? 20000 : 6000);
+      noteEl.textContent = msg;
+      noteEl.addEventListener("click", hideNote);
+      document.body.appendChild(noteEl);
+      noteTimer = setTimeout(hideNote, bad ? 15000 : 4000);
     }catch(e){}
   }
 
@@ -39,7 +42,7 @@
     var lastSent = {};            // gameId -> the exact text last uploaded
     var busy = false;
     var publishedIds = {};        // gameId -> true, for games an admin has published
-    note("World sync is on (checking your games...)");
+    console.log("[studio-sync] world sync is on");
 
     function pack(w){
       var parts = (w.parts || []).map(function(p){
