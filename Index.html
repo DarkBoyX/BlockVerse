@@ -5705,19 +5705,35 @@
       profile: g.icon ? ("url('" + g.icon + "') center/cover") : "linear-gradient(135deg,#5a6cd6,#3a4aa8)",
       maxPlayers: g.maxPlayers || 20,
       isCommunity: true,
-      start: () => {
+      start: async () => {
         closeGamePanel();
-        const msg = "\"" + (g.name || "This game") + "\" doesn't have a published experience to join yet.";
-        if(typeof showToast === "function"){ showToast(msg); return; }
-        const el = document.createElement("div");
-        el.textContent = msg;
-        Object.assign(el.style, {
-          position:"fixed", left:"50%", bottom:"26px", transform:"translateX(-50%)",
-          background:"rgba(10,10,11,0.92)", color:"#fff", padding:"12px 18px", borderRadius:"10px",
-          fontSize:"12.5px", zIndex:9999, border:"1px solid rgba(255,255,255,0.15)"
-        });
-        document.body.appendChild(el);
-        setTimeout(() => el.remove(), 3200);
+        const notify = (msg) => {
+          if(typeof showToast === "function"){ showToast(msg); return; }
+          const el = document.createElement("div");
+          el.textContent = msg;
+          Object.assign(el.style, {
+            position:"fixed", left:"50%", bottom:"26px", transform:"translateX(-50%)",
+            background:"rgba(10,10,11,0.92)", color:"#fff", padding:"12px 18px", borderRadius:"10px",
+            fontSize:"12.5px", zIndex:9999, border:"1px solid rgba(255,255,255,0.15)"
+          });
+          document.body.appendChild(el);
+          setTimeout(() => el.remove(), 3200);
+        };
+        let world = null;
+        try{
+          const snap = await fbDb.ref("game_worlds/" + gameId).once("value");
+          const v = snap.val();
+          if(v && v.data) world = JSON.parse(v.data);
+        }catch(err){
+          console.error("Couldn't load the world for", gameId, err);
+          notify("Couldn't load \"" + (g.name || "this game") + "\" - check your connection and try again.");
+          return;
+        }
+        if(!world || !world.parts || !world.parts.length){
+          notify("\"" + (g.name || "This game") + "\" doesn't have a published experience to join yet.");
+          return;
+        }
+        BaseplateGame.start({ id: gameId, world });
       }
     };
   }
@@ -6309,6 +6325,13 @@
     let renderer, scene, camera, clock;
     let character, leftArm, rightArm, leftLeg, rightLeg, head;
     let running = false;
+    let ROOM = "rooms/baseplate";   // community games run in rooms/<gameId>
+    let gameTitle = "Baseplate";
+    let worldMode = false;          // true while a published Studio world is loaded instead of the grass field
+    let worldGroup = null;          // meshes of the loaded world
+    let worldBoxes = [];            // collision boxes of the loaded world
+    let worldSpawn = [0, 0, 0];
+    const envObjects = [];          // grass field / mountains / trees / etc. (hidden inside a custom world)
     let animId = null;
     let sunLight = null, hemiLight = null, fillLight = null, moonLight = null, moonMesh = null, sunMesh = null, starField = null;
     const DAY_NIGHT_CYCLE_MS = 30 * 60 * 1000; // full day->night->day loop; reaches full night at the 15-min mark
@@ -6581,6 +6604,7 @@
       ground.rotation.x = -Math.PI/2;
       ground.receiveShadow = true;
       scene.add(ground);
+      envObjects.push(ground);
 
       const patchTex = makeGroundPatchTexture();
       const patchMat = new THREE.MeshLambertMaterial({ map: patchTex, transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1 });
@@ -6588,14 +6612,19 @@
       patch.rotation.x = -Math.PI/2;
       patch.position.y = 0.02;
       scene.add(patch);
+      envObjects.push(patch);
 
+      let envMark = scene.children.length;
       spawnMountains();
       spawnTrees();
+      scene.children.slice(envMark).forEach(o => envObjects.push(o));
       spawnClouds();
+      envMark = scene.children.length;
       spawnRocks();
       spawnGrassTufts();
       spawnSkyline();
       spawnBoundaryFence();
+      scene.children.slice(envMark).forEach(o => envObjects.push(o));
 
       buildCharacter();
       clock = new THREE.Clock();
@@ -6731,7 +6760,7 @@
       updateGrassField(true);
     }
     function updateGrassField(force){
-      const g = grassField; if(!g || !character) return;
+      const g = grassField; if(!g || !character || worldMode) return;
       const px = character.position.x, pz = character.position.z;
       const ci = Math.floor(px / g.CELL), cj = Math.floor(pz / g.CELL);
       if(!force && ci === g.ci && cj === g.cj) return;
@@ -6875,7 +6904,8 @@
     // returns the ground height at a given XZ, taking any mountain slopes
     // into account - flat GROUND_Y everywhere except inside a mountain's base
     // radius, where it rises linearly toward the peak (a cone's actual slope)
-    function terrainHeightAt(x, z){
+    function terrainHeightAt(x, z, feetY){
+      if(worldMode) return worldGroundAt(x, z, feetY == null ? (character ? character.position.y : 0) : feetY);
       let height = GROUND_Y;
       for(const m of mountainColliders){
         const d = Math.hypot(x - m.x, z - m.z);
@@ -7467,7 +7497,7 @@
 
       playerId = getPlayerId();
 
-      playersRef = fbDb.ref("rooms/baseplate/players");
+      playersRef = fbDb.ref(ROOM + "/players");
       onlineRef = playersRef.child(playerId);
 
       onlineRef.onDisconnect().remove();
@@ -7889,7 +7919,7 @@
 
     function connectChatTyping(){
       typingState = {};
-      typingRef = fbDb.ref("rooms/baseplate/typing");
+      typingRef = fbDb.ref(ROOM + "/typing");
       typingRef.on("value", (snap) => {
         typingState = snap.val() || {};
         renderTypingIndicator();
@@ -7944,7 +7974,7 @@
       chatSeenKeys = new Set();
       chatMessages = [];
       connectChatTyping();
-      chatRef = fbDb.ref("rooms/baseplate/chat").limitToLast(50);
+      chatRef = fbDb.ref(ROOM + "/chat").limitToLast(50);
       chatRef.on("child_added", (snap) => {
         const msg = snap.val() || {};
         if(msg.name && msg.accountKey) knownUsers[msg.name.toLowerCase()] = msg.accountKey; // learn name->key regardless of whisper visibility
@@ -8091,7 +8121,7 @@
           ts: firebase.database.ServerValue.TIMESTAMP
         };
         if(whisperKey){ payload.whisperTo = whisperKey; payload.whisperToName = whisperName || ""; }
-        fbDb.ref("rooms/baseplate/chat").push(payload).catch(err => {
+        fbDb.ref(ROOM + "/chat").push(payload).catch(err => {
           console.error("BlockVerse chat: failed to send message (often a rules/publish issue).", err);
           showMultiplayerError();
         });
@@ -8312,7 +8342,7 @@
 
         // log the report either way so staff can review edge cases later
         try{
-          fbDb.ref("rooms/baseplate/reports").push({
+          fbDb.ref(ROOM + "/reports").push({
             reporterUid: playerId, reporterName: currentUsername(),
             targetName: reportTarget.name, reason: "Chat message: " + reportTarget.text.slice(0,200),
             ts: firebase.database.ServerValue.TIMESTAMP
@@ -8517,8 +8547,8 @@
       if(Math.hypot(velX, velZ) > 0.002){
         character.position.x += velX * FRAME_SCALE;
         character.position.z += velZ * FRAME_SCALE;
-        resolveTreeCollisions();
-        resolveMapBoundary();
+        if(worldMode){ resolveWorldCollisions(); }
+        else { resolveTreeCollisions(); resolveMapBoundary(); }
 
         const targetRot = Math.atan2(velX, velZ);
         let diff = targetRot - character.rotation.y;
@@ -8564,7 +8594,7 @@
       // gravity) after a jump, or when the ground drops more than a step
       // can reasonably cover (an actual ledge/cliff, not a walkable slope).
       const wasOnGround = onGround;
-      const groundHere = terrainHeightAt(character.position.x, character.position.z);
+      const groundHere = terrainHeightAt(character.position.x, character.position.z, character.position.y);
       const STEP_MAX = 1.2;
       if(onGround && vy <= 0){
         const drop = character.position.y - groundHere;
@@ -8630,6 +8660,147 @@
       } else if(character.scale.y !== baseScaleY){
         character.scale.set(baseScaleX, baseScaleY, baseScaleZ);
       }
+    }
+
+    /* ---------- published Studio worlds ----------
+       A community game's world is a flat list of parts saved by Studio at game_worlds/<gameId>.
+       Parts are drawn as plain meshes and collide as boxes (yaw-rotated boxes stay exact, tilted ones use their
+       bounding box, wedges are walkable ramps). */
+    function placeAtSpawn(){
+      if(worldMode) character.position.set(worldSpawn[0], worldSpawn[1], worldSpawn[2]);
+      else character.position.set(0, 0, 0);
+    }
+    function worldGeometry(shape, size){
+      const w = size[0], h = size[1], d = size[2];
+      if(shape === "sphere"){ const g = new THREE.SphereGeometry(1, 24, 16); g.scale(w/2, h/2, d/2); return g; }
+      if(shape === "cylinder"){ const r = Math.max(w, d) / 2; return new THREE.CylinderGeometry(r, r, h, 20); }
+      if(shape === "wedge"){
+        const hw = w/2, hh = h/2, hd = d/2;
+        const v = [[-hw,-hh,-hd],[hw,-hh,-hd],[hw,-hh,hd],[-hw,-hh,hd],[-hw,hh,-hd],[-hw,hh,hd]];
+        const idx = [0,1,2, 0,2,3, 0,4,5, 0,5,3, 1,2,5, 1,5,4, 0,1,4, 2,3,5];
+        const pos = []; idx.forEach(i => pos.push(v[i][0], v[i][1], v[i][2]));
+        const g = new THREE.BufferGeometry();
+        g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+        g.computeVertexNormals();
+        return g;
+      }
+      if(shape === "cornerwedge"){
+        const hw = w/2, hh = h/2, hd = d/2;
+        const A = [-hw,-hh,-hd], B = [hw,-hh,-hd], C = [hw,-hh,hd], D = [-hw,-hh,hd], T = [-hw,hh,-hd];
+        const tris = [[A,B,C],[A,C,D],[A,D,T],[A,T,B],[B,T,C],[C,T,D]];
+        const cen = [-hw/5, -hh*3/5, -hd/5];
+        const pos = [];
+        tris.forEach(t => {
+          const u = [t[1][0]-t[0][0], t[1][1]-t[0][1], t[1][2]-t[0][2]], q = [t[2][0]-t[0][0], t[2][1]-t[0][1], t[2][2]-t[0][2]];
+          const n = [u[1]*q[2]-u[2]*q[1], u[2]*q[0]-u[0]*q[2], u[0]*q[1]-u[1]*q[0]];
+          const c = [(t[0][0]+t[1][0]+t[2][0])/3-cen[0], (t[0][1]+t[1][1]+t[2][1])/3-cen[1], (t[0][2]+t[1][2]+t[2][2])/3-cen[2]];
+          const tt = (n[0]*c[0]+n[1]*c[1]+n[2]*c[2]) < 0 ? [t[0], t[2], t[1]] : t;
+          tt.forEach(p => pos.push(p[0], p[1], p[2]));
+        });
+        const g = new THREE.BufferGeometry();
+        g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+        g.computeVertexNormals();
+        return g;
+      }
+      return new THREE.BoxGeometry(w, h, d);
+    }
+    const WORLD_MATS = { wood:[0.85,0], stone:[0.95,0], ice:[0.06,0], snow:[0.9,0], metal:[0.28,0.85], plastic:[0.35,0], neon:[0.4,0] };
+    function clearWorld(){
+      if(worldGroup){ scene.remove(worldGroup); disposeObject3D(worldGroup); worldGroup = null; }
+      worldBoxes = [];
+    }
+    function applyWorld(world){
+      clearWorld();
+      worldMode = !!(world && world.parts && world.parts.length);
+      envObjects.forEach(o => { o.visible = !worldMode; });
+      if(!worldMode){ worldSpawn = [0, 0, 0]; return; }
+      const LOWFX = !!window.BV_IS_TOUCH;
+      worldGroup = new THREE.Group();
+      let spawn = null;
+      world.parts.forEach(p => {
+        const size = (p.z || [4, 1, 2]).map(v => Math.max(0.05, +v || 0.05));
+        const pos = p.p || [0, 0, 0], rot = p.r || [0, 0, 0];
+        const mk = WORLD_MATS[p.m] || WORLD_MATS.plastic;
+        const trans = +p.t || 0;
+        const mat = new THREE.MeshStandardMaterial({
+          color: (p.k != null ? p.k : 0xa3a2a5), roughness: mk[0], metalness: mk[1],
+          transparent: trans > 0 || p.m === "ice", opacity: Math.max(0.15, 1 - trans - (p.m === "ice" ? 0.25 : 0))
+        });
+        if(p.m === "neon"){ mat.emissive = new THREE.Color(p.k != null ? p.k : 0x39ff88); mat.emissiveIntensity = 0.7; }
+        const mesh = new THREE.Mesh(worldGeometry(p.s, size), mat);
+        mesh.position.set(pos[0], pos[1], pos[2]);
+        mesh.rotation.set(rot[0], rot[1], rot[2]);
+        mesh.castShadow = !LOWFX && p.cs !== 0;
+        mesh.receiveShadow = true;
+        worldGroup.add(mesh);
+        if(p.c === "SpawnLocation"){ if(!spawn) spawn = { pos, size }; return; }   // like Studio: you walk over the pad
+        if(p.cc === 0) return;                                                   // CanCollide off
+        const hx = size[0]/2, hy = size[1]/2, hz = size[2]/2;
+        const yawOnly = Math.abs(rot[0]) < 1e-3 && Math.abs(rot[2]) < 1e-3;
+        if(yawOnly){
+          worldBoxes.push({ cx: pos[0], cy: pos[1], cz: pos[2], hx, hy, hz, cos: Math.cos(rot[1]), sin: Math.sin(rot[1]), wedge: p.s === "wedge" });
+        }else{
+          const e = new THREE.Euler(rot[0], rot[1], rot[2], "XYZ");
+          const m = new THREE.Matrix4().makeRotationFromEuler(e).elements;   // column-major
+          const ax = Math.abs(m[0])*hx + Math.abs(m[4])*hy + Math.abs(m[8])*hz;
+          const ay = Math.abs(m[1])*hx + Math.abs(m[5])*hy + Math.abs(m[9])*hz;
+          const az = Math.abs(m[2])*hx + Math.abs(m[6])*hy + Math.abs(m[10])*hz;
+          worldBoxes.push({ cx: pos[0], cy: pos[1], cz: pos[2], hx: ax, hy: ay, hz: az, cos: 1, sin: 0, wedge: false });
+        }
+      });
+      scene.add(worldGroup);
+      if(spawn){
+        const top = worldGroundAt(spawn.pos[0], spawn.pos[2], 1e6);
+        worldSpawn = [spawn.pos[0], top > -1e8 ? top : spawn.pos[1] + spawn.size[1] / 2, spawn.pos[2]];
+      }else{
+        const top = worldGroundAt(0, 0, 1e6);
+        worldSpawn = [0, top > -1e8 ? top : 0, 0];
+      }
+    }
+    // highest walkable surface under (x, z) that is no more than one step above the player's feet
+    function worldGroundAt(x, z, feetY){
+      const STEP = 1.2;
+      let best = -1e9;
+      for(let i = 0; i < worldBoxes.length; i++){
+        const b = worldBoxes[i];
+        const dx = x - b.cx, dz = z - b.cz;
+        const lx = dx * b.cos - dz * b.sin, lz = dx * b.sin + dz * b.cos;
+        if(Math.abs(lx) > b.hx || Math.abs(lz) > b.hz) continue;
+        let top = b.cy + b.hy;
+        if(b.wedge) top = b.cy - b.hy + 2 * b.hy * ((b.hx - lx) / (2 * b.hx));
+        if(top <= feetY + STEP + 0.001 && top > best) best = top;
+      }
+      return best > -1e8 ? best : -1000;   // nothing under you: fall into the void
+    }
+    function resolveWorldCollisions(){
+      const STEP = 1.2, PH = 3.0, R = PLAYER_RADIUS;
+      const fy = character.position.y;
+      for(let i = 0; i < worldBoxes.length; i++){
+        const b = worldBoxes[i];
+        if(fy + PH <= b.cy - b.hy + 0.05) continue;                    // box is entirely above your head
+        const dx = character.position.x - b.cx, dz = character.position.z - b.cz;
+        const lx = dx * b.cos - dz * b.sin, lz = dx * b.sin + dz * b.cos;
+        const qx = Math.max(-b.hx, Math.min(b.hx, lx)), qz = Math.max(-b.hz, Math.min(b.hz, lz));
+        let top = b.cy + b.hy;
+        if(b.wedge) top = b.cy - b.hy + 2 * b.hy * ((b.hx - qx) / (2 * b.hx));
+        if(top <= fy + STEP) continue;                                  // low enough to step onto - ground handling lifts you
+        const ox = lx - qx, oz = lz - qz, d2 = ox * ox + oz * oz;
+        let nx, nz, pen;
+        if(d2 > 1e-8){
+          if(d2 >= R * R) continue;
+          const d = Math.sqrt(d2); nx = ox / d; nz = oz / d; pen = R - d;
+        }else{
+          const gx = b.hx - Math.abs(lx), gz = b.hz - Math.abs(lz);
+          if(gx < gz){ nx = lx >= 0 ? 1 : -1; nz = 0; pen = gx + R; }
+          else { nx = 0; nz = lz >= 0 ? 1 : -1; pen = gz + R; }
+        }
+        const px = nx * pen, pz = nz * pen;
+        character.position.x += px * b.cos + pz * b.sin;
+        character.position.z += -px * b.sin + pz * b.cos;
+      }
+      // keep players inside the range the multiplayer rules accept
+      character.position.x = Math.max(-495, Math.min(495, character.position.x));
+      character.position.z = Math.max(-495, Math.min(495, character.position.z));
     }
 
     const PLAYER_RADIUS = 0.5;
@@ -9336,7 +9507,7 @@
       leftLeg.position.set(-0.226, 0.78, 0); leftLeg.rotation.set(0,0,0);
       rightLeg.position.set(0.226, 0.78, 0); rightLeg.rotation.set(0,0,0);
 
-      character.position.set(0, 0, 0);
+      placeAtSpawn();
       character.rotation.set(0,0,0);
       vy = 0; onGround = true; velX = 0; velZ = 0;
       camYaw = Math.PI; camPitch = 0.28; smYaw = Math.PI; smPitch = 0.28;
@@ -9735,7 +9906,7 @@
         const text = document.getElementById("reportReasonText").value.trim();
         if(!text || !reportTargetName) return;
         btn.disabled = true;
-        fbDb.ref("rooms/baseplate/reports").push({
+        fbDb.ref(ROOM + "/reports").push({
           reporterUid: playerId,
           reporterName: currentUsername(),
           targetName: reportTargetName,
@@ -9780,7 +9951,11 @@
       }
     }
 
-    function start(){
+    function start(opts){
+      opts = opts || {};
+      const gid = opts.id || "baseplate";
+      ROOM = "rooms/" + gid;
+      gameTitle = (typeof GAMES_CATALOG !== "undefined" && GAMES_CATALOG[gid] && GAMES_CATALOG[gid].title) || "Baseplate";
       hp = 100; hpRegenAccum = 0;
       const screen = document.getElementById("gameScreen");
       const loading = document.getElementById("gameLoading");
@@ -9788,10 +9963,12 @@
       screen.classList.remove("hidden");
       loading.classList.remove("hidden");
       bar.style.width = "0%";
+      const loadLabel = document.getElementById("gameLoadingText");
+      if(loadLabel) loadLabel.textContent = "Loading " + gameTitle + "...";
 
       // loading screen shows the game's own background + profile + creator,
       // matching whatever's in the catalog for this game
-      const game = (typeof GAMES_CATALOG !== "undefined") ? GAMES_CATALOG.baseplate : null;
+      const game = (typeof GAMES_CATALOG !== "undefined") ? (GAMES_CATALOG[gid] || GAMES_CATALOG.baseplate) : null;
       if(game){
         loading.style.background = game.background;
         const profileEl = document.getElementById("gameLoadingProfile");
@@ -9804,6 +9981,7 @@
       }
 
       if(!renderer) initScene();
+      applyWorld(opts.world || null);
       if(!wired){ wireInput(); wired = true; }
       wireMenu();
       wireChat();
@@ -9811,7 +9989,7 @@
       wireShiftlockSetting();
       wireFullscreenSetting();
 
-      character.position.set(0,0,0);
+      placeAtSpawn();
       vy = 0; onGround = true; camYaw = Math.PI; camPitch = 0.28;
       updateCamera();
       renderer.render(scene, camera);
@@ -9849,7 +10027,7 @@
       if(chatPanel) chatPanel.classList.add("hidden");
 
       // show a quick "leaving" loading screen before we actually tear the game down
-      label.textContent = "Leaving Baseplate...";
+      label.textContent = "Leaving " + gameTitle + "...";
       loading.classList.remove("hidden");
       loading.classList.remove("fade-out");
       bar.style.width = "0%";
@@ -9872,7 +10050,7 @@
             if(profileEl) profileEl.classList.remove("show");
             if(creatorEl) creatorEl.classList.remove("show");
             if(cubeEl) cubeEl.classList.remove("hide");
-            label.textContent = "Loading Baseplate...";
+            label.textContent = "Loading Baseplate...";   // reset for the next game
             bar.style.width = "0%";
             showPage("home"); // always land back on a real dashboard tab, never wherever you happened to be before
           }, 180);
