@@ -140,3 +140,106 @@
     }, true);
   }
 })();
+
+
+/* ===================================================================================================
+   Editor menu: the "<" back button in the editor becomes a hamburger menu with
+   Publish for review / Publish update / Take offline / Close.
+   It needs the one-line hook in studio.html (window.__bvStudio = {...}) that exposes a few Studio functions.
+   =================================================================================================== */
+(function(){
+  "use strict";
+  var panel = null, backBtn = null;
+
+  function S(){ return window.__bvStudio; }
+
+  function closeMenu(){ if(panel){ panel.remove(); panel = null; } document.removeEventListener("mousedown", onOutside, true); document.removeEventListener("keydown", onKey, true); }
+  function onOutside(e){ if(panel && !panel.contains(e.target) && e.target !== backBtn && !backBtn.contains(e.target)) closeMenu(); }
+  function onKey(e){ if(e.key === "Escape") closeMenu(); }
+
+  function item(label, sub, enabled, onClick, danger){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.disabled = !enabled;
+    b.style.cssText = "display:block;width:100%;text-align:left;padding:10px 12px;margin:0 0 6px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:" +
+      (danger ? "rgba(229,72,77,0.12)" : "rgba(255,255,255,0.06)") + ";color:" + (enabled ? (danger ? "#ff8b8f" : "#f2f2f4") : "#6f6f77") +
+      ";cursor:" + (enabled ? "pointer" : "not-allowed") + ";font:600 13px 'Segoe UI',system-ui,sans-serif";
+    b.innerHTML = '<div>' + label + '</div>' + (sub ? '<div style="font-weight:500;font-size:11.5px;color:#8a8a92;margin-top:2px">' + sub + '</div>' : "");
+    if(enabled) b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function openMenu(){
+    if(panel){ closeMenu(); return; }
+    var st = S().status();
+    panel = document.createElement("div");
+    panel.style.cssText = "position:fixed;left:12px;top:54px;z-index:2147482000;width:290px;padding:12px;border-radius:13px;background:#101013;border:1px solid rgba(255,255,255,0.14);box-shadow:0 18px 44px rgba(0,0,0,0.6);font-family:'Segoe UI',system-ui,sans-serif;color:#f2f2f4";
+    var label = { draft: "Draft - not published", pending: "Waiting on admin review", published: "Live on the home page", denied: "Denied - fix it and resubmit" }[st] || "Draft";
+    var head = document.createElement("div");
+    head.style.cssText = "margin:0 0 10px;font-size:12px;color:#a8a8b0";
+    head.innerHTML = '<div style="font-weight:800;font-size:14px;color:#fff;margin-bottom:3px">Game menu</div>Status: ' + label;
+    panel.appendChild(head);
+
+    var canSubmit = st !== "pending" && st !== "published";
+    panel.appendChild(item(st === "denied" ? "Resubmit for review" : "Publish for review",
+      st === "pending" ? "Already sent - waiting on an admin" : st === "published" ? "This game is already published" : "Send this game to the admins to be reviewed",
+      canSubmit, function(){
+        closeMenu();
+        S().submit().then(function(r){
+          if(r.ok){ S().toast("Sent for review. You'll see it update here once an admin decides."); return; }
+          S().toast(r.msg || "Couldn't submit.");
+          if(r.settings) S().openSettings();
+        }).catch(function(err){ console.error(err); S().toast("Couldn't submit - check your connection and try again."); });
+      }));
+
+    panel.appendChild(item("Publish update",
+      st === "published" ? "Save and push your latest changes to the live game" : "Only for games that are already published",
+      st === "published", function(){
+        closeMenu();
+        S().save();
+        if(typeof window.bvSyncNow === "function") window.bvSyncNow();
+        S().toast("Update published. Players who join from now on get your latest version.");
+      }));
+
+    if(st === "published"){
+      panel.appendChild(item("Take game offline", "Removes it from the home page and sends everyone inside back to the dashboard", true, function(){
+        closeMenu();
+        S().takeOffline();
+      }, true));
+    }
+
+    panel.appendChild(item("Close", "Save and go back to the dashboard", true, function(){
+      closeMenu();
+      backBtn.dataset.bvClose = "1";
+      backBtn.click();
+      delete backBtn.dataset.bvClose;
+    }));
+
+    document.body.appendChild(panel);
+    document.addEventListener("mousedown", onOutside, true);
+    document.addEventListener("keydown", onKey, true);
+  }
+
+  function setup(){
+    backBtn = document.getElementById("editorBackBtn");
+    if(!backBtn || !S()) return false;
+    if(backBtn.dataset.bvMenu) return true;
+    backBtn.dataset.bvMenu = "1";
+    backBtn.title = "Menu";
+    backBtn.setAttribute("aria-label", "Menu");
+    backBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+    // runs before Studio's own click handler, which is kept for the "Close" item
+    backBtn.addEventListener("click", function(e){
+      if(backBtn.dataset.bvClose === "1") return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      openMenu();
+    }, true);
+    return true;
+  }
+
+  var tries = 0;
+  (function wait(){
+    if(setup()) return;
+    if(++tries < 40) setTimeout(wait, 500);
+  })();
+})();
