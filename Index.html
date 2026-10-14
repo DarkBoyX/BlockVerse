@@ -5738,7 +5738,7 @@
           notify("\"" + (g.name || "This game") + "\" doesn't have a published experience to join yet.");
           return;
         }
-        BaseplateGame.start({ id: gameId, world, ownerKey: g.ownerKey });
+        BaseplateGame.start({ id: gameId, world, ownerKey: g.ownerKey, title: g.name });
       }
     };
   }
@@ -9059,6 +9059,26 @@
     function humScale(){ const hm = luaRt && luaRt.running ? luaRt.hum : null; return { walk: hm ? hm.WalkSpeed / 16 : 1, jump: hm ? hm.JumpPower / 50 : 1, hm }; }
 
     /* ---------- developer console (only the game's owner sees the button) ---------- */
+    let shutdownRef = null, shutdownCb = null;
+    // a published game can be taken down by its creator ("Take offline" in Studio) or an admin; both delete
+    // published_games/<id>. Everyone inside gets sent back to the home page.
+    function watchShutdown(gid, title){
+      unwatchShutdown();
+      if(gid === "baseplate" || typeof fbDb === "undefined") return;
+      shutdownRef = fbDb.ref("published_games/" + gid);
+      shutdownCb = (snap) => {
+        if(snap.exists() || !running) return;
+        unwatchShutdown();
+        bvNotify("\"" + title + "\" was shut down. You've been returned to the home page.");
+        stop();
+      };
+      shutdownRef.on("value", shutdownCb);
+    }
+    function unwatchShutdown(){
+      if(shutdownRef && shutdownCb){ try{ shutdownRef.off("value", shutdownCb); }catch(e){} }
+      shutdownRef = null; shutdownCb = null;
+    }
+
     let devLog = [], devOwner = false, devWired = false, devPanel = null, devTimer = null, devEngineState = "not started", devStartInfo = null;
     const devErr = {};          // script name -> last error text
     function logDev(kind, text, vm){
@@ -9148,6 +9168,7 @@
       if(devPanel) devPanel.style.display = "none";
       if(devTimer){ clearInterval(devTimer); devTimer = null; }
     }
+    function gameTitleForShutdown(opts, gid){ return opts.title || gameTitle || "This game"; }
     function wireDevConsole(){
       const row = document.getElementById("devConsoleRow"), btn = document.getElementById("devConsoleBtn");
       if(row) row.style.display = (worldMode && devOwner) ? "" : "none";
@@ -10356,6 +10377,7 @@
       vy = 0; onGround = true; camYaw = Math.PI; camPitch = 0.28;
       updateCamera();
       if(worldMode) startLua();
+      watchShutdown(gid, gameTitleForShutdown(opts, gid));
       renderer.render(scene, camera);
       wireOrientationPrompt();
       if(!worldMode) startAmbientAir();      // that wind loop is Baseplate's; a published game has no sound unless its creator adds one
@@ -10378,6 +10400,7 @@
     }
 
     function stop(){
+      unwatchShutdown();
       const screen = document.getElementById("gameScreen");
       const loading = document.getElementById("gameLoading");
       const bar = document.getElementById("gameLoadBar");
