@@ -6331,6 +6331,7 @@
     let worldGroup = null;          // meshes of the loaded world
     let worldBoxes = [];            // collision boxes of the loaded world
     let worldSpawn = [0, 0, 0];
+    let worldClock = 14;            // Lighting.ClockTime of the loaded world (Studio's default is 14:00)
     let worldParts = [];            // the parts of the loaded world (scripts see these)
     let worldNodes = [];            // scripts / folders / values of the loaded world
     let boxesDirty = false;         // a script moved something: rebuild the collision boxes before the next step
@@ -6432,6 +6433,10 @@
     // Using absolute Date.now() (not a per-session timer) means every player
     // sees the same time of day automatically, with zero syncing needed.
     function nightAmount(){
+      if(worldMode){                       // 0 = full day, 1 = full night, from the world's own clock (0-24 hours)
+        const c = Math.cos((worldClock - 12) / 12 * Math.PI);
+        return Math.max(0, Math.min(1, 0.5 - c * 0.75));
+      }
       const phase = (Date.now() % DAY_NIGHT_CYCLE_MS) / DAY_NIGHT_CYCLE_MS;
       return phase < 0.5 ? phase * 2 : (1 - phase) * 2;
     }
@@ -8801,6 +8806,8 @@
       worldParts = world.parts.map(newWorldPart);
       worldParts.forEach(rec => worldGroup.add(rec.mesh));
       worldNodes = (world.nodes || []).map(n => Object.assign({}, n));
+      worldClock = (world.light && typeof world.light.time === "number") ? world.light.time : 14;
+      lastSkyRedrawAt = 0;
       scene.add(worldGroup);
       rebuildWorldBoxes();
       const sp = worldParts.find(r => r.className === "SpawnLocation");
@@ -8987,8 +8994,8 @@
           getBox(){ const r = character.position; return { min: [r.x - 1.2, r.y, r.z - 1.2], max: [r.x + 1.2, r.y + 3.2, r.z + 1.2] }; }
         },
         lighting: {
-          get(k){ return k === "ClockTime" ? 14 : 1; },
-          set(){ /* the home page runs its own day/night cycle */ }
+          get(k){ return k === "ClockTime" ? worldClock : 1; },
+          set(k, v){ if(k === "ClockTime"){ worldClock = ((Number(v) % 24) + 24) % 24; lastSkyRedrawAt = 0; } }
         },
         respawn(){ placeAtSpawn(); vy = 0; onGround = true; }
       };
@@ -10235,7 +10242,7 @@
       if(worldMode) startLua();
       renderer.render(scene, camera);
       wireOrientationPrompt();
-      startAmbientAir();
+      if(!worldMode) startAmbientAir();      // that wind loop is Baseplate's; a published game has no sound unless its creator adds one
 
       let pct = 0;
       const iv = setInterval(() => {
