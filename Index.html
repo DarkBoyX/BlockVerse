@@ -2332,6 +2332,11 @@
           <p class="s-desc" style="margin:0 0 8px;">Press Shift to lock the camera to the crosshair and look around without holding the mouse. Press Shift again to release. Turn this off if you don't want Shift to do anything.</p>
           <div class="g-switch" id="shiftlockToggle"><div class="g-switch-nub"></div></div>
         </div>
+        <div class="game-settings-row" id="devConsoleRow" style="display:none">
+          <label><span>Developer console</span></label>
+          <p class="s-desc" style="margin:0 0 8px;">Only you can see this. Shows which of your game's scripts are running, which broke, and what they print.</p>
+          <button type="button" id="devConsoleBtn" style="width:100%;padding:10px 12px;border-radius:9px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;font:600 13px 'Segoe UI',system-ui,sans-serif;cursor:pointer;">Open developer console</button>
+        </div>
         <div class="game-settings-row game-toggle-row desktop-only">
           <label><span>Fullscreen</span></label>
           <p class="s-desc" style="margin:0 0 8px;">Press F11 anytime to toggle fullscreen, or use this switch - they stay in sync with each other either way.</p>
@@ -5733,7 +5738,7 @@
           notify("\"" + (g.name || "This game") + "\" doesn't have a published experience to join yet.");
           return;
         }
-        BaseplateGame.start({ id: gameId, world });
+        BaseplateGame.start({ id: gameId, world, ownerKey: g.ownerKey });
       }
     };
   }
@@ -7161,8 +7166,8 @@
     // getMyCustom() - called from saveMyCustom() (outside this module) so
     // changing your look while already in a game shows up immediately
     // instead of only taking effect next time you rejoin
-    function refreshOwnCharacterAppearance(){
-      if(!running || !character) return;
+    function refreshOwnCharacterAppearance(force){
+      if((!running && !force) || !character) return;
       const oldPos = character.position.clone(), oldRotY = character.rotation.y;
       const rig = buildCharacterRig(getMyCustom());
       rig.group.position.copy(oldPos);
@@ -8351,8 +8356,8 @@
 
         // log the report either way so staff can review edge cases later
         try{
-          fbDb.ref(ROOM + "/reports").push({
-            reporterUid: playerId, reporterName: currentUsername(),
+          fbDb.ref("rooms/baseplate/reports").push({
+            gameId: ROOM.slice(6), reporterUid: playerId, reporterName: currentUsername(),
             targetName: reportTarget.name, reason: "Chat message: " + reportTarget.text.slice(0,200),
             ts: firebase.database.ServerValue.TIMESTAMP
           }).catch(()=>{});
@@ -8876,20 +8881,19 @@
         });
       }
       const html = await (await fetch("studio.html", { cache: "no-cache" })).text();
-      const rtm = html.match(/<script>\s*(\/\* =+ BlockVerse Studio Lua runtime[\s\S]*?)<\/script>/);
-      const prm = html.match(/<script type="text\/plain" id="bvLuaPrelude">([\s\S]*?)<\/script>/);
-      const pal = html.match(/const BV_BRICK_PALETTE = ("(?:[^"\\]|\\.)*");/);
-      if(!rtm || !prm || !pal) throw new Error("Couldn't read the Lua runtime from studio.html");
-      const factory = new Function(rtm[1] + "\nreturn createLuaRuntime;");
-      luaEngine = { create: factory(), prelude: prm[1].replace("__BRICK_PALETTE__", () => JSON.parse(pal[1])) };
+      const blocks = [];
+      html.replace(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g, (m, attrs, code) => { blocks.push({ attrs, code }); return m; });
+      const rtm = blocks.find(b => b.code.indexOf("function createLuaRuntime(") >= 0 && b.attrs.indexOf("text/plain") < 0);
+      const prm = blocks.find(b => /id=["']bvLuaPrelude["']/.test(b.attrs));
+      const pal = html.match(/BV_BRICK_PALETTE\s*=\s*("(?:[^"\\]|\\.)*")/);
+      if(!rtm || !prm || !pal) throw new Error("Couldn't read the Lua engine from studio.html (runtime " + !!rtm + ", prelude " + !!prm + ", palette " + !!pal + ")");
+      const factory = new Function(rtm.code + "\nreturn createLuaRuntime;");
+      luaEngine = { create: factory(), prelude: prm.code.replace("__BRICK_PALETTE__", () => JSON.parse(pal[1])) };
       return luaEngine;
     }
     const SHAPE_TO_ENUM = { cube:"Block", ledge:"Block", sphere:"Ball", cylinder:"Cylinder", wedge:"Wedge", cornerwedge:"CornerWedge" };
     const ENUM_TO_SHAPE = { block:"cube", ball:"sphere", cylinder:"cylinder", wedge:"wedge", cornerwedge:"cornerwedge" };
-    function luaToast(msg){
-      const now = Date.now(); if(now - luaErrAt < 2500) return; luaErrAt = now;
-      if(typeof showToast === "function") showToast(msg);
-    }
+    function luaToast(msg){ bvNotify(msg); }
     function makeWorldAdapter(){
       const dirty = () => { boxesDirty = true; };
       const addRec = (cn) => {
@@ -8901,7 +8905,8 @@
       return {
         log(kind, text, vm){
           const tag = vm === "server" ? "[Server] " : vm === "client" ? "[Client] " : "";
-          if(kind === "error"){ console.error(tag + text); luaToast("Script error: " + String(text).slice(0, 120)); }
+          logDev(kind, text, vm);
+          if(kind === "error"){ console.error(tag + text); if(devOwner) bvNotify("Script error: " + String(text).slice(0, 120) + " (Settings > Developer console)"); }
           else if(kind === "warn") console.warn(tag + text); else console.log(tag + text);
         },
         parts: () => worldParts,
@@ -9003,12 +9008,16 @@
     function lookupKey(e){ return e.key; }
     async function startLua(){
       const hasScripts = worldNodes.some(n => (n.className === "Script" || n.className === "LocalScript") && !n.disabled);
-      if(!hasScripts) return;
+      logDev("info", "World loaded: " + worldParts.length + " part(s), " + worldNodes.length + " other object(s).");
+      if(!hasScripts){ devEngineState = "no scripts"; logDev("info", "This world has no enabled Script or LocalScript."); return; }
       try{
+        devEngineState = "loading"; logDev("info", "Loading the Lua engine...");
         const eng = await ensureLuaEngine();
         if(!worldMode || !running) return;                 // left the game while the engine was loading
         luaRt = eng.create(window.fengari, makeWorldAdapter(), eng.prelude);
         const info = luaRt.start();
+        devEngineState = "running"; devStartInfo = info.server + " server, " + info.client + " local started";
+        logDev("info", "Lua engine ready: " + info.server + " server script(s) and " + info.client + " local script(s) started.");
         lastHumHealth = luaRt.hum ? luaRt.hum.Health : 100;
         console.log("Lua: running " + info.server + " server script(s) and " + info.client + " local script(s)");
         luaKeyDown = (e) => { if(!isTypingField() && !e.repeat) luaRt && luaRt.running && luaRt.keyEvent(e.key, true); };
@@ -9017,8 +9026,9 @@
         window.addEventListener("keyup", luaKeyUp);
       }catch(err){
         console.error("Scripts couldn't start:", err);
-        luaRt = null;
-        luaToast("This game's scripts couldn't start: " + (err && err.message ? err.message : err));
+        luaRt = null; devEngineState = "failed";
+        logDev("error", "Scripts couldn't start: " + (err && err.message ? err.message : err));
+        if(devOwner) bvNotify("This game's scripts couldn't start (Settings > Developer console shows why)");
       }
     }
     function isTypingField(){
@@ -9026,6 +9036,7 @@
       return !!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"));
     }
     function stopLua(){
+      closeDevConsole();
       if(luaKeyDown){ window.removeEventListener("keydown", luaKeyDown); luaKeyDown = null; }
       if(luaKeyUp){ window.removeEventListener("keyup", luaKeyUp); luaKeyUp = null; }
       if(luaRt){ try{ luaRt.stop(); }catch(e){ console.error(e); } luaRt = null; }
@@ -9046,6 +9057,104 @@
       lastHumHealth = hm.Health;
     }
     function humScale(){ const hm = luaRt && luaRt.running ? luaRt.hum : null; return { walk: hm ? hm.WalkSpeed / 16 : 1, jump: hm ? hm.JumpPower / 50 : 1, hm }; }
+
+    /* ---------- developer console (only the game's owner sees the button) ---------- */
+    let devLog = [], devOwner = false, devWired = false, devPanel = null, devTimer = null, devEngineState = "not started", devStartInfo = null;
+    const devErr = {};          // script name -> last error text
+    function logDev(kind, text, vm){
+      devLog.push({ t: Date.now(), kind: kind || "info", vm: vm || "", text: String(text) });
+      if(devLog.length > 500) devLog.splice(0, devLog.length - 500);
+      if(kind === "error"){ const m = /^([^:\n]+):\d+:/.exec(String(text)); if(m) devErr[m[1]] = String(text); }
+    }
+    function bvNotify(msg){
+      if(typeof showToast === "function"){ showToast(msg); return; }
+      const now = Date.now(); if(now - luaErrAt < 2500) return; luaErrAt = now;
+      const el = document.createElement("div");
+      el.textContent = msg;
+      Object.assign(el.style, { position:"fixed", left:"50%", top:"18px", transform:"translateX(-50%)", background:"rgba(40,10,10,0.95)", color:"#fff", padding:"11px 16px", borderRadius:"10px", fontSize:"12.5px", zIndex:99999, border:"1px solid rgba(255,90,90,0.5)", maxWidth:"86vw" });
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4500);
+    }
+    function containerOfNode(n){
+      let cur = n.parent, guard = 0;
+      while(cur && guard++ < 40){
+        if(String(cur).indexOf("svc:") === 0) return cur;
+        if(worldParts.some(p => p.id === cur)) return "svc:Workspace";
+        const pn = worldNodes.find(x => x.id === cur);
+        if(!pn) return null;
+        cur = pn.parent;
+      }
+      return null;
+    }
+    function devScriptRows(){
+      const rows = [];
+      worldNodes.forEach(n => {
+        if(n.className !== "Script" && n.className !== "LocalScript" && n.className !== "ModuleScript") return;
+        const c = containerOfNode(n);
+        const where = c ? c.replace("svc:", "") : "(unknown parent)";
+        let state = "ok", note = "Running";
+        if(n.className === "ModuleScript"){ state = "idle"; note = "ModuleScript - runs when another script requires it"; }
+        else if(n.disabled){ state = "idle"; note = "Disabled"; }
+        else if(!c){ state = "bad"; note = "Not running - its parent wasn't found (a script inside a part needs Studio's part-ID update; re-add it after updating)"; }
+        else if(n.className === "Script" && c !== "svc:ServerScriptService" && c !== "svc:Workspace"){ state = "bad"; note = "Not running - a Script only runs in ServerScriptService or Workspace"; }
+        else if(n.className === "LocalScript" && c !== "svc:StarterPlayerScripts"){ state = "bad"; note = "Not running - a LocalScript only runs in StarterPlayerScripts"; }
+        else if(devErr[n.name]){ state = "bad"; note = "Error: " + devErr[n.name].replace(/\s+/g, " ").slice(0, 200); }
+        else if(!luaRt){ state = "idle"; note = devEngineState === "failed" ? "Not started - the Lua engine failed (see output)" : "Waiting for the Lua engine..."; }
+        rows.push({ name: n.name || n.className, cls: n.className, where, state, note });
+      });
+      return rows;
+    }
+    function renderDevConsole(){
+      if(!devPanel) return;
+      const esc = escapeHtml;
+      const colors = { ok: "#3ecf6e", bad: "#ff5c5c", idle: "#8a8a92" };
+      const rows = devScriptRows();
+      const okN = rows.filter(r => r.state === "ok").length, badN = rows.filter(r => r.state === "bad").length;
+      const sc = devPanel.querySelector("#devScripts"), out = devPanel.querySelector("#devOut");
+      devPanel.querySelector("#devSummary").textContent = rows.length + " script(s): " + okN + " running, " + badN + " with problems  |  engine: " + devEngineState + (devStartInfo ? "  |  " + devStartInfo : "");
+      sc.innerHTML = rows.length ? rows.map(r => '<div style="display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.07)"><span style="color:' + colors[r.state] + ';font-size:15px;line-height:1.1">&#9679;</span><div><div style="font-weight:700">' + esc(r.name) + ' <span style="font-weight:500;color:#8a8a92">' + esc(r.cls) + ' in ' + esc(r.where) + '</span></div><div style="color:' + (r.state === "bad" ? "#ff9a9a" : "#a8a8b0") + ';font-size:12px">' + esc(r.note) + '</div></div></div>').join("")
+        : '<div style="color:#a8a8b0;padding:6px 0">This game has no scripts in the uploaded world. If you added one in Studio, wait for the green "World uploaded" message in Studio, then rejoin.</div>';
+      const atBottom = out.scrollTop + out.clientHeight >= out.scrollHeight - 20;
+      const kc = { error: "#ff7b7b", warn: "#ffd166", info: "#d8d8de" };
+      out.innerHTML = devLog.length ? devLog.map(l => '<div style="color:' + (kc[l.kind] || kc.info) + ';white-space:pre-wrap;word-break:break-word">' + (l.vm === "server" ? "[Server] " : l.vm === "client" ? "[Client] " : "") + esc(l.text) + '</div>').join("") : '<div style="color:#8a8a92">No output yet.</div>';
+      if(atBottom) out.scrollTop = out.scrollHeight;
+    }
+    function openDevConsole(){
+      if(!devPanel){
+        devPanel = document.createElement("div");
+        devPanel.id = "devConsolePanel";
+        devPanel.style.cssText = "position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);font-family:'Segoe UI',system-ui,sans-serif;color:#f2f2f4";
+        devPanel.innerHTML =
+          '<div style="position:relative;width:min(780px,94vw);height:min(560px,82vh);display:flex;flex-direction:column;background:#0f0f12;border:1px solid rgba(255,255,255,0.14);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,0.6);overflow:hidden">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1)"><div style="font-weight:800;font-size:15px">Developer Console</div>' +
+            '<div style="display:flex;gap:8px;align-items:center"><button type="button" id="devClear" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);background:transparent;color:#ddd;cursor:pointer;font-size:12px">Clear output</button>' +
+            '<button type="button" id="devClose" aria-label="Close" style="width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.06);color:#fff;cursor:pointer;font-size:17px;line-height:1">&#10005;</button></div></div>' +
+            '<div id="devSummary" style="padding:8px 16px;font-size:12px;color:#a8a8b0;border-bottom:1px solid rgba(255,255,255,0.07)"></div>' +
+            '<div style="padding:8px 16px 4px;font-size:11px;letter-spacing:.08em;color:#8a8a92;font-weight:700">SCRIPTS</div>' +
+            '<div id="devScripts" style="padding:0 16px;max-height:34%;overflow:auto;font-size:13px"></div>' +
+            '<div style="padding:10px 16px 4px;font-size:11px;letter-spacing:.08em;color:#8a8a92;font-weight:700">OUTPUT</div>' +
+            '<div id="devOut" style="flex:1;overflow:auto;margin:0 16px 14px;padding:8px 10px;background:#08080a;border:1px solid rgba(255,255,255,0.08);border-radius:9px;font:12px/1.5 Consolas,Menlo,monospace"></div>' +
+          '</div>';
+        document.body.appendChild(devPanel);
+        devPanel.querySelector("#devClose").addEventListener("click", closeDevConsole);
+        devPanel.querySelector("#devClear").addEventListener("click", () => { devLog = []; renderDevConsole(); });
+        devPanel.addEventListener("mousedown", (e) => { if(e.target === devPanel) closeDevConsole(); });
+      }
+      devPanel.style.display = "flex";
+      renderDevConsole();
+      if(!devTimer) devTimer = setInterval(renderDevConsole, 500);
+    }
+    function closeDevConsole(){
+      if(devPanel) devPanel.style.display = "none";
+      if(devTimer){ clearInterval(devTimer); devTimer = null; }
+    }
+    function wireDevConsole(){
+      const row = document.getElementById("devConsoleRow"), btn = document.getElementById("devConsoleBtn");
+      if(row) row.style.display = (worldMode && devOwner) ? "" : "none";
+      if(devWired || !btn) return;
+      devWired = true;
+      btn.addEventListener("click", () => { closeMenu(); openDevConsole(); });
+    }
 
     const PLAYER_RADIUS = 0.5;
     function resolveTreeCollisions(){
@@ -9783,6 +9892,8 @@
       if(shiftLocked) toggleShiftlock(); // free the cursor while the menu is open
       for(const k in keys) keys[k] = false;
       showTab("tabMain");
+      const dcRow = document.getElementById("devConsoleRow");
+      if(dcRow) dcRow.style.display = (worldMode && devOwner) ? "" : "none";
       document.getElementById("gameMenuOverlay").classList.remove("hidden");
     }
     function closeMenu(){
@@ -10153,7 +10264,8 @@
         const text = document.getElementById("reportReasonText").value.trim();
         if(!text || !reportTargetName) return;
         btn.disabled = true;
-        fbDb.ref(ROOM + "/reports").push({
+        fbDb.ref("rooms/baseplate/reports").push({
+          gameId: ROOM.slice(6),
           reporterUid: playerId,
           reporterName: currentUsername(),
           targetName: reportTargetName,
@@ -10202,6 +10314,8 @@
       opts = opts || {};
       const gid = opts.id || "baseplate";
       ROOM = "rooms/" + gid;
+      devLog = []; devStartInfo = null; devEngineState = "not started"; Object.keys(devErr).forEach(k => delete devErr[k]);
+      devOwner = !!(opts.ownerKey && typeof currentAccountKey === "function" && currentAccountKey() && String(currentAccountKey()).toLowerCase() === String(opts.ownerKey).toLowerCase());
       gameTitle = (typeof GAMES_CATALOG !== "undefined" && GAMES_CATALOG[gid] && GAMES_CATALOG[gid].title) || "Baseplate";
       hp = 100; hpRegenAccum = 0;
       const screen = document.getElementById("gameScreen");
@@ -10228,9 +10342,11 @@
       }
 
       if(!renderer) initScene();
+      else { refreshOwnCharacterAppearance(true); refreshOwnNameTag(); }   // pick up a skin colour / username changed since the last game
       applyWorld(opts.world || null);
       if(!wired){ wireInput(); wired = true; }
       wireMenu();
+      wireDevConsole();
       wireChat();
       wireLeaderboard();
       wireShiftlockSetting();
