@@ -9073,6 +9073,9 @@
       if(boxesDirty) rebuildWorldBoxes();
       if(!luaRt || !luaRt.running) return;
       try{ luaRt.step(dt); }catch(e){ console.error(e); }
+      { const jm = luaRt.hum;                                       // Humanoid:ChangeState(Jumping) / Humanoid.Jump from scripts
+        if(jm && jm.forceJump){ jm.forceJump = false; jm.Jump = false; performJump(); }
+        else if(jm && jm.Jump){ jm.Jump = false; if(onGround) performJump(); } }
       if(boxesDirty) rebuildWorldBoxes();
       const hm = luaRt.hum; if(!hm) return;
       const maxH = hm.MaxHealth || 100;
@@ -9446,14 +9449,16 @@
       if(windNode){ try{ windNode.stop(); }catch(e){} windNode = null; }
     }
 
-    function doJump(){
-      if(onGround){
-        if(myEmote) stopDance(); // jumping always cancels an emote
-        const hs = humScale();
-        if(hs.hm && hs.hm.JumpPower <= 0) return;
-        vy = JUMP_VELOCITY * hs.jump; onGround = false;
-        playJumpSound();
-      }
+    function performJump(){
+      if(myEmote) stopDance(); // jumping always cancels an emote
+      const hs = humScale();
+      if(hs.hm && hs.hm.JumpPower <= 0) return;
+      vy = JUMP_VELOCITY * hs.jump; onGround = false;
+      playJumpSound();
+    }
+    function doJump(isRepeat){
+      if(!isRepeat && luaRt && luaRt.running) luaRt.jumpRequest();   // scripts see UserInputService.JumpRequest, even in mid-air
+      if(onGround) performJump();
     }
 
     /* ---- /dance emote ---- */
@@ -9564,6 +9569,7 @@
       if(window.BV_IS_TOUCH && rawDt > 0) adaptQuality(rawDt);
       stepLua(dt);
       if(!ragdoll) updateMovement(dt);
+      if(luaRt && luaRt.running && luaRt.hum) luaRt.humFrame(Math.hypot(velX, velZ) > 0.01, luaRt.hum.WalkSpeed, onGround, vy);   // Running / Jumping / Landed / StateChanged
       updateGrassField(false);
       updateRemotePlayers(dt);
       pushOwnTransform(dt);
@@ -9720,7 +9726,7 @@
           return;
         }
         keys[e.key.toLowerCase()] = true;
-        if(e.key === " ") doJump();
+        if(e.key === " ") doJump(e.repeat);
       });
       window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
       window.addEventListener("resize", onResize);
