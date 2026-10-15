@@ -1481,7 +1481,13 @@ local function dec(v)
   elseif tag == "CF" then return newCF(v.x, v.y, v.z, v.m1 and { v.m1, v.m2, v.m3, v.m4, v.m5, v.m6, v.m7, v.m8, v.m9 } or nil)
   elseif tag == "E" then return enumItem(v.e, v.n)
   elseif tag == "Input" then
-    return { KeyCode = enumItem("KeyCode", v.key), UserInputType = enumItem("UserInputType", "Keyboard"), UserInputState = enumItem("UserInputState", v.state or "Begin") }
+    local isMouse = v.mouse
+    return {
+      KeyCode = enumItem("KeyCode", isMouse and "Unknown" or v.key),
+      UserInputType = enumItem("UserInputType", isMouse and v.key or "Keyboard"),
+      UserInputState = enumItem("UserInputState", v.state or "Begin"),
+      Position = newV3(v.mx or 0, v.my or 0, 0)
+    }
   end
   local out = {}
   for k, x in pairs(v) do out[k] = dec(x) end
@@ -1718,8 +1724,43 @@ function TweenService:Create(inst, info, goals)
   return tw
 end
 
+local ContextActionService
+do
+  local actions, hooked = {}, false
+  local function dispatch(input, begin)
+    local list = {}
+    for name, a in pairs(actions) do list[#list + 1] = { name, a } end
+    for _, e in ipairs(list) do
+      local name, a = e[1], e[2]
+      for _, key in ipairs(a.keys) do
+        if input.KeyCode == key or input.UserInputType == key then
+          a.fn(name, begin and Enum.UserInputState.Begin or Enum.UserInputState.End, input)
+          break
+        end
+      end
+    end
+  end
+  local function hook()
+    if hooked then return end
+    hooked = true
+    local uis = host("service", { n = "UserInputService" })
+    uis = wrap(uis)
+    uis.InputBegan:Connect(function(input) dispatch(input, true) end)
+    uis.InputEnded:Connect(function(input) dispatch(input, false) end)
+  end
+  ContextActionService = {
+    BindAction = function(_, name, fn, createTouchButton, ...)
+      actions[name] = { fn = fn, keys = { ... } }
+      hook()
+    end,
+    UnbindAction = function(_, name) actions[name] = nil end,
+    UnbindAllActions = function() actions = {} end,
+  }
+end
+
 local function serviceFor(name)
   if name == "TweenService" then return TweenService end
+  if name == "ContextActionService" then return ContextActionService end
   if name == "Debris" then
     if not Debris then
       Debris = { AddItem = function(_, inst, t) task.delay(t or 10, function() pcall(function() inst:Destroy() end) end) end }
@@ -1737,7 +1778,7 @@ for k, v in pairs(instMT) do gameMT[k] = v end
 gameMT.__index = function(self, k)
   if k == "GetService" or k == "getService" then return function(_, name) return serviceFor(name) end end
   if k == "FindService" then return function(_, name) local ok, s = pcall(serviceFor, name); if ok then return s end return nil end end
-  if k == "TweenService" or k == "Debris" then return serviceFor(k) end
+  if k == "TweenService" or k == "Debris" or k == "ContextActionService" then return serviceFor(k) end
   return gameIndex(self, k)
 end
 setmetatable(game, gameMT)
@@ -1993,7 +2034,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   const { lua, lauxlib, lualib, to_luastring, to_jsstring } = fengari;
   const rt = {
     running: false, vms: {}, signals: new Map(), conns: new Map(), nextConn: 1,
-    now: 0, tmpNodes: [], attrs: new Map(), touching: new Map(), keysDown: new Set(),
+    now: 0, tmpNodes: [], attrs: new Map(), touching: new Map(), keysDown: new Set(), mouseDown: new Set(), mouse: { x: 0, y: 0 },
     hum: { Health: 100, MaxHealth: 100, WalkSpeed: 16, JumpPower: 50, HipHeight: 0, DisplayName: "", AutoRotate: true, Sit: false, PlatformStand: false, Jump: false,
             MoveDirection: [0, 0, 0], state: "Running", lastRunSpeed: 0, moveVec: null, moveRel: false, moveUntil: 0, moveTarget: null, moveTargetUntil: 0, dead: false, deadAt: 0 },
     createdParts: new Map(), invoke: new Map(), checkVM: null
@@ -2376,7 +2417,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === "svc:UserInputService"){
       if(k === "InputBegan" || k === "InputEnded") return { k: "signal" };
-      if(k === "IsKeyDown") return { k: "method" };
+      if(k === "IsKeyDown" || k === "IsMouseButtonPressed" || k === "GetMouseLocation") return { k: "method" };
     }
     if(id === "svc:Lighting"){
       if(k === "ClockTime" || k === "Brightness") return { k: "prop", v: A.lighting.get(k) };
@@ -2513,7 +2554,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(m === "IsClient") return vm.name === "client";
       if(m === "IsStudio" || m === "IsRunning") return true;
     }
-    if(id === "svc:UserInputService" && m === "IsKeyDown") return rt.keysDown.has(String(args[0] && args[0].n || "").toUpperCase());
+    if(id === "svc:UserInputService" && m === "IsKeyDown"){
+      const want = String(args[0] && args[0].n || "").toUpperCase();
+      for(const k of rt.keysDown){ if(String(k).toUpperCase() === want) return true; }
+      return false;
+    }
+    if(id === "svc:UserInputService" && m === "IsMouseButtonPressed") return rt.mouseDown.has(String(args[0] && args[0].n || ""));
+    if(id === "svc:UserInputService" && m === "GetMouseLocation") return { __t: "V3", x: rt.mouse.x, y: rt.mouse.y, z: 0 };
     if(id === "svc:HttpService"){
       if(m === "JSONEncode") return JSON.stringify(args[0]);
       if(m === "JSONDecode") return JSON.parse(args[0]);
@@ -2700,13 +2747,21 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(!rt.running) return;
     fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [{ __t: "Input", key: nm, state: down ? "Begin" : "End" }, false], "client");
   }
+  // button: the DOM's MouseEvent.button (0 left, 1 middle, 2 right)
+  function mouseEvent(button, down, x, y){
+    const nm = button === 2 ? "MouseButton2" : button === 1 ? "MouseButton3" : "MouseButton1";
+    rt.mouse.x = x || 0; rt.mouse.y = y || 0;
+    if(down) rt.mouseDown.add(nm); else rt.mouseDown.delete(nm);
+    if(!rt.running) return;
+    fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [{ __t: "Input", mouse: true, key: nm, state: down ? "Begin" : "End", mx: rt.mouse.x, my: rt.mouse.y }, false], "client");
+  }
   function checkSyntax(src, name){
     try{
       if(!rt.checkVM) rt.checkVM = makeVM("check");
       return callLua(rt.checkVM, "__check", [luauToLua(src), name || "script"], true);
     }catch(e){ return null; }
   }
-  rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.checkSyntax = checkSyntax;
+  rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.mouseEvent = mouseEvent; rt.checkSyntax = checkSyntax;
   rt.setHum = setHum; rt.humFrame = humFrame; rt.humMoveDone = humMoveDone; rt.JUMP_K = JUMP_K; rt.markCreated = (p) => rt.createdParts.set(p.id, p);
   return rt;
 }
@@ -4387,6 +4442,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(["w","a","s","d"].includes(k)) keysDown[k] = false;
       if(k === " ") keysDown[" "] = false;
       if(playMode.active && LuaRT && LuaRT.running) LuaRT.keyEvent(e.key, false);
+    });
+    // mouse buttons pressed on the 3D view reach scripts as UserInputService input
+    window.addEventListener("mousedown", (e) => {
+      if(playMode.active && LuaRT && LuaRT.running && e.target === renderer.domElement) LuaRT.mouseEvent(e.button, true, e.clientX, e.clientY);
+    });
+    window.addEventListener("mouseup", (e) => {
+      if(playMode.active && LuaRT && LuaRT.running) LuaRT.mouseEvent(e.button, false, e.clientX, e.clientY);
     });
 
     window.addEventListener("resize", onResize);
