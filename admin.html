@@ -2,835 +2,1320 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
 <title>BlockVerse - Admin</title>
 <style>
   :root{
-    --bg-0:#0a0a0b; --bg-1:#141416; --bg-2:#1b1b1e;
-    --border:#2a2a2e; --border-soft:#232326;
-    --text-0:#f2f2f3; --text-1:#c4c4c9; --text-2:#8a8a90; --text-3:#5c5c62;
-    --grey-1:#232326; --grey-2:#2c2c30; --grey-3:#3a3a40;
-    --danger:#e5484d; --success:#3ecf6e;
+    --bg:#050506; --s1:#0b0b0d; --s2:#101013; --s3:#16161a; --s4:#1d1d22;
+    --line:#1c1c21; --line2:#27272d; --line3:#383840;
+    --t0:#f5f5f6; --t1:#c9c9ce; --t2:#8c8c95; --t3:#5a5a63;
+    --danger:#ff6a6f; --danger-bg:#241112; --danger-line:#4a2023;
+    --ok:#5ee39c; --ok-bg:#0e2217; --ok-line:#1c4530;
+    --warn:#ffd27d; --warn-bg:#241d0d; --warn-line:#473817;
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --sb:252px;
   }
-  *{ box-sizing:border-box; }
-  html,body{ height:100%; margin:0; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; min-height:100%; }
   body{
-    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
-    background:
-      radial-gradient(circle at 15% -5%, rgba(74,108,247,0.10) 0%, transparent 45%),
-      radial-gradient(circle at 85% 105%, rgba(138,74,214,0.10) 0%, transparent 45%),
-      radial-gradient(circle at 20% 0%, #19191c 0%, transparent 45%),
-      radial-gradient(circle at 80% 100%, #16161a 0%, transparent 45%),
-      var(--bg-0);
-    color:var(--text-0); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--t0);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px; line-height:1.45; overflow-x:hidden;
   }
-  .card{
-    width:100%; max-width:760px; background:var(--bg-2); border:1px solid var(--border-soft);
-    border-radius:18px; padding:0; box-shadow:0 24px 70px rgba(0,0,0,0.65);
-    animation:fadeUp .4s ease both; overflow:hidden;
-  }
-  @keyframes fadeUp{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
-  .card-inner{ padding:30px 28px 28px; }
-  .logo{
-    text-align:center; padding:26px 28px 22px; background:linear-gradient(180deg, rgba(74,108,247,0.08), transparent);
-    border-bottom:1px solid var(--border-soft);
-  }
-  .logo .cube{
-    display:inline-block; width:38px; height:38px;
-    background:linear-gradient(135deg,var(--grey-3),var(--grey-1));
-    border:1px solid var(--border); border-radius:9px; margin-bottom:10px; transform:rotate(45deg);
-    box-shadow:0 0 0 rgba(74,108,247,0); animation:cubeGlow 4s ease-in-out infinite;
-  }
-  @keyframes cubeGlow{ 0%,100%{ box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ box-shadow:0 0 22px rgba(120,145,255,0.35); } }
-  .logo h1{ margin:0; font-size:20px; letter-spacing:0.3px; font-weight:800; }
-  .logo p{ margin:5px 0 0; font-size:11.5px; color:var(--text-2); }
-
-  /* ---------- quick stats strip ---------- */
-  .stats-strip{ display:flex; gap:10px; margin:0 0 20px; }
-  .stat-box{
-    flex:1; background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px;
-    padding:13px 14px; text-align:center;
-  }
-  .stat-box .stat-num{ font-size:20px; font-weight:800; color:var(--text-0); line-height:1.1; }
-  .stat-box .stat-label{ font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; }
-  .stat-box.stat-danger .stat-num{ color:#ff9d9f; }
-
-  label{ display:block; font-size:12px; color:var(--text-1); margin:14px 0 6px; }
-  input[type="password"], input[type="text"]{
-    width:100%; padding:12px 13px; background:var(--bg-1); border:1px solid var(--border);
-    border-radius:9px; color:var(--text-0); font-size:14px; outline:none;
-    transition:border-color .15s, box-shadow .15s;
-  }
-  input:focus{ border-color:var(--grey-3); box-shadow:0 0 0 3px rgba(255,255,255,0.06); }
-
-  .btn{
-    width:100%; margin-top:18px; padding:12px; background:var(--grey-2); border:1px solid var(--border);
-    border-radius:9px; color:var(--text-0); font-size:14px; font-weight:600; cursor:pointer;
-    transition:background .15s, transform .1s;
-  }
-  .btn:hover{ background:var(--grey-3); }
-  .btn:active{ transform:scale(0.98); }
-  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
-  .btn.danger{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
-  .btn.danger:hover{ background:#4a2224; }
-
-  .status-block{
-    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px;
-    padding:16px; margin-bottom:6px;
-  }
-  .status-row{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; }
-  .status-row span:first-child{ color:var(--text-2); }
-  .status-row span:last-child{ color:var(--text-0); font-weight:600; }
-
-  .msg{ min-height:18px; font-size:12.5px; margin-top:10px; text-align:center; }
-  .msg.error{ color:var(--danger); }
-  .msg.success{ color:var(--success); }
-
+  button{ font-family:inherit; }
   .hidden{ display:none !important; }
-  .note{ font-size:11px; color:var(--text-3); margin-top:16px; line-height:1.5; text-align:center; }
-  .empty-note{ font-size:12.5px; color:var(--text-2); text-align:center; padding:20px 0; }
 
-  .role-badge{
-    text-align:center; font-size:11px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase;
-    padding:8px 0; margin-bottom:18px; color:var(--text-1); background:var(--grey-1);
-    border:1px solid var(--border-soft); border-radius:9px; display:flex; align-items:center; justify-content:center; gap:6px;
+  /* ---------- ambient background ---------- */
+  .fx{ position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+  .fx::before{
+    content:""; position:absolute; inset:0; opacity:.45;
+    background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:52px 52px;
+    -webkit-mask-image:radial-gradient(ellipse 75% 60% at 50% 0%, #000 0%, transparent 75%);
+            mask-image:radial-gradient(ellipse 75% 60% at 50% 0%, #000 0%, transparent 75%);
+    animation:gridDrift 40s linear infinite;
   }
-  .role-badge .role-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 6px rgba(62,207,110,0.7); }
+  @keyframes gridDrift{ to{ background-position:52px 52px, 52px 52px; } }
+  .fx i{ position:absolute; border-radius:50%; filter:blur(90px); background:#ffffff; opacity:.05; }
+  .fx i:nth-child(1){ width:520px; height:520px; left:-140px; top:-160px; animation:blobA 22s ease-in-out infinite alternate; }
+  .fx i:nth-child(2){ width:460px; height:460px; right:-120px; bottom:-140px; opacity:.04; animation:blobB 26s ease-in-out infinite alternate; }
+  @keyframes blobA{ to{ transform:translate(180px,120px) scale(1.2); } }
+  @keyframes blobB{ to{ transform:translate(-160px,-100px) scale(1.15); } }
+
+  /* ---------- buttons / inputs ---------- */
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px 18px;
+    border-radius:11px; border:1px solid var(--line3); background:var(--s4); color:var(--t0);
+    font-size:13.5px; font-weight:650; cursor:pointer; transition:transform .12s var(--ease), background .18s, border-color .18s, box-shadow .18s;
+  }
+  .btn:hover{ background:#26262d; border-color:#4a4a54; }
+  .btn:active{ transform:scale(.97); }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; transform:none; }
+  .btn.primary{ background:#f2f2f4; color:#0a0a0b; border-color:#f2f2f4; }
+  .btn.primary:hover{ background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.08); }
+  .btn.ghost{ background:transparent; }
+  .btn.danger{ background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger); }
+  .btn.danger:hover{ background:#331618; }
+  .btn.block{ width:100%; }
+  .btn svg{ width:16px; height:16px; }
+
+  .field{ display:block; margin:0 0 14px; }
+  .field > span{ display:block; font-size:11.5px; color:var(--t2); margin:0 0 6px; letter-spacing:.3px; text-transform:uppercase; font-weight:650; }
+  input[type=text], input[type=password], input[type=search]{
+    width:100%; padding:12px 14px; background:var(--s2); border:1px solid var(--line2); border-radius:11px;
+    color:var(--t0); font-size:14px; outline:none; transition:border-color .18s, box-shadow .18s, background .18s;
+  }
+  input::placeholder{ color:var(--t3); }
+  input:focus{ border-color:var(--line3); background:var(--s3); box-shadow:0 0 0 4px rgba(255,255,255,.05); }
+
+  .msg{ min-height:18px; font-size:12.5px; margin-top:12px; text-align:center; }
+  .msg.error{ color:var(--danger); } .msg.success{ color:var(--ok); }
+  .note{ font-size:11.5px; color:var(--t3); line-height:1.55; margin:12px 0 0; }
+
+  /* ---------- login gate ---------- */
+  .gate{ position:relative; z-index:1; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .gate-card{
+    width:100%; max-width:400px; padding:34px 30px 28px; border-radius:22px; position:relative;
+    background:linear-gradient(180deg, rgba(22,22,26,.92), rgba(11,11,13,.92)); border:1px solid var(--line2);
+    box-shadow:0 30px 90px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.05);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    animation:gateIn .7s var(--ease) both;
+  }
+  .gate-card::after{
+    content:""; position:absolute; inset:-1px; border-radius:22px; padding:1px; pointer-events:none;
+    background:conic-gradient(from var(--ang,0deg), transparent 0 70%, rgba(255,255,255,.55) 85%, transparent 100%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor;
+            mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    animation:spinAng 6s linear infinite;
+  }
+  @property --ang{ syntax:"<angle>"; initial-value:0deg; inherits:false; }
+  @keyframes spinAng{ to{ --ang:360deg; } }
+  @keyframes gateIn{ from{ opacity:0; transform:translateY(22px) scale(.96); } to{ opacity:1; transform:none; } }
+  .brand-mark{ display:flex; justify-content:center; margin-bottom:16px; perspective:300px; }
+  .cube{
+    width:46px; height:46px; border-radius:12px; position:relative; transform:rotate(45deg);
+    background:linear-gradient(135deg,#3a3a42,#17171b); border:1px solid var(--line3);
+    animation:cubeFloat 5s ease-in-out infinite;
+  }
+  .cube i{ position:absolute; inset:9px; border-radius:6px; border:1px solid rgba(255,255,255,.35); animation:cubePulse 3s ease-in-out infinite; }
+  @keyframes cubeFloat{ 0%,100%{ transform:rotate(45deg) translateY(0); box-shadow:0 0 0 rgba(255,255,255,0); } 50%{ transform:rotate(225deg) translateY(-4px); box-shadow:0 12px 30px rgba(255,255,255,.12); } }
+  @keyframes cubePulse{ 0%,100%{ opacity:.25; } 50%{ opacity:1; } }
+  .gate h1{ margin:0; text-align:center; font-size:22px; font-weight:800; letter-spacing:.2px; }
+  .gate .sub{ margin:4px 0 24px; text-align:center; color:var(--t2); font-size:12.5px; }
+
+  /* ---------- app shell ---------- */
+  .app{ position:relative; z-index:1; display:grid; grid-template-columns:var(--sb) 1fr; min-height:100vh; animation:appIn .5s var(--ease) both; }
+  @keyframes appIn{ from{ opacity:0; } to{ opacity:1; } }
+  .sidebar{
+    position:sticky; top:0; height:100vh; padding:22px 14px 18px; display:flex; flex-direction:column; gap:6px;
+    background:linear-gradient(180deg, rgba(11,11,13,.92), rgba(8,8,10,.92)); border-right:1px solid var(--line);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  }
+  .brand{ display:flex; align-items:center; gap:12px; padding:4px 10px 18px; }
+  .brand .cube{ width:30px; height:30px; border-radius:8px; animation:none; transform:rotate(45deg); }
+  .brand .cube i{ inset:6px; border-radius:4px; }
+  .brand b{ display:block; font-size:15px; letter-spacing:.2px; }
+  .brand small{ color:var(--t3); font-size:11px; }
+  .nav{ position:relative; display:flex; flex-direction:column; gap:3px; }
+  .nav-ind{
+    position:absolute; left:0; top:0; width:100%; height:40px; border-radius:11px; background:var(--s4);
+    border:1px solid var(--line2); transition:transform .38s var(--ease), height .3s var(--ease); z-index:0;
+  }
+  .nav-ind::before{ content:""; position:absolute; left:-14px; top:10px; bottom:10px; width:3px; border-radius:0 3px 3px 0; background:#fff; box-shadow:0 0 12px rgba(255,255,255,.6); }
+  .nav-item{
+    position:relative; z-index:1; display:flex; align-items:center; gap:12px; padding:0 12px; height:40px; border-radius:11px;
+    color:var(--t2); font-weight:600; font-size:13.5px; cursor:pointer; user-select:none; transition:color .2s;
+    border:none; background:none; text-align:left; width:100%;
+  }
+  .nav-item svg{ width:18px; height:18px; flex-shrink:0; transition:transform .25s var(--ease); }
+  .nav-item:hover{ color:var(--t0); }
+  .nav-item:hover svg{ transform:translateX(2px) scale(1.06); }
+  .nav-item.active{ color:var(--t0); }
+  .nav-item .cnt{ font-style:normal; margin-left:auto; font-size:10.5px; font-weight:700; color:var(--t2); background:var(--s3); border:1px solid var(--line2); padding:1px 7px; border-radius:20px; min-width:22px; text-align:center; }
+  .nav-item.active .cnt{ color:var(--t0); }
+  .nav-item .cnt.alert{ background:#fff; color:#000; border-color:#fff; animation:popPulse 2.4s ease-in-out infinite; }
+  @keyframes popPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,255,255,.35); } 50%{ box-shadow:0 0 0 6px rgba(255,255,255,0); } }
+  .side-foot{ margin-top:auto; padding:12px; border:1px solid var(--line); border-radius:13px; background:var(--s1); font-size:11.5px; color:var(--t2); }
+  .side-foot b{ color:var(--t0); display:block; margin-bottom:2px; font-size:12px; }
+
+  .main{ min-width:0; display:flex; flex-direction:column; }
+  .topbar{
+    position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px; padding:16px 28px;
+    background:rgba(5,5,6,.78); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:1px solid var(--line);
+  }
+  .topbar h2{ margin:0; font-size:19px; letter-spacing:.1px; animation:titleIn .4s var(--ease) both; }
+  .topbar p{ margin:1px 0 0; font-size:12px; color:var(--t2); }
+  @keyframes titleIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  .top-right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+  .pill{
+    display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:30px; font-size:11px; font-weight:700;
+    letter-spacing:.4px; text-transform:uppercase; color:var(--t1); background:var(--s2); border:1px solid var(--line2);
+  }
+  .pill .dot{ width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok); animation:blink 2s ease-in-out infinite; }
+  @keyframes blink{ 50%{ opacity:.35; } }
+  .icon-btn{
+    width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:var(--s2); border:1px solid var(--line2);
+    color:var(--t1); cursor:pointer; transition:background .18s, transform .15s, border-color .18s;
+  }
+  .icon-btn:hover{ background:var(--s4); border-color:var(--line3); color:#fff; }
+  .icon-btn:active{ transform:scale(.92); }
+  .icon-btn svg{ width:17px; height:17px; }
+  .icon-btn.spin svg{ animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .content{ padding:26px 28px 60px; width:100%; max-width:1240px; margin:0 auto; }
+  .panel{ display:none; }
+  .panel.active{ display:block; animation:panelIn .45s var(--ease) both; }
+  @keyframes panelIn{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
   body.role-admin .owner-only{ display:none !important; }
 
-  /* ---------- Accounts panel ---------- */
-  .section-title{ font-size:13px; font-weight:700; margin:24px 0 12px; padding-top:20px; border-top:1px solid var(--border-soft); display:flex; align-items:center; gap:7px; text-transform:uppercase; letter-spacing:0.6px; color:var(--text-1); }
-  .section-title .count-pill{ background:var(--grey-2); color:var(--text-2); font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; text-transform:none; letter-spacing:0; }
-  .acct-search-wrap{ position:relative; margin-bottom:12px; }
-  .acct-search-wrap svg{ position:absolute; left:12px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
-  .acct-search{ padding-left:34px !important; }
-  .acct-list{ max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
-  .acct-row{
-    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:11px;
-    padding:12px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-    transition:border-color .15s, background .15s, transform .1s;
+  /* ---------- cards / stats ---------- */
+  .card{ background:linear-gradient(180deg, var(--s2), var(--s1)); border:1px solid var(--line); border-radius:18px; padding:20px; }
+  .card + .card{ margin-top:16px; }
+  .card h3{ margin:0 0 4px; font-size:14px; letter-spacing:.2px; }
+  .card .hint{ font-size:12px; color:var(--t2); margin:0 0 14px; }
+  .stats{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:14px; margin-bottom:18px; }
+  .stat{
+    position:relative; overflow:hidden; padding:18px; border-radius:18px; background:linear-gradient(180deg, var(--s2), var(--s1));
+    border:1px solid var(--line); transition:transform .25s var(--ease), border-color .25s, box-shadow .25s; cursor:default;
+    animation:rowIn .55s var(--ease) both; animation-delay:calc(var(--i,0) * 60ms);
   }
-  .acct-row:hover{ border-color:var(--grey-3); background:#17171a; transform:translateX(1px); }
-  .acct-name{ font-size:13.5px; font-weight:600; }
-  .acct-key{ font-size:11px; color:var(--text-3); }
-  .acct-badges{ display:flex; gap:5px; }
-  .acct-badge{ font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:6px; text-transform:uppercase; letter-spacing:0.3px; }
-  .acct-badge.banned{ background:#3a1c1d; color:#ff9d9f; }
-  .acct-actions{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
-  .mini-btn{
-    padding:7px 11px; background:var(--grey-2); border:1px solid var(--border); border-radius:7px;
-    color:var(--text-0); font-size:11.5px; font-weight:600; cursor:pointer; transition:background .15s;
-  }
-  .mini-btn:hover{ background:var(--grey-3); }
-  .mini-btn.warn{ background:#3a3320; border-color:#5c4f26; color:#ffd98a; }
-  .mini-btn.warn:hover{ background:#4a4128; }
-  .mini-btn.ban{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
-  .mini-btn.ban:hover{ background:#4a2224; }
-  .mini-btn.terminate{ background:#e5484d; border-color:#e5484d; color:#fff; }
-  .mini-btn.terminate:hover{ background:#c93c41; }
-  .mini-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .stat::after{ content:""; position:absolute; right:-30px; top:-30px; width:110px; height:110px; border-radius:50%; background:radial-gradient(circle, rgba(255,255,255,.07), transparent 70%); transition:transform .5s var(--ease); }
+  .stat:hover{ transform:translateY(-4px); border-color:var(--line3); box-shadow:0 18px 40px rgba(0,0,0,.55); }
+  .stat:hover::after{ transform:scale(1.6); }
+  .stat .s-ic{ width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:var(--s4); border:1px solid var(--line2); color:var(--t1); margin-bottom:14px; }
+  .stat .s-ic svg{ width:17px; height:17px; }
+  .stat .s-num{ font-size:30px; font-weight:800; letter-spacing:-.5px; line-height:1; font-variant-numeric:tabular-nums; }
+  .stat .s-label{ margin-top:7px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--t2); font-weight:650; }
+  .two-col{ display:grid; grid-template-columns:1.35fr 1fr; gap:16px; }
+  .kv{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .kv:last-of-type{ border-bottom:none; }
+  .kv span:first-child{ color:var(--t2); } .kv span:last-child{ font-weight:650; }
 
-  /* ---------- Requested Games panel ---------- */
-  .game-req-list{ display:flex; flex-direction:column; gap:10px; }
-  .game-req-card{
-    background:var(--bg-1); border:1px solid var(--border-soft); border-radius:12px; overflow:hidden;
+  /* ---------- toolbars / segmented ---------- */
+  .toolbar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0 0 16px; }
+  .search{ position:relative; flex:1; min-width:200px; }
+  .search svg{ position:absolute; left:13px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:var(--t3); pointer-events:none; }
+  .search input{ padding-left:38px; }
+  .seg{ display:inline-flex; padding:3px; gap:2px; background:var(--s2); border:1px solid var(--line2); border-radius:12px; }
+  .seg button{
+    padding:7px 14px; font-size:12.5px; font-weight:650; border:none; border-radius:9px; background:transparent; color:var(--t2); cursor:pointer;
+    transition:background .2s, color .2s;
   }
-  .grc-banner{
-    width:100%; height:84px; background:linear-gradient(135deg,var(--grey-2),var(--grey-1)); background-size:cover; background-position:center;
-  }
-  .grc-body{ padding:12px 14px; display:flex; gap:12px; align-items:flex-start; }
-  .grc-icon{
-    width:48px; height:48px; border-radius:10px; background:var(--grey-2) center/cover no-repeat; flex-shrink:0;
-    border:1px solid var(--border-soft);
-  }
-  .grc-info{ flex:1; min-width:0; }
-  .grc-name{ font-size:14px; font-weight:700; }
-  .grc-meta{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
-  .grc-actions{ display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
-  .mini-btn.accept{ background:#173b26; border-color:#245c39; color:#6be29a; }
-  .mini-btn.accept:hover{ background:#1e4c31; }
-  .mini-btn.deny{ background:#3a1c1d; border-color:#5c2426; color:#ff9d9f; }
-  .mini-btn.deny:hover{ background:#4a2224; }
-  .mini-btn.shutdown{ background:#3a3320; border-color:#5c4f26; color:#ffd98a; }
-  .mini-btn.shutdown:hover{ background:#4a4128; }
-  .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--success); display:inline-block; margin-right:5px; box-shadow:0 0 6px rgba(62,207,110,0.7); }
+  .seg button:hover{ color:var(--t0); }
+  .seg button.on{ background:var(--s4); color:#fff; box-shadow:inset 0 0 0 1px var(--line3); }
+  .section-h{ display:flex; align-items:center; gap:10px; margin:26px 0 12px; font-size:12px; text-transform:uppercase; letter-spacing:.8px; color:var(--t2); font-weight:750; }
+  .section-h:first-child{ margin-top:0; }
+  .section-h .count{ background:var(--s3); border:1px solid var(--line2); padding:1px 9px; border-radius:20px; font-size:11px; color:var(--t1); letter-spacing:0; }
+  .section-h::after{ content:""; flex:1; height:1px; background:linear-gradient(90deg, var(--line2), transparent); }
 
-  /* ---------- Tabs ---------- */
-  .admin-tabs{
-    display:flex; gap:4px; margin:0 0 20px; background:var(--bg-1); border:1px solid var(--border-soft);
-    border-radius:11px; padding:4px; overflow-x:auto;
+  /* ---------- rows ---------- */
+  .list{ display:flex; flex-direction:column; gap:8px; }
+  .row{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:13px 16px; border-radius:15px;
+    background:var(--s1); border:1px solid var(--line); transition:transform .2s var(--ease), border-color .2s, background .2s;
   }
-  .admin-tab{
-    flex:1; white-space:nowrap; text-align:center; padding:9px 10px; border-radius:8px; cursor:pointer;
-    font-size:12.5px; font-weight:600; color:var(--text-2); transition:background .15s, color .15s; user-select:none;
+  .row:hover{ border-color:var(--line3); background:var(--s2); transform:translateX(3px); }
+  .anim-item{ animation:rowIn .5s var(--ease) both; animation-delay:calc(var(--i,0) * 32ms); }
+  @keyframes rowIn{ from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:none; } }
+  .avatar{
+    width:38px; height:38px; border-radius:12px; flex-shrink:0; display:grid; place-items:center; font-weight:800; font-size:13px;
+    background:linear-gradient(135deg,#34343b,#1a1a1f); border:1px solid var(--line3); color:var(--t0);
   }
-  .admin-tab:hover{ color:var(--text-1); }
-  .admin-tab.active{ background:var(--grey-2); color:var(--text-0); }
-  .admin-tab .tab-count{
-    display:inline-block; margin-left:5px; background:var(--grey-1); color:var(--text-2); font-size:10px;
-    padding:1px 6px; border-radius:9px;
+  .avatar.sm{ width:28px; height:28px; border-radius:9px; font-size:11px; }
+  .r-main{ flex:1; min-width:160px; }
+  .r-title{ font-weight:700; font-size:13.5px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .r-sub{ color:var(--t2); font-size:12px; margin-top:2px; overflow-wrap:anywhere; }
+  .r-meta{ color:var(--t3); font-size:11px; margin-top:3px; }
+  .r-actions{ display:flex; gap:6px; flex-wrap:wrap; margin-left:auto; }
+  .badge{ display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:7px; letter-spacing:.5px; text-transform:uppercase; background:var(--s4); border:1px solid var(--line2); color:var(--t1); }
+  .badge.red{ background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger); }
+  .badge.green{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok); }
+  .badge.amber{ background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn); }
+  .badge.live::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; box-shadow:0 0 8px currentColor; animation:blink 1.6s infinite; }
+  .mini{
+    padding:7px 12px; border-radius:9px; font-size:12px; font-weight:650; cursor:pointer; background:var(--s4); color:var(--t0);
+    border:1px solid var(--line2); transition:background .18s, transform .12s, border-color .18s;
   }
-  .admin-tab.active .tab-count{ background:var(--grey-3); color:var(--text-0); }
-  .tab-panel{ display:none; }
-  .tab-panel.active{ display:block; }
-  .tab-panel .section-title:first-child{ margin-top:0; padding-top:0; border-top:none; }
+  .mini:hover{ background:#2a2a31; border-color:var(--line3); }
+  .mini:active{ transform:scale(.94); }
+  .mini:disabled{ opacity:.4; cursor:not-allowed; }
+  .mini.warn{ background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn); }
+  .mini.warn:hover{ background:#33280f; }
+  .mini.red{ background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger); }
+  .mini.red:hover{ background:#331618; }
+  .mini.solid-red{ background:#e5484d; border-color:#e5484d; color:#fff; }
+  .mini.solid-red:hover{ background:#c93c41; }
+  .mini.green{ background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok); }
+  .mini.green:hover{ background:#133021; }
+  .empty{ text-align:center; padding:44px 20px; color:var(--t2); font-size:13px; border:1px dashed var(--line2); border-radius:16px; }
+  .empty svg{ width:30px; height:30px; color:var(--t3); display:block; margin:0 auto 10px; }
 
-  /* ---------- Banned tab ---------- */
-  .ban-reason{ font-size:11.5px; color:var(--text-2); margin-top:2px; }
-  .ban-meta{ font-size:10px; color:var(--text-3); margin-top:2px; }
+  /* ---------- skeleton ---------- */
+  .sk{ border-radius:14px; height:62px; background:linear-gradient(90deg, var(--s1) 25%, var(--s3) 37%, var(--s1) 63%); background-size:400% 100%; animation:shimmer 1.4s ease infinite; border:1px solid var(--line); }
+  .sk + .sk{ margin-top:8px; }
+  @keyframes shimmer{ 0%{ background-position:100% 50%; } 100%{ background-position:0 50%; } }
+
+  /* ---------- game cards ---------- */
+  .gridcards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:14px; }
+  .gcard{
+    border-radius:18px; overflow:hidden; background:var(--s1); border:1px solid var(--line); cursor:default;
+    transition:transform .28s var(--ease), border-color .25s, box-shadow .28s;
+  }
+  .gcard.click{ cursor:pointer; }
+  .gcard:hover{ transform:translateY(-5px); border-color:var(--line3); box-shadow:0 22px 46px rgba(0,0,0,.6); }
+  .g-banner{ height:92px; background:linear-gradient(135deg,#26262c,#111114) center/cover; position:relative; }
+  .g-banner::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, transparent 40%, var(--s1)); }
+  .g-body{ padding:0 16px 16px; margin-top:-26px; position:relative; z-index:1; }
+  .g-icon{ width:52px; height:52px; border-radius:14px; background:#26262c center/cover; border:2px solid var(--s1); box-shadow:0 6px 16px rgba(0,0,0,.5); display:grid; place-items:center; font-weight:800; color:var(--t1); }
+  .g-name{ margin-top:10px; font-weight:750; font-size:14.5px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .g-meta{ color:var(--t2); font-size:12px; margin-top:3px; }
+  .g-stats{ display:flex; gap:14px; margin-top:12px; font-size:11.5px; color:var(--t2); flex-wrap:wrap; }
+  .g-stats b{ color:var(--t0); }
+  .g-actions{ display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+
+  /* ---------- chat logs ---------- */
+  .crumbs{ display:flex; align-items:center; gap:6px; margin:0 0 18px; flex-wrap:wrap; font-size:12.5px; }
+  .crumbs button{ background:none; border:none; color:var(--t2); cursor:pointer; padding:5px 8px; border-radius:8px; font-weight:650; transition:background .15s,color .15s; }
+  .crumbs button:hover{ background:var(--s3); color:#fff; }
+  .crumbs .cur{ color:var(--t0); font-weight:750; padding:5px 8px; }
+  .crumbs .sep{ color:var(--t3); }
+  .server{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:16px 18px; border-radius:16px; background:var(--s1); border:1px solid var(--line); cursor:pointer; transition:transform .22s var(--ease), border-color .2s, background .2s; }
+  .server:hover{ transform:translateX(5px); border-color:var(--line3); background:var(--s2); }
+  .server.live{ border-color:var(--ok-line); background:linear-gradient(90deg, rgba(94,227,156,.07), var(--s1) 60%); }
+  .srv-ic{ width:42px; height:42px; border-radius:13px; display:grid; place-items:center; background:var(--s4); border:1px solid var(--line2); color:var(--t1); flex-shrink:0; }
+  .srv-ic svg{ width:19px; height:19px; }
+  .srv-main{ flex:1; min-width:200px; }
+  .srv-title{ font-weight:750; font-size:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .srv-sub{ color:var(--t2); font-size:12px; margin-top:3px; }
+  .people{ display:flex; margin-top:9px; flex-wrap:wrap; gap:6px; }
+  .person{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px 3px 4px; border-radius:30px; background:var(--s3); border:1px solid var(--line2); font-size:11.5px; color:var(--t1); }
+  .srv-stats{ display:flex; gap:18px; }
+  .srv-stat{ text-align:center; min-width:54px; }
+  .srv-stat b{ display:block; font-size:18px; font-variant-numeric:tabular-nums; }
+  .srv-stat span{ font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--t2); }
+  .chev{ color:var(--t3); width:18px; height:18px; transition:transform .2s var(--ease), color .2s; }
+  .server:hover .chev{ transform:translateX(4px); color:#fff; }
+
+  .chatbox{ background:var(--s1); border:1px solid var(--line); border-radius:18px; overflow:hidden; }
+  .chat-head{ padding:16px 18px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; background:var(--s2); }
+  .chat-head .grow{ flex:1; min-width:160px; }
+  .chat-head h3{ margin:0; font-size:14.5px; } .chat-head small{ color:var(--t2); font-size:12px; }
+  .chat-tools{ padding:12px 18px; border-bottom:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .chat-scroll{ max-height:62vh; overflow-y:auto; padding:6px 0 12px; scroll-behavior:smooth; }
+  .day-sep{ position:sticky; top:0; z-index:2; text-align:center; padding:10px 0 6px; font-size:10.5px; letter-spacing:.8px; text-transform:uppercase; color:var(--t3); font-weight:750; background:linear-gradient(180deg, var(--s1) 60%, transparent); }
+  .cm{ display:grid; grid-template-columns:78px 1fr; gap:10px; padding:7px 18px; align-items:start; transition:background .15s; animation:cmIn .35s var(--ease) both; }
+  @keyframes cmIn{ from{ opacity:0; transform:translateX(-8px); } to{ opacity:1; transform:none; } }
+  .cm:hover{ background:var(--s2); }
+  .cm .tm{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11px; color:var(--t3); padding-top:3px; font-variant-numeric:tabular-nums; }
+  .cm .who{ font-weight:750; font-size:13px; cursor:pointer; margin-right:7px; }
+  .cm .who:hover{ text-decoration:underline; }
+  .cm .tx{ color:var(--t1); overflow-wrap:anywhere; word-break:break-word; }
+  .cm.whisper{ background:repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 8px, transparent 8px 16px); border-left:2px solid var(--line3); padding-left:16px; }
+  .cm.whisper .tx{ color:var(--t0); font-style:italic; }
+  .cm mark{ background:#fff; color:#000; border-radius:3px; padding:0 2px; }
+  .arrow{ color:var(--t3); margin:0 5px; }
+
+  /* ---------- toasts / modal ---------- */
+  #toasts{ position:fixed; right:20px; bottom:20px; z-index:9000; display:flex; flex-direction:column; gap:10px; align-items:flex-end; pointer-events:none; }
+  .toast{
+    display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:13px; background:rgba(22,22,26,.96); border:1px solid var(--line3);
+    box-shadow:0 18px 44px rgba(0,0,0,.65); font-size:13px; font-weight:600; max-width:min(92vw, 380px); animation:toastIn .4s var(--ease) both;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  }
+  .toast.out{ animation:toastOut .26s ease both; }
+  .toast .t-dot{ width:8px; height:8px; border-radius:50%; background:#fff; flex-shrink:0; }
+  .toast.ok .t-dot{ background:var(--ok); box-shadow:0 0 10px var(--ok); }
+  .toast.err .t-dot{ background:var(--danger); box-shadow:0 0 10px var(--danger); }
+  @keyframes toastIn{ from{ opacity:0; transform:translateX(30px) scale(.95); } to{ opacity:1; transform:none; } }
+  @keyframes toastOut{ to{ opacity:0; transform:translateX(30px) scale(.95); } }
+  .modal-back{ position:fixed; inset:0; z-index:9500; display:grid; place-items:center; padding:20px; background:rgba(0,0,0,.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:fadeIn .2s ease both; }
+  .modal-back.out{ animation:fadeOut .18s ease both; }
+  .modal{ width:100%; max-width:420px; padding:24px; border-radius:20px; background:linear-gradient(180deg,#18181c,#0e0e10); border:1px solid var(--line3); box-shadow:0 40px 100px rgba(0,0,0,.8); animation:modalIn .32s var(--ease) both; }
+  .modal h3{ margin:0 0 6px; font-size:17px; } .modal p{ margin:0 0 16px; color:var(--t2); font-size:13px; }
+  .modal-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+  @keyframes fadeIn{ from{ opacity:0; } } @keyframes fadeOut{ to{ opacity:0; } }
+  @keyframes modalIn{ from{ opacity:0; transform:translateY(20px) scale(.94); } to{ opacity:1; transform:none; } }
+
+  ::-webkit-scrollbar{ width:10px; height:10px; } ::-webkit-scrollbar-thumb{ background:#2a2a31; border-radius:10px; border:2px solid var(--bg); } ::-webkit-scrollbar-thumb:hover{ background:#3b3b44; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:980px){ .two-col{ grid-template-columns:1fr; } }
+  @media (max-width:860px){
+    .app{ grid-template-columns:1fr; }
+    .sidebar{
+      position:fixed; z-index:50; top:auto; bottom:0; left:0; right:0; height:auto; flex-direction:row; padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));
+      border-right:none; border-top:1px solid var(--line2); background:rgba(8,8,10,.94);
+    }
+    .brand, .side-foot, .nav-ind{ display:none; }
+    .nav{ flex-direction:row; width:100%; gap:2px; }
+    .nav-item{ flex:1; flex-direction:column; justify-content:center; gap:3px; height:52px; padding:0 2px; font-size:10px; border-radius:12px; }
+    .nav-item.active{ background:var(--s4); }
+    .nav-item .cnt{ position:absolute; top:3px; right:calc(50% - 22px); margin:0; min-width:16px; padding:0 4px; font-size:9px; }
+    .nav-item:hover svg{ transform:none; }
+    .topbar{ padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top,0px)); }
+    .topbar h2{ font-size:17px; } .topbar p{ display:none; }
+    .content{ padding:18px 14px 110px; }
+    #toasts{ left:12px; right:12px; bottom:92px; align-items:center; }
+    .cm{ grid-template-columns:1fr; gap:2px; } .cm .tm{ padding-top:0; }
+    .row:hover, .server:hover{ transform:none; }
+    .pill.hide-sm{ display:none; }
+  }
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; } }
 </style>
 </head>
 <body>
+<div class="fx"><i></i><i></i></div>
+<div id="toasts"></div>
+<div id="modalRoot"></div>
 
-<div class="card">
-  <div class="logo">
-    <div class="cube"></div>
+<!-- ============ login ============ -->
+<main id="gateScreen" class="gate">
+  <div class="gate-card">
+    <div class="brand-mark"><div class="cube"><i></i></div></div>
     <h1>BlockVerse Admin</h1>
-    <p>Publish updates &middot; disconnect live players</p>
-  </div>
-
-  <div class="card-inner">
-
-  <!-- gate screen -->
-  <div id="gateScreen">
-    <label for="gateEmail">Admin email</label>
-    <input type="text" id="gateEmail" placeholder="owner@blockverse.app" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <label for="gateInput" style="margin-top:10px;display:block;">Password</label>
-    <input type="password" id="gateInput" placeholder="Password" autocomplete="current-password">
-    <button class="btn" id="gateBtn">Sign in</button>
+    <p class="sub">Sign in to the control console</p>
+    <label class="field"><span>Admin email</span>
+      <input type="text" id="gateEmail" placeholder="owner@blockverse.app" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
+    <label class="field"><span>Password</span>
+      <input type="password" id="gateInput" placeholder="Password" autocomplete="current-password">
+    </label>
+    <button class="btn primary block" id="gateBtn">Sign in</button>
     <div class="msg" id="gateMsg"></div>
-    <p class="note">
-      Sign in with your admin account. What each account is allowed to do is enforced by
-      the Firebase database rules, not by this page.
-    </p>
+    <p class="note" style="text-align:center">What each account can do is enforced by the Firebase database rules, not by this page.</p>
   </div>
+</main>
 
-  <!-- publish screen -->
-  <div id="publishScreen" class="hidden">
-    <div class="role-badge" id="roleBadge"><span class="role-dot"></span><span id="roleBadgeText"></span></div>
-    <div style="text-align:right;margin:-4px 0 8px;"><a href="#" id="signOutLink" class="note" style="text-decoration:underline;">Sign out</a></div>
+<!-- ============ app ============ -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand"><div class="cube"><i></i></div><div><b>BlockVerse</b><small>Admin console</small></div></div>
+    <nav class="nav" id="nav">
+      <div class="nav-ind" id="navInd"></div>
+      <button class="nav-item active" data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Dashboard</span></button>
+      <button class="nav-item" data-tab="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c2.2.7 3.5 2.6 3.5 5.5"/></svg><span>Accounts</span><em class="cnt" id="cntAccounts">-</em></button>
+      <button class="nav-item" data-tab="banned"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg><span>Banned</span><em class="cnt" id="cntBanned">-</em></button>
+      <button class="nav-item" data-tab="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3L12 2.5z"/><path d="M12 12l8.5-4.7M12 12v9.5M12 12L3.5 7.3"/></svg><span>Games</span><em class="cnt" id="cntGames">-</em></button>
+      <button class="nav-item" data-tab="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-1.5 4L16 12H5"/></svg><span>Reports</span><em class="cnt" id="cntReports">-</em></button>
+      <button class="nav-item" data-tab="chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-11.6 7.1L4 20.5l1.5-4.6A8 8 0 1121 12z"/></svg><span>Chat logs</span></button>
+    </nav>
+    <div class="side-foot"><b id="roleText">-</b><span id="roleSub">-</span></div>
+  </aside>
 
-    <div class="admin-tabs" id="adminTabs">
-      <div class="admin-tab active" data-tab="dashboard">Dashboard</div>
-      <div class="admin-tab" data-tab="accounts">Accounts<span class="tab-count" id="tabCountAccounts">-</span></div>
-      <div class="admin-tab" data-tab="banned">Banned<span class="tab-count" id="tabCountBanned">-</span></div>
-      <div class="admin-tab" data-tab="games">Games<span class="tab-count" id="tabCountGames">-</span></div>
-      <div class="admin-tab" data-tab="reports">Reports<span class="tab-count" id="tabCountReports">-</span></div>
-    </div>
+  <section class="main">
+    <header class="topbar">
+      <div><h2 id="pageTitle">Dashboard</h2><p id="pageSub"></p></div>
+      <div class="top-right">
+        <span class="pill hide-sm"><span class="dot"></span><span id="pillRole">Owner</span></span>
+        <button class="icon-btn" id="refreshBtn" title="Refresh everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg></button>
+        <button class="icon-btn" id="signOutBtn" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+      </div>
+    </header>
 
-    <!-- Dashboard tab: quick stats + publish -->
-    <div class="tab-panel active" data-panel="dashboard">
-      <div class="stats-strip">
-        <div class="stat-box"><div class="stat-num" id="statTotal">-</div><div class="stat-label">Accounts</div></div>
-        <div class="stat-box stat-danger"><div class="stat-num" id="statBanned">-</div><div class="stat-label">Banned</div></div>
-        <div class="stat-box owner-only"><div class="stat-num" id="statVersion">-</div><div class="stat-label">Live version</div></div>
+    <div class="content">
+
+      <!-- Dashboard -->
+      <div class="panel active" data-panel="dashboard">
+        <div class="stats" id="statGrid"></div>
+        <div class="two-col">
+          <div>
+            <div class="card">
+              <h3>Latest reports</h3><p class="hint">Most recent player and chat reports.</p>
+              <div class="list" id="dashReports"></div>
+            </div>
+          </div>
+          <div>
+            <div class="card owner-only">
+              <h3>Live version</h3><p class="hint">Publishing disconnects everyone and asks them to refresh.</p>
+              <div class="kv"><span>Current version</span><span id="curVersion">-</span></div>
+              <div class="kv"><span>Last published</span><span id="curTs">-</span></div>
+              <button class="btn danger block" id="publishBtn" style="margin-top:14px">Publish update &amp; disconnect players</button>
+              <div class="msg" id="publishMsg"></div>
+            </div>
+            <div class="card">
+              <h3>Waiting for review</h3><p class="hint">Games submitted from Studio.</p>
+              <div class="list" id="dashRequests"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="status-block owner-only">
-        <div class="status-row"><span>Current version</span><span id="curVersion">-</span></div>
-        <div class="status-row"><span>Last published</span><span id="curTs">-</span></div>
+      <!-- Accounts -->
+      <div class="panel" data-panel="accounts">
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="acctSearch" placeholder="Search by username..."></div>
+          <span class="pill" id="acctPill">-</span>
+        </div>
+        <div class="list" id="acctList"></div>
+        <p class="note">Kick pulls someone out of the game. Ban blocks login and logs them out everywhere. Terminate permanently deletes the account and unfriends it from everyone - that one can't be undone.</p>
       </div>
-      <button class="btn danger owner-only" id="publishBtn">Publish update &amp; disconnect players</button>
-      <div class="msg owner-only" id="publishMsg"></div>
-      <p class="note owner-only">
-        Publishing bumps the live version. Anyone currently in the game gets pulled
-        out immediately with a "please refresh" message; anyone just browsing the
-        site gets the same notice next time they interact with it.
-      </p>
-    </div>
 
-    <!-- Accounts tab: everyone, search + moderate -->
-    <div class="tab-panel" data-panel="accounts">
-      <div class="section-title">Accounts <span class="count-pill" id="acctCountPill">-</span></div>
-      <div class="acct-search-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="acctSearch" class="acct-search" placeholder="Search by username...">
+      <!-- Banned -->
+      <div class="panel" data-panel="banned">
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="banSearch" placeholder="Search banned users..."></div>
+          <span class="pill" id="banPill">-</span>
+        </div>
+        <div class="list" id="banList"></div>
+        <p class="note">Unban clears the ban immediately and lets them log back in right away.</p>
       </div>
-      <div class="acct-list" id="acctList"></div>
-      <p class="note">
-        Kick pulls someone out of Baseplate only. Ban blocks login and logs them
-        out everywhere immediately. Terminate permanently deletes the account and
-        unfriends it from everyone. None of this is undoable except Ban (you can unban
-        from here or from the dedicated Banned tab).
-      </p>
-    </div>
 
-    <!-- Banned tab: just banned accounts, fast unban -->
-    <div class="tab-panel" data-panel="banned">
-      <div class="section-title">Banned accounts <span class="count-pill" id="banCountPill">-</span></div>
-      <div class="acct-search-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="banSearch" class="acct-search" placeholder="Search banned users...">
+      <!-- Games -->
+      <div class="panel" data-panel="games">
+        <div class="section-h">Requested games <span class="count" id="reqCount">-</span></div>
+        <div class="gridcards" id="reqGamesList"></div>
+        <p class="note">Accept publishes the game to the home page. Deny sends your reason back to the creator.</p>
+        <div class="section-h" style="margin-top:30px">Published games <span class="count" id="pubCount">-</span></div>
+        <div class="gridcards" id="pubGamesList"></div>
+        <p class="note">Shutdown pulls a live game off the home page immediately - the creator can resubmit it from Studio.</p>
       </div>
-      <div class="acct-list" id="banList"></div>
-      <p class="note">Unban clears the ban immediately and lets them log back in right away.</p>
-    </div>
 
-    <!-- Games tab: requested + published -->
-    <div class="tab-panel" data-panel="games">
-      <div class="section-title">Requested Games <span class="count-pill" id="reqCountPill">-</span></div>
-      <div class="game-req-list" id="reqGamesList"></div>
-      <p class="note">
-        Accept publishes the game (icon + banner) to the home page for everyone.
-        Deny sends the reason back to the creator so they can fix it up and resubmit.
-      </p>
-
-      <div class="section-title">Published Games <span class="count-pill" id="pubCountPill">-</span></div>
-      <div class="game-req-list" id="pubGamesList"></div>
-      <p class="note">
-        Shutdown pulls a live game off the home page immediately - the creator can
-        resubmit it any time from Studio.
-      </p>
-    </div>
-
-    <!-- Reports tab: player/chat reports AND per-game reports, both sorted newest first -->
-    <div class="tab-panel" data-panel="reports">
-      <div class="section-title">Player Reports <span class="count-pill" id="reportCountPill">-</span></div>
-      <div class="acct-search-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="reportSearch" class="acct-search" placeholder="Search by reporter or target...">
+      <!-- Reports -->
+      <div class="panel" data-panel="reports">
+        <div class="section-h">Player &amp; chat reports <span class="count" id="repCount">-</span></div>
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="reportSearch" placeholder="Search by reporter, target or reason..."></div>
+          <div class="seg" id="repSeg"><button class="on" data-f="all">All</button><button data-f="chat">Chat</button><button data-f="player">Player</button></div>
+        </div>
+        <div class="list" id="reportsList"></div>
+        <p class="note">Chat reports the filter didn't catch are tagged <b>Needs review</b> - open the chat log to see the surrounding conversation, then warn, kick or ban.</p>
+        <div class="section-h" style="margin-top:30px">Game reports <span class="count" id="gameRepCount">-</span></div>
+        <div class="list" id="gameReportsList"></div>
       </div>
-      <div class="acct-list" id="reportsList"></div>
-      <p class="note">
-        These come from the "Report player" option in chat/in-game. Shows who reported
-        whom, when, and why - moderation action (kick/ban/etc) still happens from the
-        Accounts tab using the target's name.
-      </p>
 
-      <div class="section-title" style="margin-top:24px;">Game Reports <span class="count-pill" id="gameReportCountPill">-</span></div>
-      <div class="acct-list" id="gameReportsList"></div>
-      <p class="note">
-        These come from the "Report game" option on a game's info page. Grouped by
-        which game was reported, newest first within each.
-      </p>
+      <!-- Chat logs -->
+      <div class="panel" data-panel="chats">
+        <div id="chatRoot"></div>
+      </div>
+
     </div>
-
-  </div>
-
-  </div>
+  </section>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script>
-  // same project as Index.html - this page just writes one small value there
-  const firebaseConfig = {
-    apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
-    authDomain: "blockverse-3526c.firebaseapp.com",
-    databaseURL: "https://blockverse-3526c-default-rtdb.firebaseio.com",
-    projectId: "blockverse-3526c",
-    storageBucket: "blockverse-3526c.firebasestorage.app",
-    messagingSenderId: "782192628812",
-    appId: "1:782192628812:web:79d50d2c34cd8ac969d0e9"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-  const auth = firebase.auth();
+(function(){
+"use strict";
 
-  // Admin access = real Firebase email + password sign-in. The database rules check these
-  // same two emails, so what each account may do is enforced by Firebase itself.
-  const OWNER_EMAIL = "darkboyx190@gmail.com"; // full access: publish, kick, warn, ban, terminate
-  const MOD_EMAIL = "mod@blockverse.app";     // limited access: kick + warn only
-  // the account key (lowercase username) that's protected from admin-role
-  // moderation - an admin trying to kick/warn this account gets blocked and
-  // you get notified in-game instead. CHANGE THIS to your own username.
-  const OWNER_ACCOUNT_KEY = "yourownerusername";
+/* ====================== setup ====================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
+  authDomain: "blockverse-3526c.firebaseapp.com",
+  databaseURL: "https://blockverse-3526c-default-rtdb.firebaseio.com",
+  projectId: "blockverse-3526c",
+  storageBucket: "blockverse-3526c.firebasestorage.app",
+  messagingSenderId: "782192628812",
+  appId: "1:782192628812:web:79d50d2c34cd8ac969d0e9"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+const SV = firebase.database.ServerValue.TIMESTAMP;
 
-  let currentRole = null; // "owner" | "admin"
+// Admin access = real Firebase email + password sign-in. The database rules check these same emails.
+const OWNER_EMAIL = "darkboyx190@gmail.com"; // full access
+const MOD_EMAIL = "mod@blockverse.app";      // kick + warn + read chat/reports only
+// Account key (lowercase username) protected from admin-role moderation. CHANGE THIS to your own username.
+const OWNER_ACCOUNT_KEY = "yourownerusername";
 
-  const gateScreen = document.getElementById("gateScreen");
-  const publishScreen = document.getElementById("publishScreen");
-  const gateEmail = document.getElementById("gateEmail");
-  const gateInput = document.getElementById("gateInput");
-  const gateBtn = document.getElementById("gateBtn");
-  const gateMsg = document.getElementById("gateMsg");
-  const publishBtn = document.getElementById("publishBtn");
-  const publishMsg = document.getElementById("publishMsg");
-  const curVersion = document.getElementById("curVersion");
-  const curTs = document.getElementById("curTs");
+let role = null; // "owner" | "admin"
 
-  function showMsg(el, text, kind){ el.textContent = text; el.className = "msg " + kind; }
+/* ====================== helpers ====================== */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function fmtDateTime(ts){ return ts ? new Date(ts).toLocaleString([], { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "-"; }
+function fmtTime(ts){ return new Date(ts).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" }); }
+function fmtDay(ts){ return new Date(ts).toLocaleDateString([], { weekday:"short", month:"short", day:"numeric", year:"numeric" }); }
+function ago(ts){
+  if(!ts) return "-";
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if(s < 60) return "just now";
+  if(s < 3600) return Math.floor(s/60) + "m ago";
+  if(s < 86400) return Math.floor(s/3600) + "h ago";
+  if(s < 86400*30) return Math.floor(s/86400) + "d ago";
+  return fmtDateTime(ts);
+}
+function dur(ms){
+  const m = Math.round(ms / 60000);
+  if(m < 1) return "< 1 min";
+  if(m < 60) return m + " min";
+  const h = Math.floor(m / 60), r = m % 60;
+  return h + "h" + (r ? " " + r + "m" : "");
+}
+function initials(n){ n = String(n || "?").trim(); return (n.slice(0, 2) || "?").toUpperCase(); }
+function stagger(root){ $$(".anim-item", root).forEach((n, i) => n.style.setProperty("--i", Math.min(i, 14))); }
+function nameKey(n){ return String(n || "").trim().toLowerCase(); }
 
-  function roleForEmail(email){
-    email = (email || "").toLowerCase();
-    if(email === OWNER_EMAIL) return "owner";
-    if(email === MOD_EMAIL) return "admin";
-    return null;
+const IC = {
+  chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-11.6 7.1L4 20.5l1.5-4.6A8 8 0 1121 12z"/></svg>',
+  users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c2.2.7 3.5 2.6 3.5 5.5"/></svg>',
+  ban:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>',
+  cube:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3L12 2.5z"/><path d="M12 12l8.5-4.7M12 12v9.5M12 12L3.5 7.3"/></svg>',
+  flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-1.5 4L16 12H5"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  hourglass:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/></svg>',
+  server:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
+  chev:'<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
+  inbox:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  ver:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>'
+};
+function emptyBox(text){ return '<div class="empty">' + IC.inbox + esc(text) + '</div>'; }
+function skeleton(n){ return new Array(n || 4).fill('<div class="sk"></div>').join(""); }
+
+function toast(msg, kind){
+  const t = document.createElement("div");
+  t.className = "toast " + (kind || "");
+  t.innerHTML = '<span class="t-dot"></span><span>' + esc(msg) + '</span>';
+  $("#toasts").appendChild(t);
+  setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 280); }, 3600);
+}
+
+// modal: resolves to true/false (confirm) or string/null (when o.input is set)
+function modal(o){
+  return new Promise(resolve => {
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML =
+      '<div class="modal" role="dialog" aria-modal="true"><h3>' + esc(o.title) + '</h3>' +
+      (o.text ? '<p>' + esc(o.text) + '</p>' : "") +
+      (o.input ? '<input type="text" id="mInput" placeholder="' + esc(o.placeholder || "") + '" maxlength="' + (o.max || 200) + '">' : "") +
+      '<div class="modal-actions"><button class="btn ghost" data-x>Cancel</button>' +
+      '<button class="btn ' + (o.danger ? "danger" : "primary") + '" data-ok>' + esc(o.ok || "OK") + '</button></div></div>';
+    $("#modalRoot").appendChild(back);
+    const inp = $("#mInput", back);
+    setTimeout(() => (inp || $("[data-ok]", back)).focus(), 30);
+    let done = false;
+    function close(val){
+      if(done) return; done = true;
+      document.removeEventListener("keydown", onKey, true);
+      back.classList.add("out");
+      setTimeout(() => back.remove(), 190);
+      resolve(val);
+    }
+    function ok(){ close(o.input ? (inp.value.trim() || (o.allowEmpty ? "" : null)) : true); }
+    function onKey(e){ if(e.key === "Escape") close(o.input ? null : false); else if(e.key === "Enter" && e.target !== $("[data-x]", back)){ e.preventDefault(); ok(); } }
+    document.addEventListener("keydown", onKey, true);
+    $("[data-x]", back).addEventListener("click", () => close(o.input ? null : false));
+    $("[data-ok]", back).addEventListener("click", ok);
+    back.addEventListener("mousedown", e => { if(e.target === back) close(o.input ? null : false); });
+  });
+}
+const askText = (title, text, placeholder, ok, allowEmpty) => modal({ title, text, input:true, placeholder, ok, allowEmpty });
+const askConfirm = (title, text, ok, danger) => modal({ title, text, ok, danger });
+
+function countTo(el, to){
+  if(!el) return;
+  if(typeof to !== "number"){ el.textContent = to; return; }
+  const from = parseInt(el.getAttribute("data-n") || "0", 10) || 0;
+  el.setAttribute("data-n", to);
+  if(from === to){ el.textContent = to; return; }
+  const t0 = performance.now(), d = 700;
+  (function step(now){
+    const p = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from) * e);
+    if(p < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+/* ====================== state ====================== */
+const S = {
+  accounts: [], bans: {}, keyByName: {},
+  published: [], requests: [],
+  reports: [], gameReports: {},
+  repFilter: "all", version: null
+};
+
+/* ====================== auth / shell ====================== */
+const gateScreen = $("#gateScreen"), appEl = $("#app");
+const gateEmail = $("#gateEmail"), gateInput = $("#gateInput"), gateBtn = $("#gateBtn"), gateMsg = $("#gateMsg");
+function showMsg(el, text, kind){ el.textContent = text; el.className = "msg " + (kind || ""); }
+function roleForEmail(email){
+  email = (email || "").toLowerCase();
+  if(email === OWNER_EMAIL) return "owner";
+  if(email === MOD_EMAIL) return "admin";
+  return null;
+}
+
+function enterAdmin(r){
+  if(role) return;
+  role = r;
+  gateScreen.classList.add("hidden");
+  appEl.classList.remove("hidden");
+  document.body.classList.toggle("role-admin", role === "admin");
+  $("#roleText").textContent = role === "owner" ? "Owner access" : "Admin access";
+  $("#roleSub").textContent = role === "owner" ? "Full control" : "Kick, warn & review only";
+  $("#pillRole").textContent = role === "owner" ? "Owner" : "Admin";
+  renderStats(); renderDashLists();
+  const start = (location.hash || "").replace("#", "");
+  go(TITLES[start] ? start : "dashboard", true);
+  refreshAll();
+}
+
+gateBtn.addEventListener("click", async () => {
+  const email = gateEmail.value.trim().toLowerCase();
+  if(!email || !gateInput.value){ showMsg(gateMsg, "Enter your email and password.", "error"); return; }
+  gateBtn.disabled = true; showMsg(gateMsg, "", "");
+  try{
+    const cred = await auth.signInWithEmailAndPassword(email, gateInput.value);
+    const r = roleForEmail(cred.user.email);
+    if(!r){ await auth.signOut(); showMsg(gateMsg, "That account isn't an admin account.", "error"); }
+    else{ gateInput.value = ""; enterAdmin(r); }
+  }catch(e){ showMsg(gateMsg, "Wrong email or password.", "error"); }
+  gateBtn.disabled = false;
+});
+gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
+gateEmail.addEventListener("keydown", e => { if(e.key === "Enter") gateInput.focus(); });
+auth.onAuthStateChanged(u => { if(u && !role){ const r = roleForEmail(u.email); if(r) enterAdmin(r); } });
+$("#signOutBtn").addEventListener("click", () => auth.signOut().then(() => location.reload()));
+
+/* ====================== navigation ====================== */
+const TITLES = {
+  dashboard:["Dashboard","Overview of everything happening in BlockVerse"],
+  accounts:["Accounts","Search and moderate every account"],
+  banned:["Banned","Accounts currently blocked from logging in"],
+  games:["Games","Review submissions and manage live games"],
+  reports:["Reports","Player, chat and game reports from the community"],
+  chats:["Chat logs","Every game, every server, every message - whispers included"]
+};
+function moveIndicator(){
+  const a = $(".nav-item.active"), ind = $("#navInd");
+  if(!a || !ind) return;
+  ind.style.height = a.offsetHeight + "px";
+  ind.style.transform = "translateY(" + a.offsetTop + "px)";
+}
+function go(tab, silent){
+  if(!TITLES[tab]) tab = "dashboard";
+  $$(".nav-item").forEach(n => n.classList.toggle("active", n.getAttribute("data-tab") === tab));
+  $$(".panel").forEach(p => p.classList.toggle("active", p.getAttribute("data-panel") === tab));
+  $("#pageTitle").textContent = TITLES[tab][0];
+  $("#pageSub").textContent = TITLES[tab][1];
+  const h2 = $("#pageTitle"); h2.style.animation = "none"; void h2.offsetWidth; h2.style.animation = "";
+  if(!silent) history.replaceState(null, "", "#" + tab);
+  moveIndicator();
+  const c = $(".content"); if(c) window.scrollTo({ top:0 });
+  if(tab === "chats") clEnter();
+}
+$("#nav").addEventListener("click", e => { const b = e.target.closest(".nav-item"); if(b) go(b.getAttribute("data-tab")); });
+window.addEventListener("resize", moveIndicator);
+
+$("#refreshBtn").addEventListener("click", async () => {
+  const b = $("#refreshBtn"); b.classList.add("spin");
+  await refreshAll(true);
+  setTimeout(() => b.classList.remove("spin"), 400);
+  toast("Refreshed", "ok");
+});
+
+async function ensureAuth(){ if(!auth.currentUser) await auth.signInAnonymously().catch(() => {}); }
+async function refreshAll(manual){
+  await ensureAuth();
+  loadStatus();
+  await loadAccounts();
+  listenGames();
+  listenReports();
+  if(manual && $(".panel.active[data-panel='chats']")) clLoadGames(true);
+}
+
+/* ====================== stats / dashboard ====================== */
+function renderStats(){
+  const items = [
+    ["users", "Accounts", S.accounts.length, "sAccounts"],
+    ["ban", "Banned", Object.keys(S.bans).length, "sBanned"],
+    ["cube", "Live games", S.published.length, "sLive"],
+    ["hourglass", "Awaiting review", S.requests.length, "sReq"],
+    ["flag", "Open reports", S.reports.length, "sRep"]
+  ];
+  if(role === "owner") items.push(["ver", "Live version", S.version == null ? "-" : Number(S.version), "sVer"]);
+  const grid = $("#statGrid");
+  if(!grid.children.length || grid.children.length !== items.length){
+    grid.innerHTML = items.map((it, i) =>
+      '<div class="stat" style="--i:' + i + '"><div class="s-ic">' + IC[it[0]] + '</div><div class="s-num" id="' + it[3] + '">0</div><div class="s-label">' + it[1] + '</div></div>'
+    ).join("");
   }
+  items.forEach(it => countTo($("#" + it[3]), it[2]));
+  // sidebar counters
+  $("#cntAccounts").textContent = S.accounts.length;
+  $("#cntBanned").textContent = Object.keys(S.bans).length;
+  $("#cntGames").textContent = S.published.length + S.requests.length;
+  const cr = $("#cntReports"); cr.textContent = S.reports.length; cr.classList.toggle("alert", S.reports.length > 0);
+  moveIndicator();
+}
 
-  function enterAdmin(role){
-    if(currentRole) return;
-    currentRole = role;
-    gateScreen.classList.add("hidden");
-    publishScreen.classList.remove("hidden");
-    document.body.classList.toggle("role-admin", currentRole === "admin");
-    document.getElementById("roleBadgeText").textContent = currentRole === "owner" ? "Owner access" : "Admin access (kick/warn only)";
+function loadStatus(){
+  db.ref("blockverse_version").once("value").then(snap => {
+    const v = snap.val();
+    S.version = v && v.version != null ? v.version : 0;
+    $("#curVersion").textContent = S.version;
+    $("#curTs").textContent = v && v.ts ? new Date(v.ts).toLocaleString() : "Never";
+    renderStats();
+  }).catch(() => { $("#curVersion").textContent = "?"; $("#curTs").textContent = "?"; });
+}
+
+$("#publishBtn").addEventListener("click", async () => {
+  const b = $("#publishBtn"), m = $("#publishMsg");
+  if(!(await askConfirm("Publish update?", "Everyone currently in the game will be disconnected and asked to refresh.", "Publish", true))) return;
+  b.disabled = true; showMsg(m, "", "");
+  try{
+    await ensureAuth();
+    await db.ref("blockverse_version").transaction(cur => ({ version: (cur && cur.version ? cur.version : 0) + 1, ts: SV }));
+    showMsg(m, "Published! Live players are being disconnected now.", "success");
+    toast("Update published", "ok");
     loadStatus();
-    loadAccounts();
-    loadGameRequests();
-    loadReports();
-  }
+  }catch(e){ showMsg(m, "Couldn't publish - check your connection and try again.", "error"); }
+  b.disabled = false;
+});
 
-  gateBtn.addEventListener("click", async () => {
-    const email = gateEmail.value.trim().toLowerCase();
-    if(!email || !gateInput.value){ showMsg(gateMsg, "Enter your email and password.", "error"); return; }
-    gateBtn.disabled = true; showMsg(gateMsg, "", "");
-    try{
-      const cred = await auth.signInWithEmailAndPassword(email, gateInput.value);
-      const role = roleForEmail(cred.user.email);
-      if(!role){
-        await auth.signOut();
-        showMsg(gateMsg, "That account isn't an admin account.", "error");
-      }else{
-        gateInput.value = "";
-        enterAdmin(role);
-      }
-    }catch(e){
-      showMsg(gateMsg, "Wrong email or password.", "error");
+function renderDashLists(){
+  const dr = $("#dashReports");
+  const rs = S.reports.slice(0, 5);
+  dr.innerHTML = rs.length ? rs.map(r =>
+    '<div class="row anim-item"><div class="avatar sm">' + esc(initials(r.targetName)) + '</div><div class="r-main"><div class="r-title">' +
+    esc(r.reporterName || "Unknown") + ' <span class="arrow">&rarr;</span> ' + esc(r.targetName || "Unknown") + '</div><div class="r-sub">' + esc((r.reason || "").slice(0, 90)) + '</div></div>' +
+    '<span class="r-meta">' + ago(r.ts) + '</span></div>'
+  ).join("") : emptyBox("No reports - all quiet.");
+  stagger(dr);
+  const dq = $("#dashRequests");
+  dq.innerHTML = S.requests.length ? S.requests.slice(0, 4).map(g =>
+    '<div class="row anim-item"><div class="avatar sm">' + esc(initials(g.name)) + '</div><div class="r-main"><div class="r-title">' + esc(g.name) + '</div><div class="r-sub">by ' + esc(g.ownerName) + '</div></div>' +
+    '<button class="mini green" data-goto="games">Review</button></div>'
+  ).join("") : emptyBox("Nothing waiting.");
+  stagger(dq);
+}
+document.addEventListener("click", e => { const g = e.target.closest("[data-goto]"); if(g) go(g.getAttribute("data-goto")); });
+
+/* ====================== moderation actions ====================== */
+function guard(action, key){
+  if(role === "admin" && key === OWNER_ACCOUNT_KEY){
+    db.ref("blockverse_warnings/" + OWNER_ACCOUNT_KEY).set({ message: "An admin login just tried to " + action + " your account. It was blocked.", ts: SV }).catch(() => {});
+    toast("That account is protected - the owner was notified.", "err");
+    return true;
+  }
+  return false;
+}
+function permErr(e){ toast(/permission/i.test((e && (e.code || e.message)) || "") ? "Permission denied - check the database rules." : "Something went wrong. Try again.", "err"); }
+
+async function doKick(key, name){
+  if(guard("kick", key)) return;
+  try{ await db.ref("blockverse_kicks/" + key).set({ ts: SV, by: role }); toast("Kicked " + name, "ok"); }catch(e){ permErr(e); }
+}
+async function doWarn(key, name){
+  if(guard("warn", key)) return;
+  const message = await askText("Warn " + name, "This shows on their screen straight away.", "Warning message...", "Send warning");
+  if(!message) return;
+  try{ await db.ref("blockverse_warnings/" + key).set({ message: message.slice(0, 200), ts: SV }); toast("Warning sent to " + name, "ok"); }catch(e){ permErr(e); }
+}
+async function doBan(key, name){
+  const banned = !!S.bans[key];
+  try{
+    if(banned){ await db.ref("blockverse_account_bans/" + key).remove(); toast(name + " unbanned", "ok"); }
+    else{
+      const reason = await askText("Ban " + name, "They're logged out everywhere and can't log back in. The reason is shown to them.", "Reason...", "Ban account", true);
+      if(reason === null) return;
+      await db.ref("blockverse_account_bans/" + key).set({ reason: reason.slice(0, 300), by: role, ts: SV });
+      toast(name + " banned", "ok");
     }
-    gateBtn.disabled = false;
+    await loadAccounts();
+  }catch(e){ permErr(e); }
+}
+async function doTerminate(key, name){
+  if(!(await askConfirm("Terminate " + name + "?", "This permanently deletes the account and unfriends it from everyone. It cannot be undone.", "Terminate", true))) return;
+  await terminateAccount(key);
+  toast(name + " terminated", "ok");
+  loadAccounts();
+}
+async function terminateAccount(key){
+  try{
+    const fs = await db.ref("blockverse_users/" + key + "/friends").once("value");
+    await Promise.all(Object.keys(fs.val() || {}).map(f => db.ref("blockverse_users/" + f + "/friends/" + key).remove().catch(() => {})));
+  }catch(e){}
+  await db.ref("blockverse_terminated/" + key).set({ ts: SV }).catch(() => {});
+  const paths = ["blockverse_credentials","blockverse_usernames","blockverse_users","blockverse_security","blockverse_active_claim","blockverse_login_codes","blockverse_account_bans","blockverse_kicks","blockverse_warnings","blockverse_sessions"];
+  await Promise.all(paths.map(p => db.ref(p + "/" + key).remove().catch(() => {})));
+}
+const ACT = { kick:doKick, warn:doWarn, ban:doBan, terminate:doTerminate };
+function actionsFor(key, name, withTerminate){
+  const banned = !!S.bans[key];
+  return '<button class="mini" data-act="kick">Kick</button><button class="mini warn" data-act="warn">Warn</button>' +
+    (role === "admin" ? "" :
+      '<button class="mini red" data-act="ban">' + (banned ? "Unban" : "Ban") + '</button>' +
+      (withTerminate ? '<button class="mini solid-red" data-act="terminate">Terminate</button>' : ""));
+}
+
+/* ====================== accounts ====================== */
+async function loadAccounts(){
+  const list = $("#acctList");
+  if(!S.accounts.length) list.innerHTML = skeleton(5);
+  try{
+    const [n, b] = await Promise.all([db.ref("blockverse_usernames").once("value"), db.ref("blockverse_account_bans").once("value")]);
+    const names = n.val() || {};
+    S.bans = b.val() || {};
+    S.accounts = Object.keys(names).map(key => ({ key, username: (names[key] && names[key].username) || key })).sort((a, c) => a.username.localeCompare(c.username));
+    S.keyByName = {};
+    S.accounts.forEach(a => { S.keyByName[nameKey(a.username)] = a.key; S.keyByName[a.key] = a.key; });
+    renderAccounts(); renderBanned(); renderStats(); renderReports();
+  }catch(e){ list.innerHTML = emptyBox("Couldn't load accounts."); }
+}
+function renderAccounts(){
+  const q = nameKey($("#acctSearch").value);
+  const rows = S.accounts.filter(a => !q || nameKey(a.username).includes(q) || a.key.includes(q));
+  $("#acctPill").textContent = rows.length + " / " + S.accounts.length;
+  const list = $("#acctList");
+  if(!rows.length){ list.innerHTML = emptyBox("No accounts found."); return; }
+  list.innerHTML = rows.map(a =>
+    '<div class="row anim-item" data-key="' + esc(a.key) + '" data-name="' + esc(a.username) + '"><div class="avatar">' + esc(initials(a.username)) + '</div>' +
+    '<div class="r-main"><div class="r-title">' + esc(a.username) + (S.bans[a.key] ? '<span class="badge red">Banned</span>' : "") + (a.key === OWNER_ACCOUNT_KEY ? '<span class="badge">Owner</span>' : "") + '</div><div class="r-sub">' + esc(a.key) + '</div></div>' +
+    '<div class="r-actions">' + actionsFor(a.key, a.username, true) + '</div></div>'
+  ).join("");
+  stagger(list);
+}
+$("#acctSearch").addEventListener("input", renderAccounts);
+function rowAction(e){
+  const b = e.target.closest("[data-act]"); if(!b) return;
+  const row = b.closest("[data-key]"); if(!row) return;
+  const fn = ACT[b.getAttribute("data-act")]; if(fn) fn(row.getAttribute("data-key"), row.getAttribute("data-name"));
+}
+$("#acctList").addEventListener("click", rowAction);
+
+function renderBanned(){
+  const q = nameKey($("#banSearch").value);
+  const banned = S.accounts.filter(a => S.bans[a.key]);
+  const rows = banned.filter(a => !q || nameKey(a.username).includes(q) || a.key.includes(q));
+  $("#banPill").textContent = rows.length + " / " + banned.length;
+  const list = $("#banList");
+  if(!banned.length){ list.innerHTML = emptyBox("No banned accounts right now."); return; }
+  if(!rows.length){ list.innerHTML = emptyBox("No banned accounts match that search."); return; }
+  list.innerHTML = rows.map(a => {
+    const b = S.bans[a.key] || {};
+    return '<div class="row anim-item" data-key="' + esc(a.key) + '" data-name="' + esc(a.username) + '"><div class="avatar">' + esc(initials(a.username)) + '</div>' +
+      '<div class="r-main"><div class="r-title">' + esc(a.username) + '<span class="badge red">Banned</span></div><div class="r-sub">' + esc(b.reason || "No reason given") + '</div>' +
+      '<div class="r-meta">' + (b.by ? "by " + esc(b.by) : "") + (b.ts ? " &middot; " + fmtDateTime(b.ts) : "") + '</div></div>' +
+      '<div class="r-actions">' + (role === "admin" ? "" : '<button class="mini red" data-act="ban">Unban</button>') + '</div></div>';
+  }).join("");
+  stagger(list);
+}
+$("#banSearch").addEventListener("input", renderBanned);
+$("#banList").addEventListener("click", rowAction);
+
+/* ====================== games ====================== */
+let gamesListening = false;
+function listenGames(){
+  if(gamesListening) return; gamesListening = true;
+  db.ref("game_requests").orderByChild("ts").on("value", snap => {
+    const v = snap.val() || {};
+    S.requests = Object.keys(v).map(id => Object.assign({ id }, v[id])).filter(r => r.status === "pending").sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    renderRequests(); renderStats(); renderDashLists();
+  }, () => {});
+  db.ref("published_games").on("value", snap => {
+    const v = snap.val() || {};
+    S.published = Object.keys(v).map(id => Object.assign({ id }, v[id])).sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+    renderPublished(); renderStats(); loadGameReports(); renderReports();
+    if(CL.loaded) clLoadGames(true);
+  }, () => {});
+}
+function bgStyle(u){ return u ? ' style="background-image:url(\'' + esc(u) + '\')"' : ""; }
+function gameCard(g, kind){
+  return '<div class="gcard anim-item" data-id="' + esc(g.id) + '"><div class="g-banner"' + bgStyle(g.banner) + '></div><div class="g-body">' +
+    '<div class="g-icon"' + bgStyle(g.icon) + '>' + (g.icon ? "" : esc(initials(g.name))) + '</div>' +
+    '<div class="g-name">' + esc(g.name) + (kind === "pub" ? '<span class="badge green live">Live</span>' : '<span class="badge amber">Pending</span>') + '</div>' +
+    '<div class="g-meta">by ' + esc(g.ownerName) + ' &middot; up to ' + esc(g.maxPlayers || 20) + ' players</div>' +
+    '<div class="g-actions">' +
+      (kind === "pub"
+        ? '<button class="mini warn" data-g="shutdown">Shutdown</button><button class="mini" data-g="chat">Chat logs</button>'
+        : '<button class="mini green" data-g="accept">Accept &amp; publish</button><button class="mini red" data-g="deny">Deny</button>') +
+    '</div></div></div>';
+}
+function renderRequests(){
+  $("#reqCount").textContent = S.requests.length;
+  const w = $("#reqGamesList");
+  w.innerHTML = S.requests.length ? S.requests.map(r => gameCard(r, "req")).join("") : emptyBox("No games waiting for review.");
+  stagger(w);
+}
+function renderPublished(){
+  $("#pubCount").textContent = S.published.length;
+  const w = $("#pubGamesList");
+  w.innerHTML = S.published.length ? S.published.map(g => gameCard(g, "pub")).join("") : emptyBox("No published games yet.");
+  stagger(w);
+}
+async function gameAction(e){
+  const b = e.target.closest("[data-g]"); if(!b) return;
+  const id = b.closest("[data-id]").getAttribute("data-id");
+  const act = b.getAttribute("data-g");
+  const r = S.requests.find(x => x.id === id), g = S.published.find(x => x.id === id);
+  try{
+    if(act === "accept" && r){
+      b.disabled = true; b.textContent = "Publishing...";
+      await db.ref("published_games/" + r.id).set({ gameId:r.id, ownerKey:r.ownerKey, ownerName:r.ownerName, name:r.name, icon:r.icon || "", banner:r.banner || "", maxPlayers:r.maxPlayers || 20, publishedAt:SV, publishedBy:role });
+      await db.ref("game_requests/" + r.id).remove();
+      toast('"' + r.name + '" is live', "ok");
+    }else if(act === "deny" && r){
+      const reason = await askText('Deny "' + r.name + '"', "The creator sees this reason so they can fix it and resubmit.", "Reason...", "Deny game", true);
+      if(reason === null) return;
+      await db.ref("game_requests/" + r.id).update({ status:"denied", denyReason:reason });
+      setTimeout(() => db.ref("game_requests/" + r.id).remove().catch(() => {}), 4000);
+      toast("Denied " + r.name, "ok");
+    }else if(act === "shutdown" && g){
+      if(!(await askConfirm('Shut down "' + g.name + '"?', "It's pulled off the home page immediately.", "Shut down", true))) return;
+      await db.ref("published_games/" + g.id).remove();
+      toast(g.name + " shut down", "ok");
+    }else if(act === "chat" && g){
+      openChatLogs(g.id);
+    }
+  }catch(err){ permErr(err); renderRequests(); }
+}
+$("#reqGamesList").addEventListener("click", gameAction);
+$("#pubGamesList").addEventListener("click", gameAction);
+
+/* ====================== reports ====================== */
+let reportsListening = false;
+function listenReports(){
+  if(reportsListening) return; reportsListening = true;
+  // live listener: new reports appear without a refresh
+  db.ref("rooms/baseplate/reports").on("value", snap => {
+    const v = snap.val() || {};
+    S.reports = Object.keys(v).map(id => Object.assign({ id }, v[id])).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    renderReports(); renderStats(); renderDashLists();
+  }, err => {
+    $("#reportsList").innerHTML = emptyBox("Couldn't read reports (" + ((err && err.code) || "error") + "). Check the database rules.");
   });
-  gateInput.addEventListener("keydown", e => { if(e.key === "Enter") gateBtn.click(); });
-  gateEmail.addEventListener("keydown", e => { if(e.key === "Enter") gateInput.focus(); });
-
-  // already signed in from last time -> go straight in
-  auth.onAuthStateChanged((u) => {
-    if(u && !currentRole){ const r = roleForEmail(u.email); if(r) enterAdmin(r); }
+  loadGameReports();
+}
+async function loadGameReports(){
+  let data = {};
+  try{
+    const s = await db.ref("game_reports").once("value");
+    data = s.val() || {};
+  }catch(e){
+    // the root isn't readable with the old rules: read each known game on its own instead
+    const ids = new Set(["baseplate"].concat(S.published.map(g => g.id), S.requests.map(r => r.id)));
+    await Promise.all(Array.from(ids).map(async id => {
+      try{ const s = await db.ref("game_reports/" + id).once("value"); if(s.val()) data[id] = s.val(); }catch(_){}
+    }));
+  }
+  S.gameReports = {};
+  Object.keys(data).forEach(gid => {
+    S.gameReports[gid] = Object.keys(data[gid] || {}).map(id => Object.assign({ id }, data[gid][id])).sort((a, b) => (b.ts || 0) - (a.ts || 0));
   });
-  document.getElementById("signOutLink").addEventListener("click", (e) => {
-    e.preventDefault();
-    auth.signOut().then(() => location.reload());
+  renderGameReports();
+}
+function gameName(id){
+  if(id === "baseplate") return "Baseplate";
+  const g = S.published.find(x => x.id === id) || S.requests.find(x => x.id === id);
+  return g ? g.name : id;
+}
+function reportKind(r){ return /^chat/i.test(r.reason || "") ? "chat" : "player"; }
+function renderReports(){
+  const list = $("#reportsList");
+  if(!list) return;
+  const q = nameKey($("#reportSearch").value);
+  const rows = S.reports.filter(r =>
+    (S.repFilter === "all" || reportKind(r) === S.repFilter) &&
+    (!q || nameKey(r.reporterName).includes(q) || nameKey(r.targetName).includes(q) || nameKey(r.reason).includes(q)));
+  $("#repCount").textContent = rows.length + (rows.length !== S.reports.length ? " / " + S.reports.length : "");
+  if(!rows.length){ list.innerHTML = emptyBox(S.reports.length ? "No reports match that." : "No reports yet - nice and quiet."); return; }
+  list.innerHTML = rows.map(r => {
+    const tKey = S.keyByName[nameKey(r.targetName)] || null;
+    const kind = reportKind(r);
+    const needs = /needs review/i.test(r.reason || "");
+    const auto = /auto-?(flagged|muted)/i.test(r.reason || "");
+    const gid = r.gameId || "baseplate";
+    const dis = tKey ? "" : " disabled title=\"Account not found for that name\"";
+    return '<div class="row anim-item" data-id="' + esc(r.id) + '" data-key="' + esc(tKey || "") + '" data-name="' + esc(r.targetName || "") + '" data-game="' + esc(gid) + '" data-ts="' + (r.ts || 0) + '">' +
+      '<div class="avatar">' + esc(initials(r.targetName)) + '</div>' +
+      '<div class="r-main"><div class="r-title">' + esc(r.reporterName || "Unknown") + ' <span class="arrow">&rarr;</span> ' + esc(r.targetName || "Unknown") +
+        '<span class="badge">' + (kind === "chat" ? "Chat" : "Player") + '</span>' +
+        (needs ? '<span class="badge amber">Needs review</span>' : "") + (auto ? '<span class="badge red">Auto-muted</span>' : "") + '</div>' +
+      '<div class="r-sub">' + esc(r.reason || "No reason given") + '</div>' +
+      '<div class="r-meta">' + esc(gameName(gid)) + ' &middot; ' + fmtDateTime(r.ts) + ' &middot; ' + ago(r.ts) + '</div></div>' +
+      '<div class="r-actions"><button class="mini" data-rep="chat">View chat</button>' +
+        '<button class="mini"' + dis + ' data-act="kick">Kick</button><button class="mini warn"' + dis + ' data-act="warn">Warn</button>' +
+        (role === "admin" ? "" : '<button class="mini red"' + dis + ' data-act="ban">' + (tKey && S.bans[tKey] ? "Unban" : "Ban") + '</button>') +
+        '<button class="mini green" data-rep="dismiss">Dismiss</button></div></div>';
+  }).join("");
+  stagger(list);
+}
+$("#reportSearch").addEventListener("input", renderReports);
+$("#repSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  S.repFilter = b.getAttribute("data-f");
+  $$("#repSeg button").forEach(x => x.classList.toggle("on", x === b));
+  renderReports();
+});
+$("#reportsList").addEventListener("click", async e => {
+  const rb = e.target.closest("[data-rep]");
+  if(!rb){ rowAction(e); return; }
+  const row = rb.closest(".row");
+  if(rb.getAttribute("data-rep") === "chat"){
+    openChatLogs(row.getAttribute("data-game"), { search: row.getAttribute("data-name"), ts: parseInt(row.getAttribute("data-ts"), 10) || 0 });
+  }else{
+    try{ await db.ref("rooms/baseplate/reports/" + row.getAttribute("data-id")).remove(); toast("Report dismissed", "ok"); }catch(err){ permErr(err); }
+  }
+});
+function renderGameReports(){
+  const list = $("#gameReportsList");
+  const ids = Object.keys(S.gameReports).filter(id => S.gameReports[id].length);
+  $("#gameRepCount").textContent = ids.reduce((n, id) => n + S.gameReports[id].length, 0);
+  if(!ids.length){ list.innerHTML = emptyBox("No game reports yet."); return; }
+  list.innerHTML = ids.map(gid =>
+    '<div class="section-h" style="margin:14px 0 8px">' + esc(gameName(gid)) + '<span class="count">' + S.gameReports[gid].length + '</span></div>' +
+    S.gameReports[gid].map(r =>
+      '<div class="row anim-item" data-gid="' + esc(gid) + '" data-id="' + esc(r.id) + '"><div class="avatar sm">' + esc(initials(r.reporterName)) + '</div>' +
+      '<div class="r-main"><div class="r-title">' + esc(r.reporterName || "Unknown") + '</div><div class="r-sub">' + esc(r.reason || "No reason given") + '</div></div>' +
+      '<span class="r-meta">' + fmtDateTime(r.ts) + '</span><button class="mini green" data-grdismiss>Dismiss</button></div>'
+    ).join("")
+  ).join("");
+  stagger(list);
+}
+$("#gameReportsList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-grdismiss]"); if(!b) return;
+  const row = b.closest(".row");
+  try{ await db.ref("game_reports/" + row.getAttribute("data-gid") + "/" + row.getAttribute("data-id")).remove(); toast("Dismissed", "ok"); loadGameReports(); }
+  catch(err){ toast("Couldn't dismiss - add the admin write rule for game_reports.", "err"); }
+});
+
+/* ====================== chat logs ====================== */
+const SESSION_GAP = 30 * 60 * 1000;   // 30 min of silence = a new "server" session
+const LIVE_WINDOW = 120 * 1000;       // player counts as in-game if they updated in the last 2 min
+const CL = { loaded:false, view:"games", filterGames:"all", q:"", games:[], gameId:null, game:null, msgs:[], sessions:[], live:[], session:null, mf:"all", mq:"", pending:null };
+
+async function roomIds(){
+  try{
+    const tok = await auth.currentUser.getIdToken();
+    const r = await fetch(firebaseConfig.databaseURL + "/rooms.json?shallow=true&auth=" + encodeURIComponent(tok));
+    if(!r.ok) return null;
+    return Object.keys((await r.json()) || {});
+  }catch(e){ return null; }
+}
+async function readPlayers(id){
+  try{
+    const s = await db.ref("rooms/" + id + "/players").once("value");
+    const v = s.val() || {}, now = Date.now();
+    return Object.keys(v).map(uid => Object.assign({ uid }, v[uid])).filter(p => !p.ts || typeof p.ts !== "number" || now - p.ts < LIVE_WINDOW);
+  }catch(e){ return []; }
+}
+async function lastMessage(id){
+  try{
+    const s = await db.ref("rooms/" + id + "/chat").orderByChild("ts").limitToLast(1).once("value");
+    const v = s.val(); if(!v) return null;
+    return v[Object.keys(v)[0]];
+  }catch(e){ return null; }
+}
+async function clLoadGames(quiet){
+  await ensureAuth();
+  if(CL.view === "games" && !quiet) $("#chatRoot").innerHTML = '<div class="gridcards">' + new Array(6).fill('<div class="sk" style="height:200px"></div>').join("") + '</div>';
+  const rooms = await roomIds();
+  const known = new Map();
+  known.set("baseplate", { id:"baseplate", name:"Baseplate", ownerName:"BlockVerse", active:true, builtin:true });
+  S.published.forEach(g => known.set(g.id, { id:g.id, name:g.name, ownerName:g.ownerName, icon:g.icon, banner:g.banner, active:true }));
+  (rooms || []).forEach(id => { if(!known.has(id)){ const rq = S.requests.find(x => x.id === id); known.set(id, { id, name: rq ? rq.name : id, ownerName: rq ? rq.ownerName : "", active:false }); } });
+  const games = Array.from(known.values());
+  await Promise.all(games.map(async g => {
+    const [pl, last] = await Promise.all([readPlayers(g.id), lastMessage(g.id)]);
+    g.players = pl; g.last = last;
+  }));
+  CL.games = games.filter(g => g.active || g.last || g.players.length);
+  CL.roomsListed = rooms !== null;
+  CL.loaded = true;
+  if(CL.view === "games") clRender();
+}
+function clEnter(){
+  if(CL.pending){ const p = CL.pending; CL.pending = null; clOpenGame(p.id, p.opts); return; }
+  if(!CL.loaded) clLoadGames(); else clRender();
+}
+function openChatLogs(gameId, opts){
+  go("chats");
+  CL.pending = null;
+  clOpenGame(gameId, opts || {});
+}
+
+function crumbs(parts){
+  return '<div class="crumbs">' + parts.map((p, i) => {
+    const last = i === parts.length - 1;
+    return (i ? '<span class="sep">/</span>' : "") + (last ? '<span class="cur">' + esc(p[0]) + '</span>' : '<button data-crumb="' + p[1] + '">' + esc(p[0]) + '</button>');
+  }).join("") + '</div>';
+}
+
+function clRender(){
+  const root = $("#chatRoot");
+  if(CL.view === "games") return clRenderGames(root);
+  if(CL.view === "servers") return clRenderServers(root);
+  return clRenderChat(root);
+}
+
+function clRenderGames(root){
+  const q = nameKey(CL.q);
+  const rows = CL.games.filter(g =>
+    (CL.filterGames === "all" || (CL.filterGames === "active" ? g.active : !g.active)) &&
+    (!q || nameKey(g.name).includes(q) || nameKey(g.id).includes(q) || nameKey(g.ownerName).includes(q)));
+  const nActive = CL.games.filter(g => g.active).length;
+  root.innerHTML =
+    '<div class="toolbar"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="clGameSearch" placeholder="Search games..." value="' + esc(CL.q) + '"></div>' +
+    '<div class="seg" id="clGameSeg">' +
+      ['all','active','closed'].map(f => '<button data-f="' + f + '" class="' + (CL.filterGames === f ? "on" : "") + '">' + f[0].toUpperCase() + f.slice(1) + '</button>').join("") + '</div>' +
+    '<span class="pill">' + nActive + ' active &middot; ' + (CL.games.length - nActive) + ' closed</span></div>' +
+    (rows.length ? '<div class="gridcards" id="clGameGrid">' + rows.map(g =>
+      '<div class="gcard click anim-item" data-id="' + esc(g.id) + '"><div class="g-banner"' + bgStyle(g.banner) + '></div><div class="g-body">' +
+      '<div class="g-icon"' + bgStyle(g.icon) + '>' + (g.icon ? "" : esc(initials(g.name))) + '</div>' +
+      '<div class="g-name">' + esc(g.name) + (g.active ? '<span class="badge green live">Active</span>' : '<span class="badge">Closed</span>') + '</div>' +
+      '<div class="g-meta">' + (g.ownerName ? "by " + esc(g.ownerName) : esc(g.id)) + '</div>' +
+      '<div class="g-stats"><span><b>' + g.players.length + '</b> in game now</span><span>' + (g.last ? 'Last chat <b>' + ago(g.last.ts) + '</b>' : "No chat yet") + '</span></div>' +
+      '</div></div>').join("") + '</div>' : emptyBox("No games match.")) +
+    (CL.roomsListed ? "" : '<p class="note">Closed games can\'t be listed yet - add the <b>rooms</b> read rule for admins (see the rules snippet) and they\'ll show up here.</p>');
+  stagger(root);
+  const s = $("#clGameSearch");
+  s.addEventListener("input", () => { CL.q = s.value; const pos = s.selectionStart; clRenderGames(root); const n = $("#clGameSearch"); n.focus(); n.setSelectionRange(pos, pos); });
+  $("#clGameSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b){ CL.filterGames = b.getAttribute("data-f"); clRenderGames(root); } });
+  const grid = $("#clGameGrid");
+  if(grid) grid.addEventListener("click", e => { const c = e.target.closest(".gcard"); if(c) clOpenGame(c.getAttribute("data-id")); });
+}
+
+function buildSessions(msgs){
+  const out = []; let cur = null;
+  msgs.forEach(m => {
+    if(!cur || m.ts - cur.end > SESSION_GAP){ cur = { start:m.ts, end:m.ts, msgs:[], people:new Map(), whispers:0 }; out.push(cur); }
+    cur.msgs.push(m); cur.end = m.ts;
+    if(m.whisperTo) cur.whispers++;
+    const k = m.accountKey || m.uid || m.name;
+    if(!cur.people.has(k)) cur.people.set(k, m.name || "Player");
   });
+  return out.reverse(); // newest first
+}
 
-  /* ============ Tabs ============ */
-  document.getElementById("adminTabs").addEventListener("click", (e) => {
-    const tabEl = e.target.closest(".admin-tab");
-    if(!tabEl) return;
-    const name = tabEl.getAttribute("data-tab");
-    document.querySelectorAll(".admin-tab").forEach(t => t.classList.toggle("active", t === tabEl));
-    document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.getAttribute("data-panel") === name));
+async function clOpenGame(id, opts){
+  CL.gameId = id; CL.view = "servers"; CL.opts = opts || {};
+  CL.game = CL.games.find(g => g.id === id) || { id, name: gameName(id), active: id === "baseplate" || S.published.some(g => g.id === id), players: [] };
+  $("#chatRoot").innerHTML = crumbs([["Chat logs","games"], [CL.game.name,"x"]]) + skeleton(5);
+  await ensureAuth();
+  try{
+    const [snap, live] = await Promise.all([
+      db.ref("rooms/" + id + "/chat").orderByChild("ts").limitToLast(2000).once("value"),
+      readPlayers(id)
+    ]);
+    const v = snap.val() || {};
+    CL.msgs = Object.keys(v).map(k => Object.assign({ id:k }, v[k])).filter(m => m.ts).sort((a, b) => a.ts - b.ts);
+    CL.live = live;
+    CL.sessions = buildSessions(CL.msgs);
+  }catch(e){
+    CL.msgs = []; CL.sessions = []; CL.live = [];
+    toast("Couldn't read chat for that game.", "err");
+  }
+  // jumped here from a report: open the server that was running when it was filed
+  if(CL.opts.search !== undefined){
+    CL.mq = CL.opts.search || ""; CL.mf = "all";
+    if(CL.sessions.length){
+      const ts = CL.opts.ts || 0;
+      const hit = CL.sessions.find(s => ts >= s.start - SESSION_GAP && ts <= s.end + SESSION_GAP) || CL.sessions[0];
+      CL.session = hit; CL.view = "chat"; clRender(); return;
+    }
+  }
+  CL.mq = CL.opts.search ? CL.mq : ""; CL.mf = "all";
+  clRender();
+}
+
+function clRenderServers(root){
+  const g = CL.game, total = CL.msgs.length;
+  let html = crumbs([["Chat logs","games"], [g.name,"x"]]) +
+    '<div class="toolbar"><span class="pill">' + (g.active ? "Active game" : "Closed game") + '</span><span class="pill">' + CL.sessions.length + ' servers</span><span class="pill">' + total + ' messages loaded</span>' +
+    '<button class="mini" id="clReload" style="margin-left:auto">Reload</button></div><div class="list">';
+  if(CL.live.length){
+    html += '<div class="server live anim-item" data-live="1"><div class="srv-ic">' + IC.server + '</div><div class="srv-main"><div class="srv-title">Live server <span class="badge green live">Online now</span></div>' +
+      '<div class="srv-sub">' + CL.live.length + ' player' + (CL.live.length === 1 ? "" : "s") + ' in the game right now</div>' +
+      '<div class="people">' + CL.live.map(p => '<span class="person"><span class="avatar sm" style="width:20px;height:20px;border-radius:7px;font-size:9px">' + esc(initials(p.name)) + '</span>' + esc(p.name || "Player") + '</span>').join("") + '</div></div>' +
+      '<div class="srv-stats"><div class="srv-stat"><b>' + CL.live.length + '</b><span>In game</span></div></div>' + IC.chev + '</div>';
+  }
+  if(!CL.sessions.length) html += emptyBox("No chat has been sent in this game yet.");
+  CL.sessions.forEach((s, i) => {
+    const names = Array.from(s.people.values());
+    const isRecent = Date.now() - s.end < SESSION_GAP;
+    html += '<div class="server anim-item" data-i="' + i + '"><div class="srv-ic">' + IC.server + '</div><div class="srv-main">' +
+      '<div class="srv-title">' + esc(fmtDay(s.start)) + ' &middot; ' + esc(new Date(s.start).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })) +
+        (isRecent ? '<span class="badge amber">Recent</span>' : "") + '</div>' +
+      '<div class="srv-sub">' + new Date(s.start).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) + ' &ndash; ' + new Date(s.end).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) + ' &middot; ran ' + dur(s.end - s.start) + '</div>' +
+      '<div class="people">' + names.slice(0, 8).map(n => '<span class="person"><span class="avatar sm" style="width:20px;height:20px;border-radius:7px;font-size:9px">' + esc(initials(n)) + '</span>' + esc(n) + '</span>').join("") +
+        (names.length > 8 ? '<span class="person">+' + (names.length - 8) + ' more</span>' : "") + '</div></div>' +
+      '<div class="srv-stats"><div class="srv-stat"><b>' + s.people.size + '</b><span>Players</span></div><div class="srv-stat"><b>' + s.msgs.length + '</b><span>Messages</span></div><div class="srv-stat"><b>' + s.whispers + '</b><span>Whispers</span></div></div>' + IC.chev + '</div>';
   });
+  html += '</div><p class="note">Servers are grouped from the chat history: a gap of 30+ minutes with no messages starts a new one. "Players" counts everyone who chatted in it.</p>';
+  root.innerHTML = html;
+  stagger(root);
+  $("#clReload").addEventListener("click", () => clOpenGame(CL.gameId, {}));
+  $$(".crumbs [data-crumb]", root).forEach(b => b.addEventListener("click", clCrumb));
+  $$(".server", root).forEach(el => el.addEventListener("click", () => {
+    if(el.getAttribute("data-live")){ CL.session = CL.sessions[0] || { start:Date.now(), end:Date.now(), msgs:[], people:new Map(), whispers:0 }; }
+    else CL.session = CL.sessions[parseInt(el.getAttribute("data-i"), 10)];
+    CL.mq = ""; CL.mf = "all"; CL.view = "chat"; clRender();
+  }));
+}
 
-  function loadStatus(){
-    db.ref("blockverse_version").once("value").then(snap => {
-      const v = snap.val();
-      const versionText = v && v.version != null ? String(v.version) : "0";
-      curVersion.textContent = versionText;
-      curTs.textContent = v && v.ts ? new Date(v.ts).toLocaleString() : "Never";
-      const statVersion = document.getElementById("statVersion");
-      if(statVersion) statVersion.textContent = versionText;
-    }).catch(() => {
-      curVersion.textContent = "?"; curTs.textContent = "?";
-    });
-  }
-
-  publishBtn.addEventListener("click", async () => {
-    publishBtn.disabled = true;
-    showMsg(publishMsg, "", "");
-    try{
-      if(!auth.currentUser) await auth.signInAnonymously();
-      await db.ref("blockverse_version").transaction(current => {
-        const next = (current && current.version ? current.version : 0) + 1;
-        return { version: next, ts: firebase.database.ServerValue.TIMESTAMP };
-      });
-      showMsg(publishMsg, "Published! Live players are being disconnected now.", "success");
-      loadStatus();
-    }catch(e){
-      showMsg(publishMsg, "Couldn't publish - check your connection and try again.", "error");
-    }
-    publishBtn.disabled = false;
+function hl(text, q){
+  const t = esc(text);
+  if(!q) return t;
+  const eq = esc(q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return t.replace(new RegExp("(" + eq + ")", "gi"), "<mark>$1</mark>");
+}
+function visibleMsgs(){
+  let m = CL.session.msgs;
+  if(CL.mf === "whisper") m = m.filter(x => x.whisperTo);
+  else if(CL.mf === "public") m = m.filter(x => !x.whisperTo);
+  const q = nameKey(CL.mq);
+  if(q) m = m.filter(x => nameKey(x.name).includes(q) || nameKey(x.text).includes(q) || nameKey(x.whisperToName).includes(q));
+  return m;
+}
+function chatRows(){
+  const m = visibleMsgs();
+  if(!m.length) return emptyBox("No messages match.");
+  let lastDay = "", out = "";
+  m.forEach((x, i) => {
+    const day = fmtDay(x.ts);
+    if(day !== lastDay){ out += '<div class="day-sep">' + esc(day) + '</div>'; lastDay = day; }
+    const w = !!x.whisperTo;
+    out += '<div class="cm' + (w ? " whisper" : "") + '"' + (i < 40 ? ' style="animation-delay:' + (i * 12) + 'ms"' : ' style="animation:none"') + '><div class="tm">' + fmtTime(x.ts) + '</div><div>' +
+      '<span class="who" data-who="' + esc(x.name || "") + '">' + esc(x.name || "Player") + '</span>' +
+      (w ? '<span class="badge amber">Whisper</span><span class="arrow">&rarr;</span><b>' + esc(x.whisperToName || x.whisperTo) + '</b> ' : "") +
+      '<span class="tx">' + hl(x.text || "", CL.mq.trim()) + '</span></div></div>';
   });
+  return out;
+}
+function clRenderChat(root){
+  const s = CL.session, g = CL.game;
+  const title = fmtDay(s.start) + " · " + new Date(s.start).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+  root.innerHTML = crumbs([["Chat logs","games"], [g.name,"servers"], [title,"x"]]) +
+    '<div class="chatbox"><div class="chat-head"><div class="avatar">' + esc(initials(g.name)) + '</div><div class="grow"><h3>' + esc(g.name) + '</h3><small>' +
+    s.people.size + ' players &middot; ' + s.msgs.length + ' messages &middot; ' + s.whispers + ' whispers &middot; ran ' + dur(s.end - s.start) + '</small></div>' +
+    '<button class="mini" id="clExport">Export .txt</button></div>' +
+    '<div class="chat-tools"><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="clMsgSearch" placeholder="Search a player or message..." value="' + esc(CL.mq) + '"></div>' +
+    '<div class="seg" id="clMsgSeg">' + [["all","All"],["public","Public"],["whisper","Whispers"]].map(f => '<button data-f="' + f[0] + '" class="' + (CL.mf === f[0] ? "on" : "") + '">' + f[1] + '</button>').join("") + '</div></div>' +
+    '<div class="chat-scroll" id="clScroll">' + chatRows() + '</div></div>' +
+    '<p class="note">Times are in your local timezone. Messages are shown exactly as stored - the in-game filter has already censored what it caught. Click a name to filter by that player.</p>';
+  $$(".crumbs [data-crumb]", root).forEach(b => b.addEventListener("click", clCrumb));
+  const inp = $("#clMsgSearch"); let t;
+  inp.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { CL.mq = inp.value; $("#clScroll").innerHTML = chatRows(); }, 120); });
+  $("#clMsgSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; CL.mf = b.getAttribute("data-f"); $$("#clMsgSeg button").forEach(x => x.classList.toggle("on", x === b)); $("#clScroll").innerHTML = chatRows(); });
+  $("#clScroll").addEventListener("click", e => { const w = e.target.closest("[data-who]"); if(w){ CL.mq = w.getAttribute("data-who"); inp.value = CL.mq; $("#clScroll").innerHTML = chatRows(); } });
+  $("#clExport").addEventListener("click", exportChat);
+  const sc = $("#clScroll");
+  if(CL.mq){ const mk = $("mark", sc); if(mk) mk.scrollIntoView({ block:"center" }); else sc.scrollTop = sc.scrollHeight; } else sc.scrollTop = sc.scrollHeight;
+}
+function exportChat(){
+  const s = CL.session;
+  const lines = s.msgs.map(m => "[" + new Date(m.ts).toLocaleString() + "] " + (m.name || "Player") + (m.whisperTo ? " (whisper to " + (m.whisperToName || m.whisperTo) + ")" : "") + ": " + (m.text || ""));
+  const blob = new Blob([CL.game.name + " - server " + fmtDateTime(s.start) + "\n\n" + lines.join("\n")], { type:"text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = (CL.game.id + "-chat-" + new Date(s.start).toISOString().slice(0, 16).replace(/[:T]/g, "-")) + ".txt";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast("Chat exported", "ok");
+}
+function clCrumb(e){
+  const to = e.currentTarget.getAttribute("data-crumb");
+  if(to === "games"){ CL.view = "games"; clLoadGames(true).then(clRender); clRender(); }
+  else if(to === "servers"){ CL.view = "servers"; clRender(); }
+}
 
-  /* ============ Accounts ============ */
-  const acctList = document.getElementById("acctList");
-  const acctSearch = document.getElementById("acctSearch");
-  const banList = document.getElementById("banList");
-  const banSearch = document.getElementById("banSearch");
-  let allAccounts = []; // [{key, username}]
-  let banStatus = {};   // key -> ban record or null
-
-  async function loadAccounts(){
-    acctList.innerHTML = '<p class="note">Loading...</p>';
-    if(!auth.currentUser) await auth.signInAnonymously().catch(()=>{});
-    try{
-      const [namesSnap, bansSnap] = await Promise.all([
-        db.ref("blockverse_usernames").once("value"),
-        db.ref("blockverse_account_bans").once("value")
-      ]);
-      const names = namesSnap.val() || {};
-      banStatus = bansSnap.val() || {};
-      allAccounts = Object.keys(names).map(key => ({ key, username: (names[key] && names[key].username) || key }))
-        .sort((a,b) => a.username.localeCompare(b.username));
-      renderAccounts();
-      renderBanned();
-    }catch(e){
-      acctList.innerHTML = '<p class="note">Couldn\'t load accounts.</p>';
-    }
-  }
-
-  // shared by both the Accounts tab and the Banned tab's ban/unban buttons
-  function setBan(key, username){
-    const banned = !!banStatus[key];
-    if(banned){
-      return db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
-    }
-    const reason = prompt("Ban reason for " + username + " (shown to them):") || "";
-    return db.ref("blockverse_account_bans/" + key).set({ reason, by: currentRole, ts: firebase.database.ServerValue.TIMESTAMP }).then(loadAccounts);
-  }
-
-  function unban(key){
-    return db.ref("blockverse_account_bans/" + key).remove().then(loadAccounts);
-  }
-
-  function renderAccounts(){
-    const q = (acctSearch.value || "").trim().toLowerCase();
-    const rows = allAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
-    document.getElementById("acctCountPill").textContent = rows.length + " / " + allAccounts.length;
-    const tabCountAccounts = document.getElementById("tabCountAccounts");
-    if(tabCountAccounts) tabCountAccounts.textContent = allAccounts.length;
-
-    const statTotal = document.getElementById("statTotal");
-    const statBanned = document.getElementById("statBanned");
-    if(statTotal) statTotal.textContent = allAccounts.length;
-    if(statBanned) statBanned.textContent = Object.keys(banStatus).length;
-    if(rows.length === 0){ acctList.innerHTML = '<p class="note">No accounts found.</p>'; return; }
-    const isAdminRole = currentRole === "admin";
-    acctList.innerHTML = rows.map(a => {
-      const banned = !!banStatus[a.key];
-      return '<div class="acct-row" data-key="' + a.key + '">' +
-        '<div><div class="acct-name">' + escapeHtml(a.username) + '</div><div class="acct-key">' + escapeHtml(a.key) + '</div></div>' +
-        '<div class="acct-badges">' + (banned ? '<span class="acct-badge banned">Banned</span>' : '') + '</div>' +
-        '<div class="acct-actions">' +
-          '<button class="mini-btn kick-btn">Kick</button>' +
-          '<button class="mini-btn warn warn-btn">Warn</button>' +
-          (isAdminRole ? '' :
-            '<button class="mini-btn ban ban-btn">' + (banned ? 'Unban' : 'Ban') + '</button>' +
-            '<button class="mini-btn terminate terminate-btn">Terminate</button>') +
-        '</div>' +
-      '</div>';
-    }).join("");
-
-    // notifies the protected owner account in-game (reuses the existing
-    // warning-toast channel) that an admin-role login just tried to use a
-    // moderation command on them, instead of letting the action go through
-    function alertOwnerOfAttempt(action){
-      db.ref("blockverse_warnings/" + OWNER_ACCOUNT_KEY).set({
-        message: "An admin login just tried to " + action + " your account. It was blocked.",
-        ts: firebase.database.ServerValue.TIMESTAMP
-      }).catch(()=>{});
-    }
-
-    acctList.querySelectorAll(".acct-row").forEach(row => {
-      const key = row.getAttribute("data-key");
-      const username = row.querySelector(".acct-name").textContent;
-      const isOwnerTarget = key === OWNER_ACCOUNT_KEY;
-
-      row.querySelector(".kick-btn").addEventListener("click", () => {
-        if(isAdminRole && isOwnerTarget){ alertOwnerOfAttempt("kick"); alert("This account is protected - the owner has been notified."); return; }
-        db.ref("blockverse_kicks/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP, by: currentRole });
-      });
-
-      row.querySelector(".warn-btn").addEventListener("click", () => {
-        if(isAdminRole && isOwnerTarget){ alertOwnerOfAttempt("warn"); alert("This account is protected - the owner has been notified."); return; }
-        const message = prompt("Warning message for " + username + ":");
-        if(!message) return;
-        db.ref("blockverse_warnings/" + key).set({ message, ts: firebase.database.ServerValue.TIMESTAMP });
-      });
-
-      const banBtn = row.querySelector(".ban-btn");
-      if(banBtn) banBtn.addEventListener("click", () => setBan(key, username));
-
-      const termBtn = row.querySelector(".terminate-btn");
-      if(termBtn) termBtn.addEventListener("click", async () => {
-        if(!confirm("Permanently terminate " + username + "'s account? This deletes it and unfriends it from everyone. This cannot be undone.")) return;
-        termBtn.disabled = true; termBtn.textContent = "...";
-        await terminateAccount(key);
-        loadAccounts();
-      });
-    });
-  }
-
-  /* ============ Banned tab ============ */
-  function renderBanned(){
-    if(!banList) return;
-    const q = (banSearch && banSearch.value || "").trim().toLowerCase();
-    const bannedKeys = Object.keys(banStatus);
-    const bannedAccounts = allAccounts.filter(a => bannedKeys.includes(a.key));
-    const rows = bannedAccounts.filter(a => !q || a.username.toLowerCase().includes(q) || a.key.includes(q));
-
-    document.getElementById("banCountPill").textContent = rows.length + " / " + bannedAccounts.length;
-    const tabCountBanned = document.getElementById("tabCountBanned");
-    if(tabCountBanned) tabCountBanned.textContent = bannedAccounts.length;
-
-    if(bannedAccounts.length === 0){ banList.innerHTML = '<p class="note">No banned accounts right now.</p>'; return; }
-    if(rows.length === 0){ banList.innerHTML = '<p class="note">No banned accounts match that search.</p>'; return; }
-
-    const isAdminRole = currentRole === "admin";
-    banList.innerHTML = rows.map(a => {
-      const b = banStatus[a.key] || {};
-      const reason = b.reason ? escapeHtml(b.reason) : "No reason given";
-      const meta = (b.by ? "Banned by " + escapeHtml(b.by) : "") + (b.ts ? " &middot; " + new Date(b.ts).toLocaleString() : "");
-      return '<div class="acct-row" data-key="' + a.key + '">' +
-        '<div>' +
-          '<div class="acct-name">' + escapeHtml(a.username) + '</div>' +
-          '<div class="acct-key">' + escapeHtml(a.key) + '</div>' +
-          '<div class="ban-reason">' + reason + '</div>' +
-          (meta ? '<div class="ban-meta">' + meta + '</div>' : '') +
-        '</div>' +
-        '<div class="acct-actions">' +
-          (isAdminRole ? '' : '<button class="mini-btn ban unban-btn">Unban</button>') +
-        '</div>' +
-      '</div>';
-    }).join("");
-
-    banList.querySelectorAll(".unban-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const row = btn.closest(".acct-row");
-        const key = row.getAttribute("data-key");
-        btn.disabled = true; btn.textContent = "...";
-        unban(key);
-      });
-    });
-  }
-  if(banSearch) banSearch.addEventListener("input", renderBanned);
-  acctSearch.addEventListener("input", renderAccounts);
-
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-  }
-
-  /* ============ Reports ============ */
-  let allPlayerReports = [];
-  let allGameReports = {}; // { gameId: [report, ...] }
-
-  async function loadReports(){
-    try{
-      const [playerSnap, gameSnap] = await Promise.all([
-        db.ref("rooms/baseplate/reports").once("value"),
-        db.ref("game_reports").once("value")
-      ]);
-      const pv = playerSnap.val() || {};
-      allPlayerReports = Object.keys(pv).map(id => ({ id, ...pv[id] })).sort((a,b) => (b.ts||0) - (a.ts||0));
-      const gv = gameSnap.val() || {};
-      allGameReports = {};
-      Object.keys(gv).forEach(gameId => {
-        const reports = gv[gameId] || {};
-        allGameReports[gameId] = Object.keys(reports).map(id => ({ id, ...reports[id] })).sort((a,b) => (b.ts||0) - (a.ts||0));
-      });
-      renderPlayerReports();
-      renderGameReports();
-      const tabCount = document.getElementById("tabCountReports");
-      const totalGameReports = Object.values(allGameReports).reduce((sum, arr) => sum + arr.length, 0);
-      if(tabCount) tabCount.textContent = String(allPlayerReports.length + totalGameReports);
-    }catch(e){
-      console.warn("Couldn't load reports:", e);
-    }
-  }
-
-  function renderPlayerReports(){
-    const list = document.getElementById("reportsList");
-    const pill = document.getElementById("reportCountPill");
-    const q = (document.getElementById("reportSearch").value || "").toLowerCase().trim();
-    const filtered = allPlayerReports.filter(r =>
-      !q || (r.reporterName||"").toLowerCase().includes(q) || (r.targetName||"").toLowerCase().includes(q)
-    );
-    if(pill) pill.textContent = String(allPlayerReports.length);
-    if(!filtered.length){ list.innerHTML = '<div class="empty-note">No player reports' + (q ? " match that search." : " yet.") + '</div>'; return; }
-    list.innerHTML = filtered.map(r => (
-      '<div class="acct-row">' +
-        '<div>' +
-          '<div class="acct-name">' + escapeHtml(r.reporterName || "Unknown") + ' &rarr; ' + escapeHtml(r.targetName || "Unknown") + '</div>' +
-          '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + (r.gameId && r.gameId !== "baseplate" ? ' &middot; in game ' + escapeHtml(r.gameId) : "") + '</div>' +
-        '</div>' +
-        '<div class="acct-key" style="text-align:right; flex:none;">' + (r.ts ? new Date(r.ts).toLocaleString() : "-") + '</div>' +
-      '</div>'
-    )).join("");
-  }
-  document.getElementById("reportSearch").addEventListener("input", renderPlayerReports);
-
-  function renderGameReports(){
-    const list = document.getElementById("gameReportsList");
-    const pill = document.getElementById("gameReportCountPill");
-    const gameIds = Object.keys(allGameReports).filter(id => allGameReports[id].length > 0);
-    const total = gameIds.reduce((sum, id) => sum + allGameReports[id].length, 0);
-    if(pill) pill.textContent = String(total);
-    if(!gameIds.length){ list.innerHTML = '<div class="empty-note">No game reports yet.</div>'; return; }
-    list.innerHTML = gameIds.map(gameId => {
-      const reports = allGameReports[gameId];
-      const rows = reports.map(r => (
-        '<div class="acct-row" style="padding-left:16px;">' +
-          '<div>' +
-            '<div class="acct-name">' + escapeHtml(r.reporterName || "Unknown") + '</div>' +
-            '<div class="acct-key">' + escapeHtml(r.reason || "No reason given") + '</div>' +
-          '</div>' +
-          '<div class="acct-key" style="text-align:right; flex:none;">' + (r.ts ? new Date(r.ts).toLocaleString() : "-") + '</div>' +
-        '</div>'
-      )).join("");
-      return (
-        '<div class="section-title" style="font-size:12px; margin:10px 0 4px;">' +
-          escapeHtml(gameId) + ' <span class="count-pill">' + reports.length + '</span>' +
-        '</div>' + rows
-      );
-    }).join("");
-  }
-
-  // same logic as the self-service version in Index.html - deletes every
-  // per-account node and removes the reverse-friend edge on anyone who had
-  // this account as a friend. Deleting blockverse_sessions also force-logs
-  // them out immediately if they're online right now.
-  async function terminateAccount(key){
-    try{
-      const friendsSnap = await db.ref("blockverse_users/" + key + "/friends").once("value");
-      const friends = friendsSnap.val() || {};
-      await Promise.all(Object.keys(friends).map(fKey =>
-        db.ref("blockverse_users/" + fKey + "/friends/" + key).remove().catch(()=>{})
-      ));
-    }catch(e){}
-    // tombstone set FIRST - anyone online right now sees a clear "terminated"
-    // message via their own listener, and any future login attempt on this
-    // username shows the same message instead of a generic "not found"
-    await db.ref("blockverse_terminated/" + key).set({ ts: firebase.database.ServerValue.TIMESTAMP }).catch(()=>{});
-    const paths = [
-      "blockverse_credentials/" + key,
-      "blockverse_usernames/" + key,
-      "blockverse_users/" + key,
-      "blockverse_security/" + key,
-      "blockverse_active_claim/" + key,
-      "blockverse_login_codes/" + key,
-      "blockverse_account_bans/" + key,
-      "blockverse_kicks/" + key,
-      "blockverse_warnings/" + key,
-      "blockverse_sessions/" + key
-    ];
-    await Promise.all(paths.map(p => db.ref(p).remove().catch(()=>{})));
-  }
-
-  /* ============ Requested / Published Games ============ */
-  function escapeAttr(s){
-    return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-  }
-
-  function updateGamesTabCount(){
-    const req = parseInt(document.getElementById("reqCountPill").textContent, 10) || 0;
-    const pub = parseInt(document.getElementById("pubCountPill").textContent, 10) || 0;
-    const tabCountGames = document.getElementById("tabCountGames");
-    if(tabCountGames) tabCountGames.textContent = req + pub;
-  }
-
-  async function loadGameRequests(){
-    if(!auth.currentUser) await auth.signInAnonymously().catch(()=>{});
-    db.ref("game_requests").orderByChild("ts").on("value", (snap) => {
-      const val = snap.val() || {};
-      const list = Object.keys(val).map(id => Object.assign({ id }, val[id])).filter(r => r.status === "pending");
-      list.sort((a,b) => (a.ts||0) - (b.ts||0));
-      renderGameRequests(list);
-    });
-    db.ref("published_games").on("value", (snap) => {
-      const val = snap.val() || {};
-      const list = Object.keys(val).map(id => Object.assign({ id }, val[id]));
-      list.sort((a,b) => (b.publishedAt||0) - (a.publishedAt||0));
-      renderPublishedGames(list);
-    });
-  }
-
-  function renderGameRequests(list){
-    document.getElementById("reqCountPill").textContent = list.length;
-    updateGamesTabCount();
-    const wrap = document.getElementById("reqGamesList");
-    if(list.length === 0){ wrap.innerHTML = '<p class="note">No games waiting for review.</p>'; return; }
-    wrap.innerHTML = list.map(r => {
-      const bannerStyle = r.banner ? ' style="background-image:url(\'' + escapeAttr(r.banner) + '\')"' : "";
-      const iconStyle = r.icon ? ' style="background-image:url(\'' + escapeAttr(r.icon) + '\')"' : "";
-      return '<div class="game-req-card" data-id="' + escapeAttr(r.id) + '">' +
-        '<div class="grc-banner"' + bannerStyle + '></div>' +
-        '<div class="grc-body">' +
-          '<div class="grc-icon"' + iconStyle + '></div>' +
-          '<div class="grc-info">' +
-            '<div class="grc-name">' + escapeAttr(r.name) + '</div>' +
-            '<div class="grc-meta">by ' + escapeAttr(r.ownerName) + ' &middot; up to ' + escapeAttr(r.maxPlayers) + ' players</div>' +
-            '<div class="grc-actions">' +
-              '<button class="mini-btn accept accept-btn">Accept &amp; Publish</button>' +
-              '<button class="mini-btn deny deny-btn">Deny</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join("");
-
-    wrap.querySelectorAll(".game-req-card").forEach(card => {
-      const r = list.find(x => x.id === card.getAttribute("data-id"));
-      card.querySelector(".accept-btn").addEventListener("click", async (e) => {
-        e.target.disabled = true; e.target.textContent = "Publishing...";
-        try{
-          await db.ref("published_games/" + r.id).set({
-            gameId: r.id,
-            ownerKey: r.ownerKey,
-            ownerName: r.ownerName,
-            name: r.name,
-            icon: r.icon || "",
-            banner: r.banner || "",
-            maxPlayers: r.maxPlayers || 20,
-            publishedAt: firebase.database.ServerValue.TIMESTAMP,
-            publishedBy: currentRole
-          });
-          await db.ref("game_requests/" + r.id).remove();
-        }catch(err){
-          console.error("publish failed", err); alert("Couldn't publish that game.\n\nReason: " + ((err && (err.code || err.message)) || err));
-          e.target.disabled = false; e.target.textContent = "Accept & Publish";
-        }
-      });
-      card.querySelector(".deny-btn").addEventListener("click", async () => {
-        const reason = prompt("Reason for denying \"" + r.name + "\" (shown to the creator):") || "";
-        try{
-          await db.ref("game_requests/" + r.id).update({ status: "denied", denyReason: reason });
-          // clear the request node shortly after so it doesn't linger in the pending queue,
-          // once the creator's studio page has had a chance to pick up the denial
-          setTimeout(() => db.ref("game_requests/" + r.id).remove().catch(()=>{}), 4000);
-        }catch(err){
-          console.error("deny failed", err); alert("Couldn't deny that game.\n\nReason: " + ((err && (err.code || err.message)) || err));
-        }
-      });
-    });
-  }
-
-  function renderPublishedGames(list){
-    document.getElementById("pubCountPill").textContent = list.length;
-    updateGamesTabCount();
-    const wrap = document.getElementById("pubGamesList");
-    if(list.length === 0){ wrap.innerHTML = '<p class="note">No published games yet.</p>'; return; }
-    wrap.innerHTML = list.map(g => {
-      const bannerStyle = g.banner ? ' style="background-image:url(\'' + escapeAttr(g.banner) + '\')"' : "";
-      const iconStyle = g.icon ? ' style="background-image:url(\'' + escapeAttr(g.icon) + '\')"' : "";
-      return '<div class="game-req-card" data-id="' + escapeAttr(g.id) + '">' +
-        '<div class="grc-banner"' + bannerStyle + '></div>' +
-        '<div class="grc-body">' +
-          '<div class="grc-icon"' + iconStyle + '></div>' +
-          '<div class="grc-info">' +
-            '<div class="grc-name"><span class="live-dot"></span>' + escapeAttr(g.name) + '</div>' +
-            '<div class="grc-meta">by ' + escapeAttr(g.ownerName) + ' &middot; up to ' + escapeAttr(g.maxPlayers) + ' players</div>' +
-            '<div class="grc-actions">' +
-              '<button class="mini-btn shutdown shutdown-btn">Shutdown</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join("");
-
-    wrap.querySelectorAll(".game-req-card").forEach(card => {
-      const g = list.find(x => x.id === card.getAttribute("data-id"));
-      card.querySelector(".shutdown-btn").addEventListener("click", async (e) => {
-        if(!confirm('Shut down "' + g.name + '"? It will be pulled off the home page immediately.')) return;
-        e.target.disabled = true; e.target.textContent = "...";
-        try{
-          await db.ref("published_games/" + g.id).remove();
-        }catch(err){
-          alert("Couldn't shut that game down - check your connection and try again.");
-          e.target.disabled = false; e.target.textContent = "Shutdown";
-        }
-      });
-    });
-  }
+})();
 </script>
 </body>
 </html>
