@@ -2352,7 +2352,9 @@ function createLuaRuntime(fengari, A, preludeSrc){
   // called every frame by the play loop: works out the Humanoid state and fires Running / Jumping / StateChanged
   function humFrame(moving, speed, onGround, vy){
     const h = rt.hum;
-    const st = h.dead ? "Dead" : h.Sit ? "Seated" : h.PlatformStand ? "PlatformStanding" : !onGround ? (vy > 0 ? "Jumping" : "Freefall") : "Running";
+    let st = h.dead ? "Dead" : h.Sit ? "Seated" : h.PlatformStand ? "PlatformStanding" : !onGround ? (vy > 0 ? "Jumping" : "Freefall") : "Running";
+    if(st === "Running" && (h.state === "Jumping" || h.state === "Freefall")) st = "Landed";   // touching down fires Landed for one frame
+    h.onGround = !!onGround;
     if(st !== h.state){
       const old = h.state; h.state = st;
       fire(HUM_ID, "StateChanged", [stateEnum(old), stateEnum(st)]);
@@ -2371,7 +2373,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(m === "ChangeState"){
       const n = String(args[0] && args[0].n || args[0] || "");
       if(n === "Dead") setHum("Health", 0);
-      else if(n === "Jumping") h.Jump = true;
+      else if(n === "Jumping"){ h.Jump = true; h.forceJump = true; }   // works in mid-air too (double jump)
       else if(n === "Seated") h.Sit = true;
       else if(n === "GettingUp" || n === "Running") h.Sit = false;
       return null;
@@ -2418,6 +2420,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id === "svc:UserInputService"){
       if(k === "InputBegan" || k === "InputEnded") return { k: "signal" };
       if(k === "IsKeyDown" || k === "IsMouseButtonPressed" || k === "GetMouseLocation") return { k: "method" };
+      if(k === "JumpRequest") return { k: "signal" };
     }
     if(id === "svc:Lighting"){
       if(k === "ClockTime" || k === "Brightness") return { k: "prop", v: A.lighting.get(k) };
@@ -2458,7 +2461,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(k === "DisplayName") return { k: "prop", v: rt.hum.DisplayName || A.player.name };
       if(k === "MoveDirection") return { k: "prop", v: V3(rt.hum.MoveDirection) };
       if(k === "RigType") return { k: "prop", v: { __t: "E", e: "HumanoidRigType", n: "R6" } };
-      if(k === "FloorMaterial") return { k: "prop", v: { __t: "E", e: "Material", n: "Plastic" } };
+      if(k === "FloorMaterial") return { k: "prop", v: { __t: "E", e: "Material", n: rt.hum.onGround === false ? "Air" : "Plastic" } };
       if(k === "Died" || k === "HealthChanged" || k === "Running" || k === "Jumping" || k === "FreeFalling" || k === "StateChanged" || k === "MoveToFinished") return { k: "signal" };
       if(k === "TakeDamage" || k === "GetState" || k === "ChangeState" || k === "Move" || k === "MoveTo" || k === "CancelMoveTo" || k === "GetAccessories" || k === "GetPlayingAnimationTracks") return { k: "method" };
     }
@@ -2747,6 +2750,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(!rt.running) return;
     fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [{ __t: "Input", key: nm, state: down ? "Begin" : "End" }, false], "client");
   }
+  // the player pressed jump (Space, the on-screen jump button or a gamepad): scripts see UserInputService.JumpRequest
+  function jumpRequest(){ if(rt.running) fire("svc:UserInputService", "JumpRequest", [], "client"); }
   // button: the DOM's MouseEvent.button (0 left, 1 middle, 2 right)
   function mouseEvent(button, down, x, y){
     const nm = button === 2 ? "MouseButton2" : button === 1 ? "MouseButton3" : "MouseButton1";
@@ -2761,7 +2766,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       return callLua(rt.checkVM, "__check", [luauToLua(src), name || "script"], true);
     }catch(e){ return null; }
   }
-  rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.mouseEvent = mouseEvent; rt.checkSyntax = checkSyntax;
+  rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.mouseEvent = mouseEvent; rt.jumpRequest = jumpRequest; rt.checkSyntax = checkSyntax;
   rt.setHum = setHum; rt.humFrame = humFrame; rt.humMoveDone = humMoveDone; rt.JUMP_K = JUMP_K; rt.markCreated = (p) => rt.createdParts.set(p.id, p);
   return rt;
 }
@@ -4418,7 +4423,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(tag === "INPUT" || tag === "TEXTAREA") return; // don't steal keys while typing
       const k = e.key.toLowerCase();
       if(["w","a","s","d"].includes(k)) keysDown[k] = true;
-      if(k === " "){ e.preventDefault(); keysDown[" "] = true; }
+      if(k === " "){ e.preventDefault(); keysDown[" "] = true; if(playMode.active && LuaRT && LuaRT.running && !e.repeat) LuaRT.jumpRequest(); }
       if(k === "enter" && playMode.active && !playMode.loading){
         e.preventDefault();
         focusPlayChat();
@@ -4555,6 +4560,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(HM) HM.MoveDirection = isMoving ? [moveDir.x, 0, moveDir.z] : [0, 0, 0];
 
     // gravity + jump, colliding against whatever part/platform is directly beneath the rig (not just the baseplate)
+    if(HM && HM.forceJump){                                  // Humanoid:ChangeState(Jumping) from a script: jumps even in mid-air
+      HM.forceJump = false; HM.Jump = false;
+      if(HM.JumpPower > 0){ playMode.velocityY = 10 * (HM.JumpPower / 50); playMode.onGround = false; playJumpSound(); }
+    }
     const wantJump = inputOn && (keysDown[" "] || (HM && HM.Jump));
     if(HM && HM.Jump && playMode.onGround) HM.Jump = false;   // like Roblox: Jump flips back to false once the jump happens
     if(wantJump && playMode.onGround && (!HM || HM.JumpPower > 0)){
