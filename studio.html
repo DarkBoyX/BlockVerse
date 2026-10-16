@@ -3667,7 +3667,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       a.addEventListener("error", () => { A.log("warn", "Sound '" + n.name + "' couldn't load its audio (" + url.slice(0, 60) + ")", "client"); });
       sounds.set(n.id, a);
     }
-    a.volume = Math.max(0, Math.min(1, Number(P(n, "Volume")) || 0)); a.loop = !!P(n, "Looped"); a.playbackRate = Number(P(n, "PlaybackSpeed")) || 1;
+    a.volume = Math.max(0, Math.min(1, (Number(P(n, "Volume")) || 0) * (typeof window.bvMasterVolume === "number" ? window.bvMasterVolume : 1))); a.loop = !!P(n, "Looped"); a.playbackRate = Number(P(n, "PlaybackSpeed")) || 1;
     return a;
   }
   function soundPlay(n, a){
@@ -4127,6 +4127,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
 
 
   rt.CLS = CLS;
+  rt.refreshVolumes = () => { sounds.forEach((a, id) => { const n = findNode(id); if(n){ try{ soundEl(n); }catch(e){} } }); };
   function hostOp(vm, op, p){
     switch(op){
       case "log": A.log(p.k, String(p.s), vm.name); return null;
@@ -4551,19 +4552,19 @@ function createLuaRuntime(fengari, A, preludeSrc){
   <div class="ribbon">
     <div class="ribbon-group">
       <div class="ribbon-row">
-        <button class="ribbon-btn" data-tool="select" title="Select">
+        <button class="ribbon-btn" data-tool="select" title="Select (1)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 3l7 17 2.5-7.5L21 10 4 3z"/></svg>
           <span>Select</span>
         </button>
-        <button class="ribbon-btn" data-tool="move" title="Move">
+        <button class="ribbon-btn" data-tool="move" title="Move (2)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 9l-3 3 3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3"/></svg>
           <span>Move</span>
         </button>
-        <button class="ribbon-btn" data-tool="rotate" title="Rotate">
+        <button class="ribbon-btn" data-tool="rotate" title="Rotate (3)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 3 6.2"/><path d="M4 18v-4h4"/></svg>
           <span>Rotate</span>
         </button>
-        <button class="ribbon-btn" data-tool="scale" title="Scale">
+        <button class="ribbon-btn" data-tool="scale" title="Size (4)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4h16"/><path d="M8 16h8v-8"/></svg>
           <span>Scale</span>
         </button>
@@ -5601,6 +5602,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(playMode.loading) return;
     if(playMode.active) await stopPlay();
     closeLuaEditor(); closeObjCtxMenu(); saveWorld(true);
+    try{ sndPreviewAll(); }catch(e){}   // a Sound previewed in the editor must not keep playing on the dashboard
     document.getElementById("editorScreen").classList.remove("show");
     document.getElementById("dashScreen").classList.add("show");
   });
@@ -5897,7 +5899,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
         return;
       }
       // first: did we hit a gizmo handle?
-      if(gizmoGroup && currentTool !== "select"){
+      if(gizmoGroup && currentTool !== "select" && e.button === 0){
         const hit = pickGizmoHandle(e);
         if(hit){ beginGizmoDrag(hit, e); gizmoDragActive = true; return; }
       }
@@ -5914,6 +5916,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
       lastX = e.clientX; lastY = e.clientY;
 
       if(dragState){ updateGizmoDrag(e); return; }
+      if(gizmoGroup && !lookDragging && !playMode.active){
+        const hv = e.target === canvasEl ? pickGizmoHandle(e) : null;
+        gizmoHover = hv ? { axis: hv.axis, sign: hv.sign, kind: hv.kind } : null;
+        canvasEl.style.cursor = hv ? "pointer" : "";
+      }
 
       if(lookDragging){
         if(playMode.active){
@@ -5940,7 +5947,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(moved > 6) return; // ignore drag-releases
       closeObjCtxMenu();
       if(playMode.active) return;
-      if(currentTool !== "select") return; // gizmo tools don't reselect on plain click (handled by handle hit)
+      if(gizmoGroup && pickGizmoHandle(e)) return; // the click was on a handle, not on a part
       const hit = pickObject(e);
       selectObject(hit ? hit.id : null);
     });
@@ -5972,6 +5979,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
       }
       if(playMode.active) return; // remaining shortcuts (delete/focus) are studio-mode only
       if(document.getElementById("luaEditorOverlay")) return; // script editor open: keys belong to it
+      if(!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey){
+        const hk = { "1":"select", "2":"move", "3":"rotate", "4":"scale" }[e.key];
+        if(hk){ e.preventDefault(); setTool(hk); return; }   // 1 Select, 2 Move, 3 Rotate, 4 Size
+      }
       if((k === "backspace" || k === "delete") && selectedId && selectedId !== "__light__"){
         e.preventDefault();
         if(nodeById(selectedId)){ const nm = nodeById(selectedId).name; deleteNode(selectedId); showToast("Deleted " + nm); }
@@ -6011,6 +6022,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       }else if(!playMode.active){
         updateFreecam(dt);
       }
+      layoutGizmo();
       renderer.render(scene, camera);
       updateStatusBar(dt);
     }
@@ -7871,6 +7883,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   async function startPlay(){
     if(playMode.loading || playMode.active) return; // never allow a second startPlay() to run while one's already in flight
     clearStuckKeys();
+    try{ sndPreviewAll(); }catch(e){}
     playMode.loading = true;
     showPlayLoading(true);
     try{
@@ -8220,89 +8233,140 @@ function createLuaRuntime(fengari, A, preludeSrc){
     showToast("Pasted " + newObj.name);
   }
 
-  /* ---------------- Gizmo (Move / Rotate / Scale handles) ---------------- */
+  /* ---------------- Gizmo (Move / Rotate / Size handles - Roblox Studio style) ----------------
+     Move   : an arrow on both ends of each world axis (red X, green Y, blue Z)
+     Size   : a ball on every face of the part, on the part's own axes. Drag = that face moves, the opposite face stays.
+              Hold Ctrl = grow both sides, hold Shift = grow all axes together.
+     Rotate : three rings around the part. Drag around the ring (snaps to the Rotate snap value).
+     Handles keep the same size on screen at any zoom, glow yellow under the mouse, and while dragging only the
+     handle you grabbed stays visible with a guide line and a live readout.                                         */
   function axisVec(name){
     return name === "x" ? new THREE.Vector3(1,0,0) : name === "y" ? new THREE.Vector3(0,1,0) : new THREE.Vector3(0,0,1);
   }
-  function axisColor(name){ return name === "x" ? 0xe5484d : name === "y" ? 0x3ecf6e : 0x4a6cf7; }
+  function axisColor(name){ return name === "x" ? 0xf0463f : name === "y" ? 0x3fd25f : 0x3f84f5; }
+  const GIZMO_HOT = 0xffe45c;
+  let gizmoHover = null, gizmoGuide = null, gizmoReadoutEl = null;
+
+  function gizmoMat(color){ return new THREE.MeshBasicMaterial({ color, depthTest:false, depthWrite:false, transparent:true, opacity:0.95 }); }
+  function gizmoHitMat(){ return new THREE.MeshBasicMaterial({ transparent:true, opacity:0, depthTest:false, depthWrite:false, colorWrite:false }); }
+
+  function disposeGizmo(){
+    if(!gizmoGroup) return;
+    scene.remove(gizmoGroup);
+    gizmoGroup.traverse(o => { if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); });
+    gizmoGroup = null; gizmoGuide = null;
+  }
 
   function rebuildGizmo(){
-    if(gizmoGroup){ scene.remove(gizmoGroup); gizmoGroup = null; }
+    disposeGizmo();
+    gizmoHover = null;
     const obj = sceneObjects.find(o => o.id === selectedId);
     if(!obj || currentTool === "select") return;
 
     gizmoGroup = new THREE.Group();
-    gizmoGroup.position.copy(obj.mesh.position);
     gizmoGroup.renderOrder = 999;
-    // gizmo size is based on a CAPPED reference, not the part's raw
-    // dimensions - without this cap, grabbing something huge like the
-    // baseplate produced room-sized arrows/rings, since the old math
-    // scaled the gizmo directly off Math.max(...size) with no ceiling
-    const visualSize = Math.min(Math.max(...obj.props.size), 8);
-    const armLen = Math.max(2.6, visualSize * 0.5);
+    gizmoGroup.userData.tool = currentTool;
+    const handles = gizmoGroup.userData.handles = [];
 
-    function handleMat(color){
-      return new THREE.MeshBasicMaterial({ color, depthTest:false, depthWrite:false, transparent:true });
+    // rotate a +Y-pointing handle so it points along the given world axis / direction
+    function aim(node, ax, sign){
+      if(ax === "x") node.rotation.z = sign > 0 ? -Math.PI/2 : Math.PI/2;
+      else if(ax === "y"){ if(sign < 0) node.rotation.x = Math.PI; }
+      else node.rotation.x = sign > 0 ? Math.PI/2 : -Math.PI/2;
+    }
+    function addHandle(node, ax, sign, kind, hitMeshes){
+      const ud = { gizmo:true, axis:ax, sign, kind };
+      hitMeshes.forEach(h => { h.userData = ud; node.add(h); });
+      node.userData.mat = node.userData.mat || null;
+      handles.push({ node, axis:ax, sign, kind });
+      gizmoGroup.add(node);
     }
 
-    if(currentTool === "move" || currentTool === "scale"){
-      ["x","y","z"].forEach((ax, axIdx) => {
-        const color = axisColor(ax);
-        // start the handle just outside the part's own surface so it's never buried inside it -
-        // capped the same way as armLen, so this stays sane for huge parts too
-        const halfExtent = Math.min(obj.props.size[axIdx] / 2, visualSize / 2) + 0.35;
-        const shaftLen = armLen;
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,shaftLen,10), handleMat(color));
-        const tip = currentTool === "move"
-          ? new THREE.Mesh(new THREE.ConeGeometry(0.3,0.75,12), handleMat(color))
-          : new THREE.Mesh(new THREE.BoxGeometry(0.42,0.42,0.42), handleMat(color));
-        shaft.renderOrder = 999; tip.renderOrder = 1000;
-        shaft.userData = { gizmo:true, axis:ax, kind:currentTool };
-        tip.userData = { gizmo:true, axis:ax, kind:currentTool };
-        const dir = axisVec(ax);
-        const shaftMid = dir.clone().multiplyScalar(halfExtent + shaftLen/2);
-        const tipPos = dir.clone().multiplyScalar(halfExtent + shaftLen + 0.35);
-        shaft.position.copy(shaftMid);
-        tip.position.copy(tipPos);
-        if(ax === "x"){ shaft.rotation.z = -Math.PI/2; tip.rotation.z = -Math.PI/2; }
-        else if(ax === "z"){ shaft.rotation.x = Math.PI/2; tip.rotation.x = Math.PI/2; }
-        gizmoGroup.add(shaft); gizmoGroup.add(tip);
-      });
-      // center handle: free move (XZ) or uniform scale
-      const center = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 14), handleMat(0xf2f2f2));
-      center.renderOrder = 1000;
-      center.userData = { gizmo:true, axis:"center", kind:currentTool };
-      gizmoGroup.add(center);
-    }else if(currentTool === "rotate"){
-      ["x","y","z"].forEach((ax, axIdx) => {
-        const color = axisColor(ax);
-        const ringRadius = visualSize/2 + armLen * 0.5;
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.07, 10, 40), handleMat(color));
-        ring.renderOrder = 999;
-        ring.userData = { gizmo:true, axis:ax, kind:"rotate" };
-        if(ax === "x") ring.rotation.y = Math.PI/2;
-        else if(ax === "y") ring.rotation.x = Math.PI/2;
-        gizmoGroup.add(ring);
-      });
-    }
+    ["x","y","z"].forEach(ax => {
+      const color = axisColor(ax);
+      if(currentTool === "move"){
+        [1,-1].forEach(sign => {
+          const node = new THREE.Group(), m = gizmoMat(color); node.userData.mat = m;
+          const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.9, 8), m); shaft.position.y = 1.15;
+          const cone  = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.65, 18), m);           cone.position.y = 2.4;
+          shaft.renderOrder = 999; cone.renderOrder = 1000;
+          node.add(shaft); node.add(cone);
+          const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 3.1, 8), gizmoHitMat()); hit.position.y = 1.5;
+          aim(node, ax, sign);
+          addHandle(node, ax, sign, "move", [hit]);
+        });
+      }else if(currentTool === "scale"){
+        [1,-1].forEach(sign => {
+          const node = new THREE.Group(), m = gizmoMat(color); node.userData.mat = m;
+          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), m); ball.renderOrder = 1000;
+          node.add(ball);
+          const hit = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), gizmoHitMat());
+          addHandle(node, ax, sign, "scale", [hit]);
+        });
+      }else if(currentTool === "rotate"){
+        const node = new THREE.Group(), m = gizmoMat(color); node.userData.mat = m;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.018, 8, 72), m); ring.renderOrder = 999;
+        node.add(ring);
+        const hit = new THREE.Mesh(new THREE.TorusGeometry(1, 0.075, 6, 48), gizmoHitMat());
+        if(ax === "x") node.rotation.y = Math.PI/2;
+        else if(ax === "y") node.rotation.x = Math.PI/2;
+        addHandle(node, ax, 0, "rotate", [hit]);
+      }
+    });
     scene.add(gizmoGroup);
+    layoutGizmo();
+  }
+
+  function gizmoSame(a, b){ return !!(a && b && a.axis === b.axis && a.sign === b.sign && a.kind === b.kind); }
+
+  // runs every frame: follows the part, keeps handles the same size on screen, applies hover / drag colours
+  function layoutGizmo(){
+    if(!gizmoGroup) return;
+    const obj = sceneObjects.find(o => o.id === selectedId);
+    if(!obj){ return; }
+    const g = gizmoGroup, tool = g.userData.tool;
+    g.position.copy(obj.mesh.position);
+    obj.mesh.updateMatrixWorld(true);
+    const dist = Math.max(0.5, camera.position.distanceTo(g.position));
+    const tf = Math.tan(((camera.fov || 60) * Math.PI) / 360);
+    const s = Math.max(0.02, dist * tf * 0.12);
+    const box = new THREE.Box3().setFromObject(obj.mesh);
+    const ext = box.getSize(new THREE.Vector3());
+    if(tool === "scale") g.quaternion.copy(obj.mesh.quaternion); else g.quaternion.identity();
+    const ringR = Math.max(2.6 * s, Math.min(ext.length() / 2, 14) * 1.05);
+    g.userData.handles.forEach(h => {
+      const idx = "xyz".indexOf(h.axis);
+      const active = dragState && gizmoSame(dragState, h);
+      const hot = active || (!dragState && gizmoSame(gizmoHover, h));
+      h.node.visible = !dragState || active;
+      h.node.userData.mat.color.setHex(hot ? GIZMO_HOT : axisColor(h.axis));
+      if(h.kind === "move"){
+        const half = Math.min(ext.getComponent(idx) / 2, 12);
+        h.node.position.copy(axisVec(h.axis)).multiplyScalar(h.sign * (half + 0.35 * s));
+        h.node.scale.setScalar(s);
+      }else if(h.kind === "scale"){
+        const half = obj.props.size[idx] / 2;
+        h.node.position.copy(axisVec(h.axis)).multiplyScalar(h.sign * (half + 0.45 * s));
+        h.node.scale.setScalar(s);
+      }else{
+        h.node.position.set(0,0,0);
+        h.node.scale.setScalar(ringR);
+      }
+    });
   }
 
   function pickGizmoHandle(e){
+    if(!gizmoGroup) return null;
     const ndc = mouseToNDC(e);
     raycaster.setFromCamera(ndc, camera);
-    const hits = raycaster.intersectObjects(gizmoGroup.children);
+    const hits = raycaster.intersectObjects(gizmoGroup.children, true).filter(h => h.object.userData && h.object.userData.gizmo && h.object.parent && h.object.parent.visible);
     if(!hits.length) return null;
     return hits[0].object.userData;
   }
 
-  function axisDragPlane(axisName, origin){
-    if(axisName === "center"){
-      return new THREE.Plane(new THREE.Vector3(0,1,0), -origin.y);
-    }
-    const axis = axisVec(axisName);
+  function gizmoPlaneFor(dir, origin){
     const camDir = new THREE.Vector3().subVectors(camera.position, origin).normalize();
-    const proj = axis.clone().multiplyScalar(camDir.dot(axis));
+    const proj = dir.clone().multiplyScalar(camDir.dot(dir));
     let normal = camDir.clone().sub(proj);
     if(normal.lengthSq() < 1e-6) normal.set(0,1,0);
     normal.normalize();
@@ -8312,23 +8376,65 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const ndc = mouseToNDC(e);
     raycaster.setFromCamera(ndc, camera);
     const pt = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, pt);
-    return pt;
+    return raycaster.ray.intersectPlane(plane, pt) ? pt : null;
   }
+  function ringBasis(axisV){
+    const h = Math.abs(axisV.y) < 0.9 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(1,0,0);
+    const e1 = new THREE.Vector3().crossVectors(h, axisV).normalize();
+    const e2 = new THREE.Vector3().crossVectors(axisV, e1);
+    return [e1, e2];
+  }
+
+  function showGizmoReadout(e, text){
+    if(!gizmoReadoutEl){
+      gizmoReadoutEl = document.createElement("div");
+      gizmoReadoutEl.style.cssText = "position:fixed;z-index:2147480000;pointer-events:none;padding:4px 9px;border-radius:7px;background:rgba(16,16,19,0.92);border:1px solid rgba(255,255,255,0.18);color:#fff;font:600 12px 'Segoe UI',system-ui,sans-serif;white-space:nowrap";
+      document.body.appendChild(gizmoReadoutEl);
+    }
+    gizmoReadoutEl.style.display = "block";
+    gizmoReadoutEl.style.left = (e.clientX + 16) + "px";
+    gizmoReadoutEl.style.top = (e.clientY + 16) + "px";
+    gizmoReadoutEl.textContent = text;
+  }
+  function hideGizmoReadout(){ if(gizmoReadoutEl) gizmoReadoutEl.style.display = "none"; }
+  const gr2 = (v) => (Math.round(v * 100) / 100).toString();
 
   function beginGizmoDrag(handleData, e){
     const obj = sceneObjects.find(o => o.id === selectedId);
     if(!obj) return;
     const origin = obj.mesh.position.clone();
-    const plane = axisDragPlane(handleData.axis, origin);
+    const kind = handleData.kind, axis = handleData.axis, sign = handleData.sign;
+    let dirW = null, plane, basis = null;
+    if(kind === "rotate"){
+      const av = axisVec(axis);
+      plane = new THREE.Plane().setFromNormalAndCoplanarPoint(av, origin);
+      basis = ringBasis(av);
+    }else{
+      dirW = axisVec(axis);
+      if(kind === "scale") dirW.multiplyScalar(sign).applyQuaternion(obj.mesh.quaternion).normalize();
+      plane = gizmoPlaneFor(dirW, origin);
+    }
     const startPt = raycastPlane(e, plane) || origin.clone();
     dragState = {
-      axis: handleData.axis, kind: handleData.kind, obj, origin, plane, startPt,
+      axis, sign, kind, obj, origin, plane, startPt, dirW, basis,
       startPos: obj.mesh.position.clone(),
       startSize: [...obj.props.size],
-      startRot: obj.mesh.rotation.clone(),
-      lastX: e.clientX, lastY: e.clientY
+      startQuat: obj.mesh.quaternion.clone(),
+      lastX: e.clientX, lastY: e.clientY, total: 0, prevAngle: null
     };
+    if(kind === "rotate"){
+      const v = startPt.clone().sub(origin);
+      dragState.prevAngle = Math.atan2(v.dot(basis[1]), v.dot(basis[0]));
+    }
+    if(kind === "move"){
+      // long guide line through the part along the axis being dragged, like Studio
+      const a = axisVec(axis).multiplyScalar(500);
+      const geo = new THREE.BufferGeometry().setFromPoints([a.clone().negate(), a]);
+      gizmoGuide = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: axisColor(axis), depthTest:false, transparent:true, opacity:0.7 }));
+      gizmoGuide.renderOrder = 998;
+      gizmoGroup.add(gizmoGuide);
+    }
+    showGizmoReadout(e, kind === "rotate" ? "0\u00b0" : kind === "move" ? "0 studs" : gr2(obj.props.size[ "xyz".indexOf(axis) ]) + " studs");
   }
   function getSnapSettings(){
     return {
@@ -8349,57 +8455,66 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(kind === "move"){
       const pt = raycastPlane(e, dragState.plane);
       if(!pt) return;
-      if(axis === "center"){
-        const delta = pt.clone().sub(dragState.startPt);
-        obj.mesh.position.set(
-          snapTo(dragState.startPos.x + delta.x, snap.move),
-          dragState.startPos.y,
-          snapTo(dragState.startPos.z + delta.z, snap.move)
-        );
-      }else{
-        const dir = axisVec(axis);
-        const delta = pt.clone().sub(dragState.startPt);
-        const t = snapTo(delta.dot(dir), snap.move);
-        obj.mesh.position.copy(dragState.startPos.clone().addScaledVector(dir, t));
-      }
+      const t = snapTo(pt.clone().sub(dragState.startPt).dot(dragState.dirW), snap.move);
+      obj.mesh.position.copy(dragState.startPos.clone().addScaledVector(dragState.dirW, t));
       obj.props.position = [obj.mesh.position.x, obj.mesh.position.y, obj.mesh.position.z];
-      gizmoGroup.position.copy(obj.mesh.position);
       if(selectedId === obj.id) refreshPositionFields();
+      showGizmoReadout(e, (t >= 0 ? "+" : "") + gr2(t) + " studs");
     }else if(kind === "scale"){
-      let newSize = [...dragState.startSize];
-      if(axis === "center"){
-        if(dragState.baseMouseY === undefined) dragState.baseMouseY = e.clientY;
-        const dy = dragState.baseMouseY - e.clientY;
-        const factor = Math.max(0.15, 1 + dy * 0.01);
-        newSize = dragState.startSize.map(s => Math.max(0.2, s * factor));
+      const idx = "xyz".indexOf(axis);
+      const pt = raycastPlane(e, dragState.plane);
+      if(!pt) return;
+      const t = snapTo(pt.clone().sub(dragState.startPt).dot(dragState.dirW), snap.move);
+      const st = dragState.startSize;
+      let newSize = [...st], pos = dragState.startPos.clone();
+      if(e.shiftKey){
+        const f = Math.max(0.05, (st[idx] + t) / st[idx]);
+        newSize = st.map(v => Math.max(0.2, v * f));
+      }else if(e.ctrlKey || e.metaKey){
+        newSize[idx] = Math.max(0.2, st[idx] + 2 * t);
       }else{
-        const pt = raycastPlane(e, dragState.plane);
-        if(!pt) return;
-        const dir = axisVec(axis);
-        const delta = pt.clone().sub(dragState.startPt);
-        const t = delta.dot(dir);
-        const idx = axis === "x" ? 0 : axis === "y" ? 1 : 2;
-        newSize[idx] = Math.max(0.2, dragState.startSize[idx] + t * 2);
+        const ns = Math.max(0.2, st[idx] + t);
+        newSize[idx] = ns;
+        pos.addScaledVector(dragState.dirW, (ns - st[idx]) / 2);
       }
       obj.props.size = newSize;
+      obj.mesh.position.copy(pos);
+      obj.props.position = [pos.x, pos.y, pos.z];
       obj.mesh.geometry.dispose();
       obj.mesh.geometry = geometryForShape(obj.shape, newSize);
-      rebuildGizmo();
-      if(selectedId === obj.id) renderProperties();
+      if(selectedId === obj.id){ renderProperties(); }
+      showGizmoReadout(e, newSize.map(gr2).join(" \u00d7 ") + " studs");
     }else if(kind === "rotate"){
-      const dx = e.clientX - dragState.lastX;
+      const av = axisVec(axis);
+      raycaster.setFromCamera(mouseToNDC(e), camera);
+      const edgeOn = Math.abs(raycaster.ray.direction.dot(av)) < 0.12;
+      const pt = edgeOn ? null : raycastPlane(e, dragState.plane);
+      if(pt){
+        const v = pt.sub(dragState.origin);
+        const ang = Math.atan2(v.dot(dragState.basis[1]), v.dot(dragState.basis[0]));
+        let d = ang - dragState.prevAngle;
+        while(d > Math.PI) d -= Math.PI * 2;
+        while(d < -Math.PI) d += Math.PI * 2;
+        dragState.total += d; dragState.prevAngle = ang;
+      }else{
+        dragState.total += (e.clientX - dragState.lastX) * 0.012;   // ring seen edge-on: fall back to sideways mouse movement
+      }
       dragState.lastX = e.clientX; dragState.lastY = e.clientY;
-      if(!dragState.accumDeg) dragState.accumDeg = 0;
-      dragState.accumDeg += dx * (0.012 * 180 / Math.PI);
-      const snappedDeg = snap.rotate ? snapTo(dragState.accumDeg, snap.rotate) : dragState.accumDeg;
-      const appliedDeg = snappedDeg - (dragState.lastAppliedDeg || 0);
-      dragState.lastAppliedDeg = snappedDeg;
-      obj.mesh.rotateOnWorldAxis(axisVec(axis), appliedDeg * Math.PI / 180);
+      const deg = dragState.total * 180 / Math.PI;
+      const snapped = snap.rotate ? snapTo(deg, snap.rotate) : deg;
+      const q = new THREE.Quaternion().setFromAxisAngle(av, snapped * Math.PI / 180);
+      obj.mesh.quaternion.copy(dragState.startQuat).premultiply(q);
       obj.props.rotation = [obj.mesh.rotation.x, obj.mesh.rotation.y, obj.mesh.rotation.z];
+      showGizmoReadout(e, gr2(snapped) + "\u00b0");
     }
   }
   function endGizmoDrag(){
+    const had = !!dragState;
     dragState = null;
+    if(gizmoGuide && gizmoGroup){ gizmoGroup.remove(gizmoGuide); gizmoGuide.geometry.dispose(); gizmoGuide.material.dispose(); }
+    gizmoGuide = null;
+    hideGizmoReadout();
+    if(had){ try{ saveWorld(false); }catch(err){} if(selectedId) { try{ renderProperties(); }catch(err){} } }
   }
 
   function refreshPositionFields(){
