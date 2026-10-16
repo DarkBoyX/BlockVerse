@@ -2699,6 +2699,14 @@ function createLuaRuntime(fengari, A, preludeSrc){
     { id: "lleg:1", name: "Left Leg", key: "lLeg" }, { id: "rleg:1", name: "Right Leg", key: "rLeg" }
   ];
   const bodyById = (id) => BODY.find(b => b.id === id) || null;
+
+  /* ---------- the other real players in the same game ----------
+     Every device runs the game's scripts itself, so without this a script only ever knew about ITS player: a ball that follows
+     "every player" was created for you but never for anybody else. Now the other players show up in Players (GetPlayers, PlayerAdded,
+     PlayerRemoving) with a Character, HumanoidRootPart, Head and Humanoid whose positions follow them live, like in Roblox. */
+  rt.remotes = new Map();
+  const remoteOf = (id) => { const m = /^(rp|rc|rh|rd|rm):(.+)$/.exec(String(id)); if(!m) return null; const r = rt.remotes.get(m[2]); return r ? { kind: m[1], rid: m[2], r } : null; };
+  const remoteUserId = (key) => { let h = 7; String(key || "?").split("").forEach(ch => { h = (h * 31 + ch.charCodeAt(0)) >>> 0; }); return 1000 + (h % 90000000); };
   const SERVICES = ["Workspace", "Players", "ReplicatedStorage", "ServerScriptService", "StarterPlayer", "StarterPlayerScripts", "StarterGui", "Lighting", "RunService", "UserInputService", "HttpService", "SoundService"];
 
   /* ---------------- JS <-> Lua value marshalling ---------------- */
@@ -2839,13 +2847,14 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id === "svc:Game") out = SERVICES.map(s => "svc:" + s);
     else if(id === "svc:Workspace"){
       out = A.parts().filter(p => !p.pending && (!p.props || !p.props.svc || p.props.svc === "svc:Workspace")).map(p => p.id);
-      out.push(CHAR_ID); out.push(CAM_ID);
+      out.push(CHAR_ID); rt.remotes.forEach((r, k) => out.push("rc:" + k)); out.push(CAM_ID);
       allNodes().forEach(n => { if(n.parent === "svc:Workspace") out.push(n.id); });
     }
-    else if(id === "svc:Players") out = [PLAYER_ID];
+    else if(id === "svc:Players") out = [PLAYER_ID].concat(Array.from(rt.remotes.keys()).map(k => "rp:" + k));
     else if(id === "svc:StarterPlayer") out = ["svc:StarterPlayerScripts"];
     else if(id === CHAR_ID) out = BODY.map(b => b.id).concat([HRP_ID, HUM_ID]);
     else if(id === PLAYER_ID) out = [PLAYERGUI_ID];
+    else if(remoteOf(id)){ const ro = remoteOf(id); out = ro.kind === "rc" ? ["rh:" + ro.rid, "rd:" + ro.rid, "rm:" + ro.rid] : []; }
     else if(id.startsWith("svc:") || isPartId(id) || findNode(id)){
       allNodes().forEach(n => { if(n.parent === id) out.push(n.id); });
     }
@@ -2856,6 +2865,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id === CAM_ID) return "Camera";
     if(id.startsWith("svc:")) return id.slice(4);
     if(id === PLAYER_ID) return A.player.name;
+    { const ro = remoteOf(id); if(ro) return ro.kind === "rp" || ro.kind === "rc" ? ro.r.name : ro.kind === "rh" ? "HumanoidRootPart" : ro.kind === "rd" ? "Head" : "Humanoid"; }
     if(id === CHAR_ID) return A.player.name;
     if(id === HRP_ID) return "HumanoidRootPart";
     if(id === HUM_ID) return "Humanoid";
@@ -2868,6 +2878,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id === CAM_ID) return "Camera";
     if(id.startsWith("svc:")) return id === "svc:StarterPlayerScripts" ? "StarterPlayerScripts" : id.slice(4);
     if(id === PLAYER_ID) return "Player";
+    { const ro = remoteOf(id); if(ro) return ro.kind === "rp" ? "Player" : ro.kind === "rc" ? "Model" : ro.kind === "rm" ? "Humanoid" : "Part"; }
     if(id === CHAR_ID) return "Model";
     if(id === HRP_ID || bodyById(id)) return "Part";
     if(id === HUM_ID) return "Humanoid";
@@ -2883,6 +2894,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       return "svc:Game";
     }
     if(id === PLAYER_ID) return "svc:Players";
+    { const ro = remoteOf(id); if(ro) return ro.kind === "rp" ? "svc:Players" : ro.kind === "rc" ? "svc:Workspace" : "rc:" + ro.rid; }
     if(id === CHAR_ID) return "svc:Workspace";
     if(id === HRP_ID || id === HUM_ID || bodyById(id)) return CHAR_ID;
     const p = A.partById(id); if(p) return p.pending && !p.attached ? null : "svc:Workspace";
@@ -3094,6 +3106,37 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(k === "ClockTime" || k === "Brightness") return { k: "prop", v: A.lighting.get(k) };
     }
     if(id === "svc:HttpService"){ if(k === "JSONEncode" || k === "JSONDecode" || k === "GenerateGUID") return { k: "method" }; }
+    { const ro = remoteOf(id);
+      if(ro){
+        const r = ro.r, ry = r.pos, mat = yawToMat(r.yaw || 0);
+        if(ro.kind === "rp"){
+          if(k === "Name" || k === "DisplayName") return { k: "prop", v: r.name };
+          if(k === "UserId") return { k: "prop", v: remoteUserId(r.key) };
+          if(k === "Character") return { k: "prop", v: I("rc:" + ro.rid) };
+          if(k === "CharacterAdded" || k === "CharacterRemoving") return { k: "signal" };
+          if(k === "Kick" || k === "LoadCharacter") return { k: "method" };
+        } else if(ro.kind === "rc"){
+          if(k === "HumanoidRootPart" || k === "PrimaryPart") return { k: "child", id: "rh:" + ro.rid };
+          if(k === "Head") return { k: "child", id: "rd:" + ro.rid };
+          if(k === "Humanoid") return { k: "child", id: "rm:" + ro.rid };
+          if(k === "MoveTo" || k === "PivotTo" || k === "GetPivot") return { k: "method" };
+        } else if(ro.kind === "rh" || ro.kind === "rd"){
+          const y = ry[1] + (ro.kind === "rh" ? HRP_LIFT : 4.6), pp = [ry[0], y, ry[2]];
+          if(k === "Position") return { k: "prop", v: V3(pp) };
+          if(k === "CFrame") return { k: "prop", v: cfOut(pp, mat) };
+          if(k === "Size") return { k: "prop", v: V3(ro.kind === "rh" ? [2, 2, 1] : [2, 1, 1]) };
+          if(k === "Anchored") return { k: "prop", v: false };
+          if(k === "CanCollide") return { k: "prop", v: true };
+          if(k === "Velocity" || k === "AssemblyLinearVelocity") return { k: "prop", v: V3([0, 0, 0]) };
+        } else if(ro.kind === "rm"){
+          const H = { Health: 100, MaxHealth: 100, WalkSpeed: 16, JumpPower: 50, HipHeight: 0, AutoRotate: true, Sit: false, PlatformStand: false, Jump: false };
+          if(hasOwn(H, k)) return { k: "prop", v: H[k] };
+          if(k === "DisplayName") return { k: "prop", v: r.name };
+          if(k === "MoveDirection") return { k: "prop", v: V3([0, 0, 0]) };
+          if(k === "Died" || k === "HealthChanged" || k === "Running" || k === "Jumping" || k === "FreeFalling" || k === "StateChanged") return { k: "signal" };
+        }
+      }
+    }
     if(id === PLAYER_ID){
       if(k === "Name" || k === "DisplayName") return { k: "prop", v: A.player.name };
       if(k === "UserId") return { k: "prop", v: 1 };
@@ -3135,6 +3178,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     const part = A.partById(id);
     if(part){
+      if(PHYS_PROPS.indexOf(k) >= 0) return { k: "prop", v: physGet(part, k) };
+      if(PHYS_METHODS.indexOf(k) >= 0) return { k: "method" };
       if(PART_PROPS.indexOf(k) >= 0){ const v = partGet(part, k); if(v !== undefined) return { k: "prop", v }; }
       if(k === "Touched" || k === "TouchEnded" || k === "ChildAdded" || k === "Destroying") return { k: "signal" };
     }
@@ -3168,7 +3213,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
 
   function getAttrs(id){ if(!rt.attrs.has(id)) rt.attrs.set(id, {}); return rt.attrs.get(id); }
   function destroyId(id){
-    guiDrop(id); { const sn = sounds.get(id); if(sn){ try{ sn.pause(); }catch(e){} sounds.delete(id); } }
+    guiDrop(id); PHYS.bodies.delete(id); { const sn = sounds.get(id); if(sn){ try{ sn.pause(); }catch(e){} sounds.delete(id); } }
     if(isPartId(id)){ A.part.destroy(A.partById(id)); }
     else {
       rt.tmpNodes = rt.tmpNodes.filter(n => n.id !== id);
@@ -3187,6 +3232,12 @@ function createLuaRuntime(fengari, A, preludeSrc){
   function callMethod(vm, id, m, a){
     const args = a || [];
     { const ex = extCall(vm, id, m, args); if(ex !== undefined) return ex; }
+    { const ro = remoteOf(id);
+      if(ro){
+        if(ro.kind === "rc" && m === "GetPivot"){ const pp = ro.r.pos; return cfOut([pp[0], pp[1] + HRP_LIFT, pp[2]], yawToMat(ro.r.yaw || 0)); }
+        if(m === "MoveTo" || m === "PivotTo" || m === "Kick" || m === "LoadCharacter") return null;
+      } }
+    { const pm = physMethod(id, m, args); if(pm !== undefined) return pm; }
     switch(m){
       case "FindFirstAncestor": case "FindFirstAncestorOfClass": case "FindFirstAncestorWhichIsA": {
         let q = parentOf(id);
@@ -3222,9 +3273,12 @@ function createLuaRuntime(fengari, A, preludeSrc){
       case "IsAncestorOf": { let p = parentOf(args[0] && args[0].id); while(p){ if(p === id) return true; p = parentOf(p); } return false; }
     }
     if(id === "svc:Players"){
-      if(m === "GetPlayers") return [I(PLAYER_ID)];
-      if(m === "GetPlayerFromCharacter"){ return args[0] && (args[0].id === CHAR_ID || args[0].id === HRP_ID || bodyById(args[0].id)) ? I(PLAYER_ID) : null; }
-      if(m === "GetPlayerByUserId") return args[0] === 1 ? I(PLAYER_ID) : null;
+      if(m === "GetPlayers") return [I(PLAYER_ID)].concat(Array.from(rt.remotes.keys()).map(k => I("rp:" + k)));
+      if(m === "GetPlayerFromCharacter"){
+        if(args[0]){ const ro = remoteOf(args[0].id); if(ro && ro.kind !== "rp") return I("rp:" + ro.rid); }
+        return args[0] && (args[0].id === CHAR_ID || args[0].id === HRP_ID || bodyById(args[0].id)) ? I(PLAYER_ID) : null;
+      }
+      if(m === "GetPlayerByUserId"){ if(args[0] === 1) return I(PLAYER_ID); let hit = null; rt.remotes.forEach((r, k) => { if(remoteUserId(r.key) === args[0]) hit = k; }); return hit ? I("rp:" + hit) : null; }
     }
     if(id === "svc:RunService"){
       if(m === "IsServer") return vm.name === "server";
@@ -3301,6 +3355,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     }
     if(id === "svc:Lighting"){ if(k === "ClockTime" || k === "Brightness"){ A.lighting.set(k, Number(v)); return; } }
     const part = A.partById(id);
+    if(part && PHYS_PROPS.indexOf(k) >= 0){ physSet(part, k, v); return; }
     if(part && PART_PROPS.indexOf(k) >= 0){ partSet(part, k, v); return; }
     const node = findNode(id);
     if(node){
@@ -3649,6 +3704,179 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
   function soundsStop(){ sounds.forEach(a => { try{ a.pause(); }catch(e){} }); sounds.clear(); }
 
+
+  /* ================= physics for unanchored parts =================
+     A Part with Anchored = false falls with gravity, lands on / bounces off anchored parts and other loose parts, slides with friction,
+     gets pushed by the player, and can be driven from scripts:  part.Velocity / AssemblyLinearVelocity, part:ApplyImpulse(v),
+     part.Mass, part.Elasticity (0-1), part.Friction (0-1), Workspace.Gravity.  Parts don't spin (rotation is kept as you set it). */
+  const PHYS = { bodies: new Map(), pairs: new Set(), lastPlayer: null };
+  const PHYS_G_SCALE = 28 / 196.2;          // Workspace.Gravity 196.2 = the same pull the character feels, so a dropped ball falls like the player does
+  const PHYS_PROPS = ["Velocity", "AssemblyLinearVelocity", "AssemblyAngularVelocity", "RotVelocity", "Mass", "AssemblyMass", "Elasticity", "Friction"];
+  const PHYS_METHODS = ["ApplyImpulse", "ApplyImpulseAtPosition", "ApplyAngularImpulse", "GetMass", "SetNetworkOwner", "GetNetworkOwner", "GetVelocityAtPosition", "GetTouchingParts"];
+  const physDynamic = (p) => !p.pending && p.attached !== false && p.className !== "SpawnLocation" && A.part.get(p, "Anchored") === false;
+  function physBody(p){ let b = PHYS.bodies.get(p.id); if(!b){ b = { vx: 0, vy: 0, vz: 0, el: 0.3, fr: 0.5 }; PHYS.bodies.set(p.id, b); } return b; }
+  function physMass(p){ const z = A.part.get(p, "Size") || [1, 1, 1]; let v = z[0] * z[1] * z[2]; if(A.part.get(p, "Shape") === "Ball") v *= Math.PI / 6; else if(A.part.get(p, "Shape") === "Cylinder") v *= Math.PI / 4; return Math.max(0.01, v * 0.7); }
+  function physGet(p, k){
+    if(k === "Mass" || k === "AssemblyMass") return physMass(p);
+    if(k === "AssemblyAngularVelocity" || k === "RotVelocity") return V3([0, 0, 0]);
+    const b = PHYS.bodies.get(p.id) || { vx: 0, vy: 0, vz: 0, el: 0.3, fr: 0.5 };
+    if(k === "Elasticity") return b.el; if(k === "Friction") return b.fr;
+    return V3([b.vx, b.vy, b.vz]);
+  }
+  function physSet(p, k, v){
+    if(k === "Mass" || k === "AssemblyMass") throw new Error(k + " is read-only");
+    if(k === "AssemblyAngularVelocity" || k === "RotVelocity") return;
+    const b = physBody(p);
+    if(k === "Elasticity"){ b.el = Math.max(0, Math.min(1, Number(v) || 0)); return; }
+    if(k === "Friction"){ b.fr = Math.max(0, Math.min(2, Number(v) || 0)); return; }
+    if(!v || v.__t !== "V3") throw new Error(k + " must be a Vector3");
+    b.vx = v.x; b.vy = v.y; b.vz = v.z;
+  }
+  function physMethod(id, m, args){
+    if(PHYS_METHODS.indexOf(m) < 0) return undefined;
+    const p = A.partById(id); if(!p) return undefined;
+    if(m === "GetMass") return physMass(p);
+    if(m === "SetNetworkOwner") return null;
+    if(m === "GetNetworkOwner") return null;
+    if(m === "ApplyAngularImpulse") return null;
+    if(m === "GetVelocityAtPosition"){ const b = PHYS.bodies.get(p.id); return V3(b ? [b.vx, b.vy, b.vz] : [0, 0, 0]); }
+    if(m === "GetTouchingParts"){ const out = []; PHYS.pairs.forEach(k => { const ab = k.split("|"); if(ab[0] === id) out.push(I(ab[1])); else if(ab[1] === id) out.push(I(ab[0])); }); return out; }
+    const J = args[0]; if(!J || J.__t !== "V3") throw new Error(m + " needs a Vector3");
+    if(!physDynamic(p)) return null;                    // like Roblox, an anchored part ignores forces
+    const b = physBody(p), mass = physMass(p);
+    b.vx += J.x / mass; b.vy += J.y / mass; b.vz += J.z / mass;
+    return null;
+  }
+  function physBox(p){
+    const pos = A.part.get(p, "Position"), z = A.part.get(p, "Size"), o = A.part.get(p, "Orientation") || [0, 0, 0];
+    let hx = z[0] / 2, hy = z[1] / 2, hz = z[2] / 2;
+    if(o[0] || o[1] || o[2]){
+      const m = eulerToMat(o[0] * DEG, o[1] * DEG, o[2] * DEG), ax = z[0] / 2, ay = z[1] / 2, az = z[2] / 2;
+      hx = Math.abs(m[0]) * ax + Math.abs(m[1]) * ay + Math.abs(m[2]) * az;
+      hy = Math.abs(m[3]) * ax + Math.abs(m[4]) * ay + Math.abs(m[5]) * az;
+      hz = Math.abs(m[6]) * ax + Math.abs(m[7]) * ay + Math.abs(m[8]) * az;
+    }
+    const ball = A.part.get(p, "Shape") === "Ball";
+    if(ball){ const r = Math.min(z[0], z[1], z[2]) / 2; hx = hy = hz = r; }
+    return { id: p.id, p, cx: pos[0], cy: pos[1], cz: pos[2], hx, hy, hz, sphere: ball };
+  }
+  // contact between a (moving) and c: returns the push-out direction n (from c towards a) and depth, or null
+  function physContact(a, c){
+    if(a.sphere || c.sphere){
+      let s = a, o = c, flip = 1;
+      if(!a.sphere){ s = c; o = a; flip = -1; }                 // s = the sphere, o = the other shape
+      let nx, ny, nz, pen;
+      if(o.sphere){
+        nx = s.cx - o.cx; ny = s.cy - o.cy; nz = s.cz - o.cz; const d = Math.hypot(nx, ny, nz), R = s.hx + o.hx;
+        if(d >= R) return null;
+        if(d < 1e-9){ nx = 0; ny = 1; nz = 0; pen = R; } else { nx /= d; ny /= d; nz /= d; pen = R - d; }
+      } else {
+        const qx = Math.max(o.cx - o.hx, Math.min(o.cx + o.hx, s.cx)), qy = Math.max(o.cy - o.hy, Math.min(o.cy + o.hy, s.cy)), qz = Math.max(o.cz - o.hz, Math.min(o.cz + o.hz, s.cz));
+        nx = s.cx - qx; ny = s.cy - qy; nz = s.cz - qz; const d = Math.hypot(nx, ny, nz);
+        if(d >= s.hx) return null;
+        if(d > 1e-9){ nx /= d; ny /= d; nz /= d; pen = s.hx - d; }
+        else {                                                  // centre is inside the box: leave through the nearest face
+          const dx = o.hx - Math.abs(s.cx - o.cx), dy = o.hy - Math.abs(s.cy - o.cy), dz = o.hz - Math.abs(s.cz - o.cz);
+          nx = ny = nz = 0;
+          if(dy <= dx && dy <= dz){ ny = s.cy >= o.cy ? 1 : -1; pen = dy + s.hx; }
+          else if(dx <= dz){ nx = s.cx >= o.cx ? 1 : -1; pen = dx + s.hx; }
+          else { nz = s.cz >= o.cz ? 1 : -1; pen = dz + s.hx; }
+        }
+      }
+      return { nx: nx * flip, ny: ny * flip, nz: nz * flip, pen };
+    }
+    const ox = a.hx + c.hx - Math.abs(a.cx - c.cx), oy = a.hy + c.hy - Math.abs(a.cy - c.cy), oz = a.hz + c.hz - Math.abs(a.cz - c.cz);
+    if(ox <= 0 || oy <= 0 || oz <= 0) return null;
+    if(oy <= ox && oy <= oz) return { nx: 0, ny: a.cy >= c.cy ? 1 : -1, nz: 0, pen: oy };
+    if(ox <= oz) return { nx: a.cx >= c.cx ? 1 : -1, ny: 0, nz: 0, pen: ox };
+    return { nx: 0, ny: 0, nz: a.cz >= c.cz ? 1 : -1, pen: oz };
+  }
+  // resolve one contact. c = static/kinematic (cv = its velocity) or another loose body (cb)
+  function physResolve(a, c, cb, cv, mA, mC, touches){
+    const hit = physContact(a, c); if(!hit) return;
+    const wa = cb ? mC / (mA + mC) : 1, wc = cb ? mA / (mA + mC) : 0;
+    a.cx += hit.nx * hit.pen * wa; a.cy += hit.ny * hit.pen * wa; a.cz += hit.nz * hit.pen * wa;
+    if(cb){ c.cx -= hit.nx * hit.pen * wc; c.cy -= hit.ny * hit.pen * wc; c.cz -= hit.nz * hit.pen * wc; }
+    const av = a.v, bv = cb ? c.v : cv;
+    const rvx = av.vx - bv.vx, rvy = av.vy - bv.vy, rvz = av.vz - bv.vz;
+    const vn = rvx * hit.nx + rvy * hit.ny + rvz * hit.nz;
+    if(touches) touches.add(a.id < c.id ? a.id + "|" + c.id : c.id + "|" + a.id);
+    if(vn >= 0) return;
+    const e = -vn > 2.5 ? Math.min(a.v.el, cb ? c.v.el : a.v.el) : 0;      // only real impacts bounce, resting things settle
+    const jn = -(1 + e) * vn;                                              // normal impulse per unit mass
+    const ka = cb ? mC / (mA + mC) : 1, kc = cb ? mA / (mA + mC) : 0;
+    av.vx += hit.nx * jn * ka; av.vy += hit.ny * jn * ka; av.vz += hit.nz * jn * ka;
+    if(cb){ bv.vx -= hit.nx * jn * kc; bv.vy -= hit.ny * jn * kc; bv.vz -= hit.nz * jn * kc; }
+    // Coulomb friction along the surface
+    const tx = rvx - vn * hit.nx, ty = rvy - vn * hit.ny, tz = rvz - vn * hit.nz, tl = Math.hypot(tx, ty, tz);
+    if(tl > 1e-6){
+      const dv = Math.min(tl, a.v.fr * jn) / tl;
+      av.vx -= tx * dv * ka; av.vy -= ty * dv * ka; av.vz -= tz * dv * ka;
+      if(cb){ bv.vx += tx * dv * kc; bv.vy += ty * dv * kc; bv.vz += tz * dv * kc; }
+    }
+  }
+  function physStep(dt){
+    const parts = A.parts(), dyn = [];
+    for(let i = 0; i < parts.length; i++){ const p = parts[i]; if(physDynamic(p)) dyn.push(p); }
+    if(!dyn.length){ if(PHYS.bodies.size) PHYS.bodies.clear(); if(PHYS.pairs.size) PHYS.pairs.clear(); PHYS.lastPlayer = null; return; }
+    const live = new Set(dyn.map(p => p.id)); PHYS.bodies.forEach((b, id) => { if(!live.has(id)) PHYS.bodies.delete(id); });
+    dt = Math.min(dt, 1 / 20);
+    const SUB = 3, h = dt / SUB, g = rt.gravity * PHYS_G_SCALE;
+    const stat = [];
+    for(let i = 0; i < parts.length; i++){
+      const p = parts[i]; if(p.pending || p.attached === false || live.has(p.id)) continue;
+      if(A.part.get(p, "CanCollide") === false) continue;
+      stat.push(physBox(p));
+    }
+    const bodies = dyn.map(p => { const b = physBox(p); b.v = physBody(p); b.m = physMass(p); b.solid = A.part.get(p, "CanCollide") !== false; b.x0 = b.cx; b.y0 = b.cy; b.z0 = b.cz; return b; });
+    // the player pushes loose parts (a kinematic box; its speed comes from how far it moved)
+    let pl = null, pv = { vx: 0, vy: 0, vz: 0 };
+    const pbx = A.player.getBox && A.player.getBox();
+    if(pbx){
+      pl = { id: "player", cx: (pbx.min[0] + pbx.max[0]) / 2, cy: (pbx.min[1] + pbx.max[1]) / 2, cz: (pbx.min[2] + pbx.max[2]) / 2, hx: (pbx.max[0] - pbx.min[0]) / 2, hy: (pbx.max[1] - pbx.min[1]) / 2, hz: (pbx.max[2] - pbx.min[2]) / 2, sphere: false };
+      if(PHYS.lastPlayer && dt > 0){ pv = { vx: (pl.cx - PHYS.lastPlayer[0]) / dt, vy: 0, vz: (pl.cz - PHYS.lastPlayer[2]) / dt }; const sp = Math.hypot(pv.vx, pv.vz); if(sp > 60){ pv.vx *= 60 / sp; pv.vz *= 60 / sp; } }
+      PHYS.lastPlayer = [pl.cx, pl.cy, pl.cz];
+    } else PHYS.lastPlayer = null;
+    const touches = new Set();
+    for(let s = 0; s < SUB; s++){
+      for(let i = 0; i < bodies.length; i++){
+        const b = bodies[i];
+        b.v.vy -= g * h; b.v.vx *= 1 - 0.02 * h * 60 * 0.1; b.v.vz *= 1 - 0.02 * h * 60 * 0.1;      // a touch of air drag
+        b.cx += b.v.vx * h; b.cy += b.v.vy * h; b.cz += b.v.vz * h;
+      }
+      for(let i = 0; i < bodies.length; i++){
+        const b = bodies[i]; if(!b.solid) continue;
+        for(let j = 0; j < stat.length; j++) physResolve(b, stat[j], false, pv0, b.m, 0, touches);
+        if(pl && !(pl.cy - pl.hy >= b.cy + b.hy - 0.4)) physResolve(b, pl, false, pv, b.m, 0, null);
+      }
+      for(let i = 0; i < bodies.length; i++) for(let j = i + 1; j < bodies.length; j++){
+        if(!bodies[i].solid || !bodies[j].solid) continue;
+        physResolve(bodies[i], bodies[j], true, null, bodies[i].m, bodies[j].m, touches);
+      }
+    }
+    for(let i = 0; i < bodies.length; i++){
+      const b = bodies[i];
+      if(b.cy < -500){ try{ destroyId(b.id); }catch(e){} continue; }        // fell out of the world (Roblox does this at -500 too)
+      if(Math.abs(b.cx - b.x0) > 5e-4 || Math.abs(b.cy - b.y0) > 5e-4 || Math.abs(b.cz - b.z0) > 5e-4){
+        try{ A.part.set(b.p, "Position", [b.cx, b.cy, b.cz]); }catch(e){}
+      }
+      if(Math.abs(b.v.vx) < 0.01) b.v.vx = 0; if(Math.abs(b.v.vz) < 0.01) b.v.vz = 0;
+    }
+    // Touched / TouchEnded between parts
+    touches.forEach(k => {
+      if(PHYS.pairs.has(k)) return;
+      const ab = k.split("|");
+      ab.forEach((id, n) => { const other = ab[1 - n]; if(hasListeners(id, "Touched")) fire(id, "Touched", [I(other)]); });
+    });
+    PHYS.pairs.forEach(k => {
+      if(touches.has(k)) return;
+      const ab = k.split("|");
+      ab.forEach((id, n) => { const other = ab[1 - n]; if(hasListeners(id, "TouchEnded")) fire(id, "TouchEnded", [I(other)]); });
+    });
+    PHYS.pairs = touches;
+  }
+  const pv0 = { vx: 0, vy: 0, vz: 0 };
+
   /* ---------------- camera, rays, mouse ---------------- */
   const CAM_DEFAULT = { pos: [0, 10, 20], look: [0, 0, -1], fov: 70, w: 1280, h: 720 };
   const vnorm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
@@ -3943,6 +4171,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
   function start(){
     stop();
+    rt.remotes.clear(); PHYS.bodies.clear(); PHYS.pairs.clear(); PHYS.lastPlayer = null;
     rt.running = true; rt.now = 0; rt.tmpNodes = []; rt.attrs.clear(); rt.signals.clear(); rt.conns.clear(); rt.touching.clear(); rt.invoke.clear();
     resetHumDefaults();
     rt.vms.server = makeVM("server");
@@ -3958,6 +4187,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     callLua(rt.vms.client, "__step", [0]);
     allNodes().forEach(n => { if(n.className === "Sound" && P(n, "PlayOnStart") && !n.disabled){ try{ soundCall(n, "Play"); }catch(e){ A.log("warn", "Sound autoplay failed: " + e.message, "client"); } } });
     fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)], "client");
+    syncRemotes();
     return { server: servers.length, client: scriptsFor("client").length };
   }
   function stop(){
@@ -3987,14 +4217,36 @@ function createLuaRuntime(fengari, A, preludeSrc){
       else if(!hit && was){ rt.touching.set(p.id, false); fire(p.id, "TouchEnded", [I(HRP_ID)]); }
     });
   }
+  function syncRemotes(){
+    if(!A.remotePlayers) return;
+    let list; try{ list = A.remotePlayers() || []; }catch(e){ return; }
+    const seen = new Set();
+    list.forEach(p => {
+      seen.add(p.id);
+      let r = rt.remotes.get(p.id);
+      if(r){ r.pos = p.pos; r.yaw = p.yaw || 0; if(p.name) r.name = p.name; return; }
+      r = { id: p.id, name: p.name || "Player", key: p.accountKey || "", pos: p.pos, yaw: p.yaw || 0 };
+      rt.remotes.set(p.id, r);
+      fire("svc:Players", "PlayerAdded", [I("rp:" + p.id)], "server");
+      fire("rp:" + p.id, "CharacterAdded", [I("rc:" + p.id)], "server");
+    });
+    Array.from(rt.remotes.keys()).forEach(id => {
+      if(seen.has(id)) return;
+      fire("rp:" + id, "CharacterRemoving", [I("rc:" + id)], "server");
+      fire("svc:Players", "PlayerRemoving", [I("rp:" + id)], "server");
+      rt.remotes.delete(id);
+    });
+  }
   function step(dt){
     if(!rt.running) return;
     rt.now += dt;
+    syncRemotes();
     fire("svc:RunService", "Stepped", [rt.now, dt]);
     fire("svc:RunService", "Heartbeat", [dt]);
     fire("svc:RunService", "RenderStepped", [dt], "client");
     callLua(rt.vms.server, "__step", [dt]);
     callLua(rt.vms.client, "__step", [dt]);
+    try{ physStep(dt); }catch(e){ A.log("error", "Physics: " + e.message, "server"); }
     updateTouches();
     guiFlush();
     // respawn a few seconds after dying
