@@ -3662,6 +3662,16 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(a){ try{ a.pause(); }catch(e){} }
       a = new Audio(); a._src = url; a.preload = "auto";
       if(/^(https?:|data:audio|blob:)/i.test(url)){ a.src = url; }
+      else if(/^bvaudio:/i.test(url)){
+        // a big uploaded audio file: it lives in the browser's file storage (Studio) or in the cloud (players), so it loads in a moment
+        a._pending = true;
+        if(typeof window.bvResolveAudio !== "function"){ A.log("warn", "Sound '" + n.name + "' uses an uploaded audio file but this page can't load it", "client"); }
+        else window.bvResolveAudio(url).then((u) => {
+          if(sounds.get(n.id) !== a) return;
+          a._pending = false; a.src = u;
+          if(n.p && n.p.Playing) soundPlay(n, a);
+        }).catch((err) => { a._pending = false; A.log("warn", "Sound '" + n.name + "' couldn't load its uploaded audio (" + (err && err.message || err) + ")", "client"); });
+      }
       else if(url){ A.log("warn", "Sound '" + n.name + "': SoundId must be a web link to an audio file (https://...) or an uploaded file; '" + url.slice(0, 40) + "' (Roblox asset ids) can't be played here", "client"); }
       a.addEventListener("ended", () => { n.p = n.p || {}; n.p.Playing = false; fire(n.id, "Ended", []); });
       a.addEventListener("error", () => { A.log("warn", "Sound '" + n.name + "' couldn't load its audio (" + url.slice(0, 60) + ")", "client"); });
@@ -3672,6 +3682,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
   function soundPlay(n, a){
     if(!a._src){ A.log("warn", "Sound '" + n.name + "' has no SoundId, so there is nothing to play", "client"); return; }
+    if(a._pending) return;   // still loading: it starts by itself the moment the file is ready
     let pr; try{ pr = a.play(); }catch(e){ return; }
     if(pr && pr.catch) pr.catch((err) => {
       if(err && err.name === "NotAllowedError"){
@@ -6847,6 +6858,43 @@ function createLuaRuntime(fengari, A, preludeSrc){
     return def;
   }
   /* ---- Sound: preview / stop by hand + pick an audio file ---- */
+  /* ---- big audio files: kept in the browser's file storage (IndexedDB) instead of inside the world data,
+         so a song of many MB no longer fills up the game's save. The game points at it with SoundId "bvaudio:<id>",
+         and studio-sync.js copies it to the cloud when the game is published so players can hear it. ---- */
+  const BV_AUDIO_MAX = 25 * 1024 * 1024;   // 25 MB per file
+  const bvAudioDB = (function(){
+    let dbp = null;
+    function open(){
+      if(dbp) return dbp;
+      dbp = new Promise((res, rej) => { const r = indexedDB.open("bv_audio", 1); r.onupgradeneeded = () => r.result.createObjectStore("files"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      return dbp;
+    }
+    async function tx(mode, fn){
+      const db = await open();
+      return new Promise((res, rej) => { const t = db.transaction("files", mode); const rq = fn(t.objectStore("files")); t.oncomplete = () => res(rq && rq.result); t.onerror = t.onabort = () => rej(t.error); });
+    }
+    return { put: (id, blob) => tx("readwrite", st => st.put(blob, id)), get: (id) => tx("readonly", st => st.get(id)) };
+  })();
+  window.bvAudioDB = bvAudioDB;
+  async function bvFetchCloudAudio(gid, aid){
+    const base = firebase.database().ref("game_audio/" + gid + "/" + aid);
+    const m = (await base.child("meta").once("value")).val();
+    if(!m || !m.n) return null;
+    const parts = await Promise.all(Array.from({ length: m.n }, (_, i) => base.child("c/" + i).once("value").then(sn => sn.val())));
+    const bytes = parts.map(p => { const bin = atob(String(p || "")); const u8 = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; });
+    return new Blob(bytes, { type: m.mime || "audio/mpeg" });
+  }
+  const bvAudioUrls = new Map();
+  window.bvResolveAudio = async function(ref){
+    const id = String(ref).replace(/^bvaudio:/i, "");
+    if(bvAudioUrls.has(id)) return bvAudioUrls.get(id);
+    let blob = null;
+    try{ blob = await bvAudioDB.get(id); }catch(e){}
+    if(!blob && window.firebase && currentGame){ try{ blob = await bvFetchCloudAudio(currentGame.id, id); if(blob) bvAudioDB.put(id, blob).catch(() => {}); }catch(e){} }
+    if(!blob) throw new Error("the audio file isn't on this device");
+    const u = URL.createObjectURL(blob); bvAudioUrls.set(id, u); return u;
+  };
+
   const sndPrev = new Map();
   function sndPreviewStop(id){ const a = sndPrev.get(id); if(a){ try{ a.pause(); a.currentTime = 0; }catch(e){} sndPrev.delete(id); } }
   function sndPreviewAll(){ Array.from(sndPrev.keys()).forEach(sndPreviewStop); }
@@ -6855,11 +6903,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const g = document.createElement("div"); g.className = "prop-group-label"; g.textContent = "Audio"; body.appendChild(g);
     const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:6px;margin-bottom:8px";
     const mk = (t, fn) => { const b = document.createElement("button"); b.className = "script-editor-save"; b.textContent = t; b.style.flex = "1"; b.addEventListener("click", fn); wrap.appendChild(b); return b; };
-    mk("Play", () => {
+    mk("Play", async () => {
       const url = String(n.p.SoundId || "");
-      if(!/^(https?:|data:audio|blob:)/i.test(url)){ showToast("Set SoundId to a web link (https://...mp3) or press Choose file first"); return; }
+      if(!/^(https?:|data:audio|blob:|bvaudio:)/i.test(url)){ showToast("Set SoundId to a web link (https://...mp3) or press Choose file first"); return; }
       sndPreviewStop(n.id);
-      const a = new Audio(url); a.volume = Math.max(0, Math.min(1, n.p.Volume === undefined ? 0.5 : Number(n.p.Volume) || 0)); a.loop = !!n.p.Looped; a.playbackRate = Number(n.p.PlaybackSpeed) || 1;
+      let src = url;
+      if(/^bvaudio:/i.test(url)){ try{ src = await window.bvResolveAudio(url); }catch(err){ showToast("Couldn't load the audio: " + (err && err.message || err)); return; } }
+      const a = new Audio(src); a.volume = Math.max(0, Math.min(1, n.p.Volume === undefined ? 0.5 : Number(n.p.Volume) || 0)); a.loop = !!n.p.Looped; a.playbackRate = Number(n.p.PlaybackSpeed) || 1;
       a.addEventListener("ended", () => sndPrev.delete(n.id));
       a.addEventListener("error", () => { sndPrev.delete(n.id); showToast("That audio couldn't be loaded"); });
       sndPrev.set(n.id, a);
@@ -6868,14 +6918,21 @@ function createLuaRuntime(fengari, A, preludeSrc){
     mk("Stop", () => sndPreviewStop(n.id));
     body.appendChild(wrap);
     const pick = document.createElement("input"); pick.type = "file"; pick.accept = "audio/*"; pick.style.display = "none";
-    pick.addEventListener("change", () => {
+    pick.addEventListener("change", async () => {
       const f = pick.files && pick.files[0]; if(!f) return;
-      if(f.size > 1500000){ showToast("That audio file is too big (max about 1.5 MB). Use a shorter clip or a web link instead."); return; }
-      const fr = new FileReader();
-      fr.onload = () => { n.p.SoundId = String(fr.result); sndPreviewStop(n.id); const i = body.querySelector(".bvSoundIdInput"); if(i) i.value = "(uploaded audio file)"; saveWorld(false); showToast("Audio added: " + f.name); };
-      fr.readAsDataURL(f);
+      pick.value = "";
+      if(f.size > BV_AUDIO_MAX){ showToast("That audio file is too big (max 25 MB). Trim it or use a web link instead."); return; }
+      try{
+        const id = "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        await bvAudioDB.put(id, f);
+        n.p.SoundId = "bvaudio:" + id; n.p.SoundFileName = f.name;
+        sndPreviewStop(n.id);
+        const i = body.querySelector(".bvSoundIdInput"); if(i) i.value = "(uploaded audio file) " + f.name;
+        saveWorld(false);
+        showToast("Audio added: " + f.name + " (" + (f.size / 1048576).toFixed(1) + " MB)");
+      }catch(err){ showToast("Couldn't store that audio file: " + (err && err.message || err)); }
     });
-    const choose = document.createElement("button"); choose.className = "script-editor-save"; choose.textContent = "Choose file..."; choose.style.cssText = "width:100%;margin-bottom:8px";
+    const choose = document.createElement("button"); choose.className = "script-editor-save"; choose.textContent = "Choose file... (up to 25 MB)"; choose.style.cssText = "width:100%;margin-bottom:8px";
     choose.addEventListener("click", () => pick.click());
     body.appendChild(choose); body.appendChild(pick);
   }
@@ -6897,8 +6954,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
       else if(def && def.__t === "C3"){ inp = document.createElement("input"); inp.type = "color"; inp.value = wireHex(cur); inp.addEventListener("input", () => { const h = parseInt(inp.value.slice(1), 16); n.p[k] = { __t: "C3", r: ((h >> 16) & 255) / 255, g: ((h >> 8) & 255) / 255, b: (h & 255) / 255 }; saveWorld(false); }); }
       else if(n.className === "Sound" && k === "SoundId"){
         inp = document.createElement("input"); inp.type = "text"; inp.className = "bvSoundIdInput"; inp.placeholder = "https://... .mp3  or use Choose file";
-        inp.value = /^data:/i.test(String(cur)) ? "(uploaded audio file)" : String(cur);
-        inp.addEventListener("change", () => { if(inp.value === "(uploaded audio file)") return; n.p[k] = inp.value.trim(); sndPreviewStop(n.id); saveWorld(false); });
+        inp.value = /^data:/i.test(String(cur)) ? "(uploaded audio file)" : /^bvaudio:/i.test(String(cur)) ? "(uploaded audio file) " + (n.p.SoundFileName || "") : String(cur);
+        inp.addEventListener("change", () => { if(/^\(uploaded audio file\)/.test(inp.value)) return; n.p[k] = inp.value.trim(); sndPreviewStop(n.id); saveWorld(false); });
       }
       else { inp = document.createElement("input"); inp.type = "text"; inp.value = wireText(cur); inp.title = def && def.__t === "UD2" ? "scaleX, offsetX, scaleY, offsetY" : def && def.__t === "UD" ? "scale, offset" : ""; inp.addEventListener("change", () => { n.p[k] = parseWire(def, inp.value); inp.value = wireText(n.p[k]); saveWorld(false); }); }
       r.appendChild(inp); body.appendChild(r);
