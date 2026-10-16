@@ -4579,6 +4579,8 @@
       const v = snap.val() || {};
       Object.keys(v).forEach(k => { if(v[k] && (v[k].owner || v[k].dev)) badgeMap[k] = { owner: !!v[k].owner, dev: !!v[k].dev }; });
       try{ renderHomeFriendsStrip(); }catch(e){}
+      try{ if(window.bvRefreshNameTags) window.bvRefreshNameTags(); }catch(e){}
+      try{ if(window.bvRefreshLeaderboard) window.bvRefreshLeaderboard(); }catch(e){}
       try{ if(pages.friends && !pages.friends.classList.contains("hidden")) renderFriendsPage(); }catch(e){}
       try{
         const nm = document.getElementById("friendProfileName");
@@ -7281,7 +7283,7 @@
 
       // username tag floating above your own head too, so it's visible to
       // you (and to remote players, since it's part of the shared rig)
-      ownNameSprite = makeNameSprite(currentUsername ? currentUsername() : "Player");
+      ownNameSprite = makeNameSprite(currentUsername ? currentUsername() : "Player", currentAccountKey && currentAccountKey());
       ownNameSprite.position.set(0, 3.15, 0);
       character.add(ownNameSprite);
     }
@@ -7337,7 +7339,7 @@
       scene.add(rig.group);
 
       // simple floating name tag using a canvas sprite
-      const nameSprite = makeNameSprite(data.name || "Player");
+      const nameSprite = makeNameSprite(data.name || "Player", data.accountKey);
       nameSprite.position.set(0, 3.15, 0);
       rig.group.add(nameSprite);
 
@@ -7346,7 +7348,7 @@
         leftLeg: rig.leftLeg, rightLeg: rig.rightLeg,
         target: { x:data.x||0, y:data.y||0, z:data.z||0, ry:data.ry||0 },
         walkT: 0, idleT: 0, lastPos: { x:data.x||0, z:data.z||0 },
-        customKey: customSignature(custom), nameSprite
+        customKey: customSignature(custom), nameSprite, pname: data.name || "Player", pkey: data.accountKey || ""
       };
     }
 
@@ -7393,20 +7395,27 @@
       rp.customKey = customSignature(custom);
     }
 
-    function makeNameSprite(text){
+    const BADGE_PATH = {
+      owner: "M12 3.2l9 7.9h-2.6V20h-5.1v-5.8h-2.6V20H5.6v-8.9H3z",
+      dev: "M14.3 3.4l6.3 6.3-2.7 2.7-1.2-1.2-1.7 1.7 1.2 1.2-6.9 6.9a2.3 2.3 0 01-3.3-3.3l6.9-6.9 1.2 1.2 1.7-1.7-1.2-1.2z"
+    };
+    function makeNameSprite(text, badgeKey){
       const dpr = 2; // render at 2x for crisp text, then scale back down via sprite.scale
       const canvas = document.createElement("canvas");
       const padX = 16, padY = 9, h = 40;
+      const bset = (badgeKey && badgeMap[badgeKey]) || null;
+      const blist = bset ? ["owner", "dev"].filter(k => bset[k]) : [];   // owner (house) first, then dev (hammer), at the END of the name
+      const BW = 26, BGAP = 6, badgeW = blist.length ? blist.length * BW + (blist.length - 1) * 4 + BGAP : 0;
       const measure = document.createElement("canvas").getContext("2d");
       measure.font = "700 22px 'Segoe UI', Arial, sans-serif";
       const textW = measure.measureText(text).width;
-      const boxW = Math.min(240, textW + padX * 2);
+      const boxW = Math.min(280, textW + badgeW + padX * 2);
       canvas.width = Math.ceil((boxW + 4) * dpr);
       canvas.height = Math.ceil((h + 4) * dpr);
       const ctx = canvas.getContext("2d");
       ctx.scale(dpr, dpr);
       ctx.font = "700 22px 'Segoe UI', Arial, sans-serif";
-      ctx.textAlign = "center";
+      ctx.textAlign = blist.length ? "left" : "center";
       ctx.textBaseline = "middle";
 
       // soft shadow + rounded pill background so it reads clearly over any
@@ -7430,9 +7439,28 @@
       ctx.lineWidth = 3.5;
       ctx.strokeStyle = "rgba(0,0,0,0.55)";
       ctx.lineJoin = "round";
-      ctx.strokeText(text, boxW / 2 + 2, h / 2 + 2, boxW - padX);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(text, boxW / 2 + 2, h / 2 + 2, boxW - padX);
+      if(!blist.length){
+        ctx.strokeText(text, boxW / 2 + 2, h / 2 + 2, boxW - padX);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(text, boxW / 2 + 2, h / 2 + 2, boxW - padX);
+      } else {
+        const maxTW = boxW - padX * 2 - badgeW, drawnW = Math.min(textW, maxTW), tx = padX + 2;
+        ctx.strokeText(text, tx, h / 2 + 2, maxTW);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(text, tx, h / 2 + 2, maxTW);
+        let bx = tx + drawnW + BGAP;
+        blist.forEach(k => {
+          const col = k === "owner" ? "#ffd479" : "#a9c4ff";
+          ctx.save();
+          ctx.fillStyle = k === "owner" ? "rgba(255,196,77,0.22)" : "rgba(120,160,255,0.22)";
+          roundRectPath(ctx, bx, h / 2 + 2 - BW / 2, BW, BW, 7); ctx.fill();
+          ctx.strokeStyle = k === "owner" ? "rgba(255,196,77,0.55)" : "rgba(140,175,255,0.5)"; ctx.lineWidth = 1.2; ctx.stroke();
+          ctx.translate(bx + BW * 0.14, h / 2 + 2 - BW * 0.36); ctx.scale(BW * 0.72 / 24, BW * 0.72 / 24);
+          ctx.fillStyle = col; ctx.fill(new Path2D(BADGE_PATH[k]));
+          ctx.restore();
+          bx += BW + 4;
+        });
+      }
 
       const tex = new THREE.CanvasTexture(canvas);
       tex.anisotropy = 4;
@@ -9131,11 +9159,14 @@
         await new Promise((res, rej) => {
           const sc = document.createElement("script");
           sc.src = "https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js";
-          sc.onload = res; sc.onerror = () => rej(new Error("The Lua engine didn't load - check your internet connection"));
+          const to = setTimeout(() => rej(new Error("The Lua engine took too long to load - check your internet connection")), 20000);
+          sc.onload = () => { clearTimeout(to); res(); }; sc.onerror = () => { clearTimeout(to); rej(new Error("The Lua engine didn't load - check your internet connection")); };
           document.head.appendChild(sc);
         });
       }
-      const html = await (await fetch("studio.html", { cache: "no-cache" })).text();
+      const fres = await fetch("studio.html", { cache: "no-cache" });
+      if(!fres.ok) throw new Error("Couldn't download studio.html (" + fres.status + ")");
+      const html = await fres.text();
       const blocks = [];
       html.replace(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g, (m, attrs, code) => { blocks.push({ attrs, code }); return m; });
       const rtm = blocks.find(b => b.code.indexOf("function createLuaRuntime(") >= 0 && b.attrs.indexOf("text/plain") < 0);
@@ -9276,14 +9307,16 @@
       };
     }
     function lookupKey(e){ return e.key; }
+    let luaGen = 0;   // bumped on every start/stop so a slow engine load can tell whether the game it was loading for is still the current one
     async function startLua(){
+      const myGen = ++luaGen;
       const hasScripts = worldNodes.some(n => (n.className === "Script" || n.className === "LocalScript") && !n.disabled);
       logDev("info", "World loaded: " + worldParts.length + " part(s), " + worldNodes.length + " other object(s).");
       if(!hasScripts){ devEngineState = "no scripts"; logDev("info", "This world has no enabled Script or LocalScript."); return; }
       try{
         devEngineState = "loading"; logDev("info", "Loading the Lua engine...");
         const eng = await ensureLuaEngine();
-        if(!worldMode || !running) return;                 // left the game while the engine was loading
+        if(myGen !== luaGen || !worldMode){ devEngineState = "not started"; return; }   // left the game while the engine was loading (NOT "running": that flag only turns true after the loading bar finishes, which used to make this bail out and stay on "loading" forever)
         luaRt = eng.create(window.fengari, makeWorldAdapter(), eng.prelude);
         const info = luaRt.start();
         devEngineState = "running"; devStartInfo = info.server + " server, " + info.client + " local started";
@@ -9314,6 +9347,7 @@
       return !!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA"));
     }
     function stopLua(){
+      luaGen++;
       closeDevConsole();
       if(luaKeyDown){ window.removeEventListener("keydown", luaKeyDown, true); luaKeyDown = null; }
       if(luaKeyUp){ window.removeEventListener("keyup", luaKeyUp, true); luaKeyUp = null; }
@@ -10244,12 +10278,12 @@
       let html = '<div class="game-lb-head"><span>Online - ' + total + '</span><span class="lb-hint">Tab to close</span></div>';
 
       html += '<div class="game-lb-row"><span class="game-lb-rank">1</span>' +
-        '<span class="lb-name">' + escapeHtml(me) + '</span><span class="lb-you">You</span></div>';
+        '<span class="lb-name">' + escapeHtml(me) + badgesHtml(currentAccountKey && currentAccountKey()) + '</span><span class="lb-you">You</span></div>';
 
       others.forEach((p, i) => {
         html += '<div class="game-lb-row" data-lb-name="' + escapeHtml(p.name) + '" data-lb-key="' + escapeHtml(p.accountKey) + '">' +
           '<span class="game-lb-rank">' + (i + 2) + '</span>' +
-          '<span class="lb-name">' + escapeHtml(p.name) + '</span></div>';
+          '<span class="lb-name">' + escapeHtml(p.name) + badgesHtml(p.accountKey) + '</span></div>';
       });
       panel.innerHTML = html;
 
@@ -10264,6 +10298,7 @@
         });
       });
     }
+    window.bvRefreshLeaderboard = function(){ const pn = document.getElementById("gameLbPanel"); if(pn && !pn.classList.contains("hidden")) renderLeaderboard(); };
     function openLeaderboard(){
       const panel = document.getElementById("gameLbPanel");
       const btn = document.getElementById("gameLbBtn");
@@ -10775,10 +10810,26 @@
       character.remove(ownNameSprite);
       if(ownNameSprite.material && ownNameSprite.material.map) ownNameSprite.material.map.dispose();
       if(ownNameSprite.material) ownNameSprite.material.dispose();
-      ownNameSprite = makeNameSprite(currentUsername ? currentUsername() : "Player");
+      ownNameSprite = makeNameSprite(currentUsername ? currentUsername() : "Player", currentAccountKey && currentAccountKey());
       ownNameSprite.position.set(0, 3.15, 0);
       character.add(ownNameSprite);
     }
+    // badges were given/removed: redraw every name tag
+    window.bvRefreshNameTags = function(){
+      try{ refreshOwnNameTag(); }catch(e){}
+      Object.keys(remotePlayers).forEach(id => {
+        const rp = remotePlayers[id]; if(!rp || !rp.nameSprite) return;
+        try{
+          const old = rp.nameSprite, par = old.parent;
+          if(par) par.remove(old);
+          if(old.material && old.material.map) old.material.map.dispose();
+          if(old.material) old.material.dispose();
+          rp.nameSprite = makeNameSprite(rp.pname, rp.pkey);
+          rp.nameSprite.position.set(0, 3.15, 0);
+          if(par) par.add(rp.nameSprite);
+        }catch(e){}
+      });
+    };
 
     return { start, stop, forceDisconnect, isRunning: () => running, refreshOwnNameTag, refreshOwnCharacterAppearance, looksLikeProfanity, buildCharacterRig, normalizeCustom, disposeObject3D };
   })();
