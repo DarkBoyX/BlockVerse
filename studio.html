@@ -2803,7 +2803,14 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
 
   /* ---------------- node model ---------------- */
-  const allNodes = () => A.nodes().concat(rt.tmpNodes);
+  /* the GUI feature (ScreenGui, Frame, TextLabel, ...) was removed; games saved with those objects just ignore them */
+  const GUI_GONE = new Set(["ScreenGui", "Frame", "TextLabel", "TextButton", "TextBox", "ImageLabel", "ImageButton", "ScrollingFrame", "UICorner", "UIStroke", "UIListLayout", "UIGridLayout", "UIPadding", "UIAspectRatioConstraint", "UIScale"]);
+  const allNodes = () => {
+    const all = A.nodes(); const gone = new Set();
+    all.forEach(n => { if(GUI_GONE.has(n.className)) gone.add(n.id); });
+    if(gone.size) for(let i = 0, grew = true; grew && i < 12; i++){ grew = false; all.forEach(n => { if(!gone.has(n.id) && gone.has(n.parent)){ gone.add(n.id); grew = true; } }); }
+    return (gone.size ? all.filter(n => !gone.has(n.id)) : all).concat(rt.tmpNodes);
+  };
   const findNode = (id) => allNodes().find(n => n.id === id) || null;
   const isPartId = (id) => !!A.partById(id);
   const V3 = (a) => ({ __t: "V3", x: a[0], y: a[1], z: a[2] });
@@ -3332,22 +3339,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   const MOUSE_SIGS = ["MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "MouseButton2Click", "MouseButton2Down", "MouseButton2Up", "MouseEnter", "MouseLeave", "MouseMoved", "MouseWheelForward", "MouseWheelBackward", "Activated", "InputBegan", "InputEnded", "InputChanged"];
   const merge = (...a) => Object.assign({}, ...a);
   const CLS = {
-    ScreenGui: { gui: "screen", isa: ["LayerCollector", "GuiBase2d"], props: { Enabled: true, DisplayOrder: 0, ResetOnSpawn: true, IgnoreGuiInset: false, ZIndexBehavior: ENW("ZIndexBehavior", "Sibling") } },
-    Frame: { gui: "obj", isa: ["GuiObject", "GuiBase2d"], props: GUI_COMMON, signals: MOUSE_SIGS, abs: true },
-    TextLabel: { gui: "obj", isa: ["GuiObject", "GuiLabel", "GuiBase2d"], props: merge(GUI_COMMON, TEXT_COMMON), signals: MOUSE_SIGS, abs: true },
-    TextButton: { gui: "obj", isa: ["GuiObject", "GuiButton", "GuiBase2d"], props: merge(GUI_COMMON, TEXT_COMMON, { Text: "Button", AutoButtonColor: true }), signals: MOUSE_SIGS, abs: true, button: true },
-    TextBox: { gui: "obj", isa: ["GuiObject", "GuiBase2d"], props: merge(GUI_COMMON, TEXT_COMMON, { BackgroundColor3: C3W(1, 1, 1), PlaceholderText: "", PlaceholderColor3: C3W(0.7, 0.7, 0.7), ClearTextOnFocus: true, MultiLine: false, TextEditable: true, TextXAlignment: ENW("TextXAlignment", "Left") }), signals: MOUSE_SIGS.concat(["FocusLost", "Focused"]), methods: ["CaptureFocus", "ReleaseFocus", "IsFocused"], abs: true },
-    ImageLabel: { gui: "obj", isa: ["GuiObject", "GuiLabel", "GuiBase2d"], props: merge(GUI_COMMON, IMG_COMMON), signals: MOUSE_SIGS, abs: true },
-    ImageButton: { gui: "obj", isa: ["GuiObject", "GuiButton", "GuiBase2d"], props: merge(GUI_COMMON, IMG_COMMON, { AutoButtonColor: true }), signals: MOUSE_SIGS, abs: true, button: true },
-    ScrollingFrame: { gui: "obj", isa: ["GuiObject", "GuiBase2d"], props: merge(GUI_COMMON, { CanvasSize: UD2W(0, 0, 2, 0), ScrollBarThickness: 8, ScrollingEnabled: true, ScrollBarImageColor3: C3W(0, 0, 0) }), signals: MOUSE_SIGS, abs: true },
-    UICorner: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { CornerRadius: UDW(0, 8) } },
-    UIStroke: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { Color: C3W(0, 0, 0), Thickness: 1, Transparency: 0, Enabled: true } },
-    UIListLayout: { gui: "mod", isa: ["UIComponent", "UIBase", "UILayout"], props: { FillDirection: ENW("FillDirection", "Vertical"), HorizontalAlignment: ENW("HorizontalAlignment", "Left"), VerticalAlignment: ENW("VerticalAlignment", "Top"), SortOrder: ENW("SortOrder", "LayoutOrder"), Padding: UDW(0, 0), Wraps: false } },
-    UIGridLayout: { gui: "mod", isa: ["UIComponent", "UIBase", "UILayout"], props: { CellSize: UD2W(0, 100, 0, 100), CellPadding: UD2W(0, 5, 0, 5), FillDirection: ENW("FillDirection", "Horizontal"), SortOrder: ENW("SortOrder", "LayoutOrder") } },
-    UIPadding: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { PaddingTop: UDW(0, 0), PaddingBottom: UDW(0, 0), PaddingLeft: UDW(0, 0), PaddingRight: UDW(0, 0) } },
-    UIAspectRatioConstraint: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { AspectRatio: 1 } },
-    UIScale: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { Scale: 1 } },
-    Sound: { isa: ["Instance"], props: { SoundId: "", Volume: 0.5, Looped: false, Playing: false, PlaybackSpeed: 1, TimePosition: 0, TimeLength: 0, IsPlaying: false, IsLoaded: true }, signals: ["Ended", "Played", "Paused", "Loaded"], methods: ["Play", "Stop", "Pause", "Resume"] },
+    Sound: { isa: ["Instance"], props: { SoundId: "", Volume: 0.5, Looped: false, PlayOnStart: false, Playing: false, PlaybackSpeed: 1, TimePosition: 0, TimeLength: 0, IsPlaying: false, IsLoaded: true }, signals: ["Ended", "Played", "Paused", "Loaded"], methods: ["Play", "Stop", "Pause", "Resume"] },
     BindableEvent: { props: {}, signals: ["Event"], methods: ["Fire"] },
     BindableFunction: { props: {}, methods: ["Invoke"] }
   };
@@ -3613,21 +3605,35 @@ function createLuaRuntime(fengari, A, preludeSrc){
     let a = sounds.get(n.id); const url = String(P(n, "SoundId") || "");
     if(!a || a._src !== url){
       if(a){ try{ a.pause(); }catch(e){} }
-      a = new Audio(); a._src = url;
-      if(/^(https?:|data:|blob:)/.test(url)){ a.src = url; }
-      else if(url){ A.log("warn", "Sound.SoundId must be a web link (https://...); '" + url.slice(0, 40) + "' can't be played here", "client"); }
+      a = new Audio(); a._src = url; a.preload = "auto";
+      if(/^(https?:|data:audio|blob:)/i.test(url)){ a.src = url; }
+      else if(url){ A.log("warn", "Sound '" + n.name + "': SoundId must be a web link to an audio file (https://...) or an uploaded file; '" + url.slice(0, 40) + "' (Roblox asset ids) can't be played here", "client"); }
       a.addEventListener("ended", () => { n.p = n.p || {}; n.p.Playing = false; fire(n.id, "Ended", []); });
+      a.addEventListener("error", () => { A.log("warn", "Sound '" + n.name + "' couldn't load its audio (" + url.slice(0, 60) + ")", "client"); });
       sounds.set(n.id, a);
     }
     a.volume = Math.max(0, Math.min(1, Number(P(n, "Volume")) || 0)); a.loop = !!P(n, "Looped"); a.playbackRate = Number(P(n, "PlaybackSpeed")) || 1;
     return a;
   }
+  function soundPlay(n, a){
+    if(!a._src){ A.log("warn", "Sound '" + n.name + "' has no SoundId, so there is nothing to play", "client"); return; }
+    let pr; try{ pr = a.play(); }catch(e){ return; }
+    if(pr && pr.catch) pr.catch((err) => {
+      if(err && err.name === "NotAllowedError"){
+        // the browser wants a tap/click first: try again on the player's next input
+        if(a._retry) return; a._retry = true;
+        const evs = ["pointerdown", "keydown", "touchstart"];
+        const go = () => { evs.forEach(e => window.removeEventListener(e, go, true)); a._retry = false; if(n.p && n.p.Playing && sounds.get(n.id) === a){ try{ a.play().catch(() => {}); }catch(e){} } };
+        evs.forEach(e => window.addEventListener(e, go, true));
+      } else if(err && err.name !== "AbortError") A.log("warn", "Sound '" + n.name + "' couldn't play: " + (err.message || err), "client");
+    });
+  }
   function soundCall(n, m){
     const a = soundEl(n); n.p = n.p || {};
-    if(m === "Play"){ a.play().catch(() => {}); n.p.Playing = true; fire(n.id, "Played", []); }
-    else if(m === "Resume"){ a.play().catch(() => {}); n.p.Playing = true; }
+    if(m === "Play"){ try{ a.currentTime = 0; }catch(e){} soundPlay(n, a); n.p.Playing = true; fire(n.id, "Played", []); }
+    else if(m === "Resume"){ soundPlay(n, a); n.p.Playing = true; }
     else if(m === "Pause"){ a.pause(); n.p.Playing = false; fire(n.id, "Paused", []); }
-    else if(m === "Stop"){ a.pause(); try{ a.currentTime = 0; }catch(e){} n.p.Playing = false; }
+    else if(m === "Stop"){ a.pause(); try{ a.currentTime = 0; }catch(e){} n.p.Playing = false; fire(n.id, "Paused", []); }
   }
   function soundProp(n, k){
     const a = sounds.get(n.id);
@@ -3950,6 +3956,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     rt.vms.client = makeVM("client");
     scriptsFor("client").forEach(n => callLua(rt.vms.client, "__start", [n.id, n.name, luauToLua(n.source || "")], false));
     callLua(rt.vms.client, "__step", [0]);
+    allNodes().forEach(n => { if(n.className === "Sound" && P(n, "PlayOnStart") && !n.disabled){ try{ soundCall(n, "Play"); }catch(e){ A.log("warn", "Sound autoplay failed: " + e.message, "client"); } } });
     fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)], "client");
     return { server: servers.length, client: scriptsFor("client").length };
   }
@@ -6414,18 +6421,16 @@ function createLuaRuntime(fengari, A, preludeSrc){
   const SERVICE_DEFS = [
     { id: "svc:ReplicatedStorage", name: "ReplicatedStorage", icon: SVG('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>'), hint: "Shared: both the server and every player can see these" },
     { id: "svc:StarterPlayerScripts", name: "StarterPlayerScripts", icon: SVG('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/>'), hint: "LocalScripts here run on each player's device" },
-    { id: "svc:ServerScriptService", name: "ServerScriptService", icon: SVG('<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>'), hint: "Scripts here run only on the server, hidden from players" },
-    { id: "svc:StarterGui", name: "StarterGui", icon: SVG('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/>'), hint: "ScreenGuis here are copied to every player's screen (PlayerGui) when the game starts" }
+    { id: "svc:ServerScriptService", name: "ServerScriptService", icon: SVG('<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>'), hint: "Scripts here run only on the server, hidden from players" }
   ];
   const INSERT_OPTIONS = {
-    "svc:Workspace": ["Script", "Folder"],
+    "svc:Workspace": ["Script", "Folder", "Sound"],
     "svc:ServerScriptService": ["Script", "ModuleScript", "Folder"],
-    "svc:StarterPlayerScripts": ["LocalScript", "ModuleScript", "Folder"],
-    "svc:ReplicatedStorage": ["ModuleScript", "RemoteEvent", "RemoteFunction", "BindableEvent", "BindableFunction", "Folder", "NumberValue", "IntValue", "StringValue", "BoolValue", "ObjectValue", "Vector3Value", "Color3Value", "Sound"],
-    "svc:StarterGui": ["ScreenGui", "LocalScript", "ModuleScript", "Folder"]
+    "svc:StarterPlayerScripts": ["LocalScript", "ModuleScript", "Folder", "Sound"],
+    "svc:ReplicatedStorage": ["ModuleScript", "RemoteEvent", "RemoteFunction", "BindableEvent", "BindableFunction", "Folder", "NumberValue", "IntValue", "StringValue", "BoolValue", "ObjectValue", "Vector3Value", "Color3Value", "Sound"]
   };
-  const GUI_CONTAINERS = new Set(["ScreenGui", "Frame", "ScrollingFrame", "TextButton", "ImageButton", "TextLabel", "ImageLabel", "TextBox"]);
-  const GUI_KIDS = ["Frame", "TextLabel", "TextButton", "TextBox", "ImageLabel", "ImageButton", "ScrollingFrame", "UICorner", "UIStroke", "UIListLayout", "UIGridLayout", "UIPadding", "UIAspectRatioConstraint", "UIScale", "LocalScript", "Sound"];
+  const GUI_CONTAINERS = new Set();   // GUI feature removed
+  const GUI_KIDS = [];
   const DEFAULT_SOURCE = {
     Script: 'print("Hello world!")\n',
     LocalScript: 'print("Hello from the client!")\n',
@@ -6577,12 +6582,46 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(def && def.__t === "V2") return { __t: "V2", x: nums[0] || 0, y: nums[1] || 0 };
     return def;
   }
+  /* ---- Sound: preview / stop by hand + pick an audio file ---- */
+  const sndPrev = new Map();
+  function sndPreviewStop(id){ const a = sndPrev.get(id); if(a){ try{ a.pause(); a.currentTime = 0; }catch(e){} sndPrev.delete(id); } }
+  function sndPreviewAll(){ Array.from(sndPrev.keys()).forEach(sndPreviewStop); }
+  function soundControls(body, n){
+    n.p = n.p || {};
+    const g = document.createElement("div"); g.className = "prop-group-label"; g.textContent = "Audio"; body.appendChild(g);
+    const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:6px;margin-bottom:8px";
+    const mk = (t, fn) => { const b = document.createElement("button"); b.className = "script-editor-save"; b.textContent = t; b.style.flex = "1"; b.addEventListener("click", fn); wrap.appendChild(b); return b; };
+    mk("Play", () => {
+      const url = String(n.p.SoundId || "");
+      if(!/^(https?:|data:audio|blob:)/i.test(url)){ showToast("Set SoundId to a web link (https://...mp3) or press Choose file first"); return; }
+      sndPreviewStop(n.id);
+      const a = new Audio(url); a.volume = Math.max(0, Math.min(1, n.p.Volume === undefined ? 0.5 : Number(n.p.Volume) || 0)); a.loop = !!n.p.Looped; a.playbackRate = Number(n.p.PlaybackSpeed) || 1;
+      a.addEventListener("ended", () => sndPrev.delete(n.id));
+      a.addEventListener("error", () => { sndPrev.delete(n.id); showToast("That audio couldn't be loaded"); });
+      sndPrev.set(n.id, a);
+      a.play().catch(err => { sndPrev.delete(n.id); showToast("Couldn't play: " + (err && err.message || err)); });
+    });
+    mk("Stop", () => sndPreviewStop(n.id));
+    body.appendChild(wrap);
+    const pick = document.createElement("input"); pick.type = "file"; pick.accept = "audio/*"; pick.style.display = "none";
+    pick.addEventListener("change", () => {
+      const f = pick.files && pick.files[0]; if(!f) return;
+      if(f.size > 1500000){ showToast("That audio file is too big (max about 1.5 MB). Use a shorter clip or a web link instead."); return; }
+      const fr = new FileReader();
+      fr.onload = () => { n.p.SoundId = String(fr.result); sndPreviewStop(n.id); const i = body.querySelector(".bvSoundIdInput"); if(i) i.value = "(uploaded audio file)"; saveWorld(false); showToast("Audio added: " + f.name); };
+      fr.readAsDataURL(f);
+    });
+    const choose = document.createElement("button"); choose.className = "script-editor-save"; choose.textContent = "Choose file..."; choose.style.cssText = "width:100%;margin-bottom:8px";
+    choose.addEventListener("click", () => pick.click());
+    body.appendChild(choose); body.appendChild(pick);
+  }
   const HIDDEN_NODE_PROPS = { Sound: ["Playing", "TimePosition", "TimeLength", "IsPlaying", "IsLoaded"] };
   function nodePropRows(body, n){
     const lua = ensureLua(); const reg = lua && lua.CLS && lua.CLS[n.className];
     if(!reg || !reg.props) return;
     const keys = Object.keys(reg.props).filter(k => (HIDDEN_NODE_PROPS[n.className] || []).indexOf(k) < 0);
     if(!keys.length) return;
+    if(n.className === "Sound") soundControls(body, n);
     const g = document.createElement("div"); g.className = "prop-group-label"; g.textContent = "Properties"; body.appendChild(g);
     n.p = n.p || {};
     keys.forEach(k => {
@@ -6592,6 +6631,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
       let inp;
       if(typeof def === "boolean"){ inp = document.createElement("input"); inp.type = "checkbox"; inp.checked = !!cur; inp.addEventListener("change", () => { n.p[k] = inp.checked; saveWorld(false); }); }
       else if(def && def.__t === "C3"){ inp = document.createElement("input"); inp.type = "color"; inp.value = wireHex(cur); inp.addEventListener("input", () => { const h = parseInt(inp.value.slice(1), 16); n.p[k] = { __t: "C3", r: ((h >> 16) & 255) / 255, g: ((h >> 8) & 255) / 255, b: (h & 255) / 255 }; saveWorld(false); }); }
+      else if(n.className === "Sound" && k === "SoundId"){
+        inp = document.createElement("input"); inp.type = "text"; inp.className = "bvSoundIdInput"; inp.placeholder = "https://... .mp3  or use Choose file";
+        inp.value = /^data:/i.test(String(cur)) ? "(uploaded audio file)" : String(cur);
+        inp.addEventListener("change", () => { if(inp.value === "(uploaded audio file)") return; n.p[k] = inp.value.trim(); sndPreviewStop(n.id); saveWorld(false); });
+      }
       else { inp = document.createElement("input"); inp.type = "text"; inp.value = wireText(cur); inp.title = def && def.__t === "UD2" ? "scaleX, offsetX, scaleY, offsetY" : def && def.__t === "UD" ? "scale, offset" : ""; inp.addEventListener("change", () => { n.p[k] = parseWire(def, inp.value); inp.value = wireText(n.p[k]); saveWorld(false); }); }
       r.appendChild(inp); body.appendChild(r);
     });
@@ -6886,6 +6930,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
       applyPartHome(o);
     });
     projectNodes = (w.nodes || []).map(n => Object.assign({}, n));
+    { // the GUI feature was removed: drop old ScreenGui/Frame/... objects (and anything inside them); scripts that sat in StarterGui move to StarterPlayerScripts
+      const GONE = new Set(["ScreenGui", "Frame", "TextLabel", "TextButton", "TextBox", "ImageLabel", "ImageButton", "ScrollingFrame", "UICorner", "UIStroke", "UIListLayout", "UIGridLayout", "UIPadding", "UIAspectRatioConstraint", "UIScale"]);
+      const dead = new Set(projectNodes.filter(n => GONE.has(n.className)).map(n => n.id));
+      for(let i = 0, grew = true; grew && i < 12; i++){ grew = false; projectNodes.forEach(n => { if(!dead.has(n.id) && dead.has(n.parent)){ dead.add(n.id); grew = true; } }); }
+      projectNodes = projectNodes.filter(n => !dead.has(n.id));
+      projectNodes.forEach(n => { if(n.parent === "svc:StarterGui") n.parent = "svc:StarterPlayerScripts"; });
+    }
     if(w.light){ lightState.brightness = w.light.brightness; lightState.time = w.light.time; updateSunAndSky(); }
   }
   function saveWorld(toCloud){
@@ -8249,7 +8300,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
 
   /* ---------- drag & drop: hold a row, move over another parent, let go ---------- */
-  const EXP_SERVICES = ["svc:Workspace", "svc:ServerScriptService", "svc:StarterPlayerScripts", "svc:ReplicatedStorage", "svc:StarterGui"];
+  const EXP_SERVICES = ["svc:Workspace", "svc:ServerScriptService", "svc:StarterPlayerScripts", "svc:ReplicatedStorage"];
   const expName = (id) => String(id).startsWith("svc:") ? String(id).slice(4) : ((sceneObjects.find(o => o.id === id) || nodeById(id) || {}).name || "?");
   function isInsideNode(id, ancestorId){      // is `id` the same as, or somewhere below, `ancestorId`?
     let cur = id, guard = 0;
