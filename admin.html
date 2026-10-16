@@ -625,7 +625,7 @@ function countTo(el, to){
 
 /* ====================== state ====================== */
 const S = {
-  accounts: [], bans: {}, keyByName: {},
+  accounts: [], bans: {}, badges: {}, keyByName: {},
   published: [], requests: [],
   reports: [], gameReports: {},
   repFilter: "all", version: null
@@ -837,10 +837,40 @@ async function terminateAccount(key){
   const paths = ["blockverse_credentials","blockverse_usernames","blockverse_users","blockverse_security","blockverse_active_claim","blockverse_login_codes","blockverse_account_bans","blockverse_kicks","blockverse_warnings","blockverse_sessions"];
   await Promise.all(paths.map(p => db.ref(p + "/" + key).remove().catch(() => {})));
 }
-const ACT = { kick:doKick, warn:doWarn, ban:doBan, terminate:doTerminate };
+/* badges: a house (owner) and a hammer (dev) shown at the end of a player's name in the game */
+function doBadges(key, name){
+  if(role !== "owner"){ toast("Only the owner can give badges.", "err"); return Promise.resolve(); }
+  const cur = S.badges[key] || {};
+  return new Promise(resolve => {
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML =
+      '<div class="modal" role="dialog" aria-modal="true"><h3>Badges for ' + esc(name) + '</h3>' +
+      '<p>Shown at the end of their name in chat, the player list, name tags and profiles.</p>' +
+      '<label style="display:flex;align-items:center;gap:10px;margin:10px 0;cursor:pointer"><input type="checkbox" id="bgOwner"' + (cur.owner ? " checked" : "") + '> <span style="color:#ffd479;font-size:18px">&#8962;</span> Owner badge (house)</label>' +
+      '<label style="display:flex;align-items:center;gap:10px;margin:10px 0;cursor:pointer"><input type="checkbox" id="bgDev"' + (cur.dev ? " checked" : "") + '> <span style="color:#a9c4ff;font-size:18px">&#9874;</span> Dev badge (hammer)</label>' +
+      '<div class="modal-actions"><button class="btn ghost" data-x>Cancel</button><button class="btn primary" data-ok>Save</button></div></div>';
+    $("#modalRoot").appendChild(back);
+    let done = false;
+    const close = () => { if(done) return; done = true; back.classList.add("out"); setTimeout(() => back.remove(), 190); resolve(); };
+    $("[data-x]", back).addEventListener("click", close);
+    back.addEventListener("mousedown", e => { if(e.target === back) close(); });
+    $("[data-ok]", back).addEventListener("click", async () => {
+      const owner = $("#bgOwner", back).checked, dev = $("#bgDev", back).checked;
+      try{
+        if(owner || dev) await db.ref("blockverse_badges/" + key).set({ owner: owner, dev: dev });
+        else await db.ref("blockverse_badges/" + key).remove();
+        S.badges[key] = (owner || dev) ? { owner, dev } : undefined; if(!S.badges[key]) delete S.badges[key];
+        toast("Badges saved for " + name, "ok"); renderAccounts();
+      }catch(e){ permErr(e); }
+      close();
+    });
+  });
+}
+const ACT = { kick:doKick, warn:doWarn, ban:doBan, terminate:doTerminate, badges:doBadges };
 function actionsFor(key, name, withTerminate){
   const banned = !!S.bans[key];
-  return '<button class="mini" data-act="kick">Kick</button><button class="mini warn" data-act="warn">Warn</button>' +
+  return (role === "owner" && withTerminate ? '<button class="mini green" data-act="badges">Badges</button>' : "") + '<button class="mini" data-act="kick">Kick</button><button class="mini warn" data-act="warn">Warn</button>' +
     (role === "admin" ? "" :
       '<button class="mini red" data-act="ban">' + (banned ? "Unban" : "Ban") + '</button>' +
       (withTerminate ? '<button class="mini solid-red" data-act="terminate">Terminate</button>' : ""));
@@ -851,9 +881,10 @@ async function loadAccounts(){
   const list = $("#acctList");
   if(!S.accounts.length) list.innerHTML = skeleton(5);
   try{
-    const [n, b] = await Promise.all([db.ref("blockverse_usernames").once("value"), db.ref("blockverse_account_bans").once("value")]);
+    const [n, b, bd] = await Promise.all([db.ref("blockverse_usernames").once("value"), db.ref("blockverse_account_bans").once("value"), db.ref("blockverse_badges").once("value").catch(() => null)]);
     const names = n.val() || {};
     S.bans = b.val() || {};
+    S.badges = (bd && bd.val()) || {};
     S.accounts = Object.keys(names).map(key => ({ key, username: (names[key] && names[key].username) || key })).sort((a, c) => a.username.localeCompare(c.username));
     S.keyByName = {};
     S.accounts.forEach(a => { S.keyByName[nameKey(a.username)] = a.key; S.keyByName[a.key] = a.key; });
@@ -868,7 +899,7 @@ function renderAccounts(){
   if(!rows.length){ list.innerHTML = emptyBox("No accounts found."); return; }
   list.innerHTML = rows.map(a =>
     '<div class="row anim-item" data-key="' + esc(a.key) + '" data-name="' + esc(a.username) + '"><div class="avatar">' + esc(initials(a.username)) + '</div>' +
-    '<div class="r-main"><div class="r-title">' + esc(a.username) + (S.bans[a.key] ? '<span class="badge red">Banned</span>' : "") + (a.key === OWNER_ACCOUNT_KEY ? '<span class="badge">Owner</span>' : "") + '</div><div class="r-sub">' + esc(a.key) + '</div></div>' +
+    '<div class="r-main"><div class="r-title">' + esc(a.username) + (S.bans[a.key] ? '<span class="badge red">Banned</span>' : "") + (a.key === OWNER_ACCOUNT_KEY ? '<span class="badge">Owner</span>' : "") + ((S.badges[a.key] && S.badges[a.key].owner) ? '<span class="badge amber" title="Has the owner (house) badge">&#8962; Owner badge</span>' : "") + ((S.badges[a.key] && S.badges[a.key].dev) ? '<span class="badge green" title="Has the dev (hammer) badge">&#9874; Dev badge</span>' : "") + '</div><div class="r-sub">' + esc(a.key) + '</div></div>' +
     '<div class="r-actions">' + actionsFor(a.key, a.username, true) + '</div></div>'
   ).join("");
   stagger(list);
