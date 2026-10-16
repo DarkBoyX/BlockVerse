@@ -1432,13 +1432,115 @@ CFrame.identity = newCF(0, 0, 0)
 
 ---------------------------------------------------------------- Enum
 local enumCache = {}
+---------------------------------------------------------------- Vector2 / UDim / UDim2 / Rect / Ray / NumberRange
+local V2 = {}
+local V2methods = {}
+local function newV2(x, y) return setmetatable({ X = x, Y = y }, V2) end
+V2.__index = function(t, k)
+  if k == "Magnitude" then return msqrt(t.X * t.X + t.Y * t.Y) end
+  if k == "Unit" then
+    local m = msqrt(t.X * t.X + t.Y * t.Y)
+    if m == 0 then return newV2(0, 0) end
+    return newV2(t.X / m, t.Y / m)
+  end
+  if k == "x" then return t.X elseif k == "y" then return t.Y end
+  return V2methods[k]
+end
+V2.__add = function(a, b) return newV2(a.X + b.X, a.Y + b.Y) end
+V2.__sub = function(a, b) return newV2(a.X - b.X, a.Y - b.Y) end
+V2.__mul = function(a, b)
+  if type(a) == "number" then return newV2(a * b.X, a * b.Y) end
+  if type(b) == "number" then return newV2(a.X * b, a.Y * b) end
+  return newV2(a.X * b.X, a.Y * b.Y)
+end
+V2.__div = function(a, b)
+  if type(b) == "number" then return newV2(a.X / b, a.Y / b) end
+  return newV2(a.X / b.X, a.Y / b.Y)
+end
+V2.__unm = function(a) return newV2(-a.X, -a.Y) end
+V2.__eq = function(a, b) return a.X == b.X and a.Y == b.Y end
+V2.__tostring = function(a) return fmtnum(a.X) .. ", " .. fmtnum(a.Y) end
+function V2methods.Dot(a, b) return a.X * b.X + a.Y * b.Y end
+function V2methods.Cross(a, b) return a.X * b.Y - a.Y * b.X end
+function V2methods.Lerp(a, b, t) return newV2(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t) end
+function V2methods.FuzzyEq(a, b, e) e = e or 1e-5; return math.abs(a.X - b.X) <= e and math.abs(a.Y - b.Y) <= e end
+function V2methods.Max(a, b) return newV2(math.max(a.X, b.X), math.max(a.Y, b.Y)) end
+function V2methods.Min(a, b) return newV2(math.min(a.X, b.X), math.min(a.Y, b.Y)) end
+local Vector2 = {
+  new = function(x, y) return newV2(x or 0, y or 0) end,
+  zero = newV2(0, 0), one = newV2(1, 1), xAxis = newV2(1, 0), yAxis = newV2(0, 1),
+}
+
+local UD = {}
+local function newUD(s, o) return setmetatable({ Scale = s, Offset = o }, UD) end
+UD.__add = function(a, b) return newUD(a.Scale + b.Scale, a.Offset + b.Offset) end
+UD.__sub = function(a, b) return newUD(a.Scale - b.Scale, a.Offset - b.Offset) end
+UD.__eq = function(a, b) return a.Scale == b.Scale and a.Offset == b.Offset end
+UD.__tostring = function(a) return fmtnum(a.Scale) .. ", " .. fmtnum(a.Offset) end
+local UDim = { new = function(s, o) return newUD(s or 0, o or 0) end }
+
+local UD2 = {}
+local UD2methods = {}
+local function newUD2(xs, xo, ys, yo) return setmetatable({ X = newUD(xs, xo), Y = newUD(ys, yo) }, UD2) end
+UD2.__index = function(t, k)
+  if k == "Width" then return rawget(t, "X") elseif k == "Height" then return rawget(t, "Y") end
+  return UD2methods[k]
+end
+UD2.__add = function(a, b) return newUD2(a.X.Scale + b.X.Scale, a.X.Offset + b.X.Offset, a.Y.Scale + b.Y.Scale, a.Y.Offset + b.Y.Offset) end
+UD2.__sub = function(a, b) return newUD2(a.X.Scale - b.X.Scale, a.X.Offset - b.X.Offset, a.Y.Scale - b.Y.Scale, a.Y.Offset - b.Y.Offset) end
+UD2.__eq = function(a, b) return a.X == b.X and a.Y == b.Y end
+UD2.__tostring = function(a) return "{" .. tostring(a.X) .. "}, {" .. tostring(a.Y) .. "}" end
+function UD2methods.Lerp(a, b, t)
+  return newUD2(a.X.Scale + (b.X.Scale - a.X.Scale) * t, a.X.Offset + (b.X.Offset - a.X.Offset) * t,
+                a.Y.Scale + (b.Y.Scale - a.Y.Scale) * t, a.Y.Offset + (b.Y.Offset - a.Y.Offset) * t)
+end
+local UDim2 = {
+  new = function(xs, xo, ys, yo)
+    if type(xs) == "table" then return newUD2(xs.Scale, xs.Offset, xo.Scale, xo.Offset) end
+    return newUD2(xs or 0, xo or 0, ys or 0, yo or 0)
+  end,
+  fromScale = function(x, y) return newUD2(x or 0, 0, y or 0, 0) end,
+  fromOffset = function(x, y) return newUD2(0, x or 0, 0, y or 0) end,
+}
+
+local RectMT = {}
+RectMT.__index = function(t, k)
+  if k == "Width" then return rawget(t, "Max").X - rawget(t, "Min").X end
+  if k == "Height" then return rawget(t, "Max").Y - rawget(t, "Min").Y end
+end
+RectMT.__tostring = function(r) return tostring(r.Min) .. ", " .. tostring(r.Max) end
+local Rect = { new = function(a, b, c, d)
+  if type(a) == "number" then return setmetatable({ Min = newV2(a, b), Max = newV2(c, d) }, RectMT) end
+  return setmetatable({ Min = a, Max = b }, RectMT)
+end }
+
+local RayMT = {}
+local RayMethods = {}
+local function newRay(o, d) return setmetatable({ Origin = o, Direction = d }, RayMT) end
+RayMT.__index = function(t, k)
+  if k == "Unit" then return newRay(rawget(t, "Origin"), rawget(t, "Direction").Unit) end
+  return RayMethods[k]
+end
+function RayMethods.ClosestPoint(r, p)
+  local d = r.Direction
+  local len2 = d.X * d.X + d.Y * d.Y + d.Z * d.Z
+  if len2 == 0 then return r.Origin end
+  local t = math.max(0, math.min(1, ((p - r.Origin):Dot(d)) / len2))
+  return r.Origin + d * t
+end
+function RayMethods.Distance(r, p) return (r:ClosestPoint(p) - p).Magnitude end
+local Ray = { new = function(o, d) return newRay(o, d) end }
+
+local NumberRange = { new = function(a, b) return { Min = a, Max = b == nil and a or b } end }
+
+local ENUMVALUES = { ContextActionPriority = { Low = 1000, Medium = 2000, Default = 2000, High = 3000 } }
 local EnumItemMT = {}
 EnumItemMT.__tostring = function(i) return "Enum." .. i.EnumType .. "." .. i.Name end
 local function enumItem(etype, name)
   local key = etype .. "." .. name
   local it = enumCache[key]
   if not it then
-    it = setmetatable({ Name = name, EnumType = etype, Value = 0 }, EnumItemMT)
+    it = setmetatable({ Name = name, EnumType = etype, Value = (ENUMVALUES[etype] and ENUMVALUES[etype][name]) or 0 }, EnumItemMT)
     enumCache[key] = it
   end
   return it
@@ -1467,6 +1569,10 @@ local function enc(v)
   if mt == BC then return { __t = "C3", r = v.r, g = v.g, b = v.b } end
   if mt == CF then local r = v.__r; return { __t = "CF", x = v.X, y = v.Y, z = v.Z, m1 = r[1], m2 = r[2], m3 = r[3], m4 = r[4], m5 = r[5], m6 = r[6], m7 = r[7], m8 = r[8], m9 = r[9] } end
   if mt == EnumItemMT then return { __t = "E", e = v.EnumType, n = v.Name } end
+  if mt == V2 then return { __t = "V2", x = v.X, y = v.Y } end
+  if mt == UD2 then return { __t = "UD2", xs = v.X.Scale, xo = v.X.Offset, ys = v.Y.Scale, yo = v.Y.Offset } end
+  if mt == UD then return { __t = "UD", s = v.Scale, o = v.Offset } end
+  if mt == RayMT then return { __t = "RAY", ox = v.Origin.X, oy = v.Origin.Y, oz = v.Origin.Z, dx = v.Direction.X, dy = v.Direction.Y, dz = v.Direction.Z } end
   local out = {}
   for k, x in pairs(v) do out[k] = enc(x) end
   return out
@@ -1480,13 +1586,18 @@ local function dec(v)
   elseif tag == "C3" then return newC3(v.r, v.g, v.b)
   elseif tag == "CF" then return newCF(v.x, v.y, v.z, v.m1 and { v.m1, v.m2, v.m3, v.m4, v.m5, v.m6, v.m7, v.m8, v.m9 } or nil)
   elseif tag == "E" then return enumItem(v.e, v.n)
+  elseif tag == "V2" then return newV2(v.x, v.y)
+  elseif tag == "UD2" then return newUD2(v.xs, v.xo, v.ys, v.yo)
+  elseif tag == "UD" then return newUD(v.s, v.o)
+  elseif tag == "RAY" then return newRay(newV3(v.ox, v.oy, v.oz), newV3(v.dx, v.dy, v.dz))
   elseif tag == "Input" then
     local isMouse = v.mouse
     return {
       KeyCode = enumItem("KeyCode", isMouse and "Unknown" or v.key),
       UserInputType = enumItem("UserInputType", isMouse and v.key or "Keyboard"),
       UserInputState = enumItem("UserInputState", v.state or "Begin"),
-      Position = newV3(v.mx or 0, v.my or 0, 0)
+      Position = newV3(v.mx or 0, v.my or 0, v.mz or 0),
+      Delta = newV3(v.dx or 0, v.dy or 0, 0)
     }
   end
   local out = {}
@@ -1601,6 +1712,8 @@ end
 instMT.__index = function(self, k)
   local id = rawget(self, "__id")
   if k == "WaitForChild" then return waitForChild end
+  if k == "GetPropertyChangedSignal" then return function(_, prop) return getSignal(id, "prop:" .. tostring(prop)) end end
+  if k == "GetMouse" and id == "player:1" then return function() return __getMouse() end end
   if k == "BrickColor" then
     local r = host("member", { id = id, k = "Color" })
     if r.k == "prop" and type(r.v) == "table" then return bcNearest(r.v.r, r.v.g, r.v.b) end
@@ -1612,7 +1725,13 @@ instMT.__index = function(self, k)
   elseif kind == "signal" then return getSignal(id, k)
   elseif kind == "method" then
     return function(_, ...)
-      return dec(host("call", { id = id, m = k, a = packArgs(...) }))
+      local res = host("call", { id = id, m = k, a = packArgs(...) })
+      if type(res) == "table" and res.__t == "MULTI" then
+        local list, n = {}, res.v.n or #res.v
+        for i = 1, n do list[i] = dec(res.v[i]) end
+        return table.unpack(list, 1, n)
+      end
+      return dec(res)
     end
   end
   error(tostring(k) .. " is not a valid member of " .. tostring(r.cn or "Instance"), 2)
@@ -1726,41 +1845,201 @@ end
 
 local ContextActionService
 do
-  local actions, hooked = {}, false
-  local function dispatch(input, begin)
+  local actions, order = {}, 0
+  local function matches(a, inp)
+    for _, key in ipairs(a.keys) do
+      if inp.KeyCode == key or inp.UserInputType == key then return true end
+    end
+    return false
+  end
+  local function sortedList()
     local list = {}
-    for name, a in pairs(actions) do list[#list + 1] = { name, a } end
-    for _, e in ipairs(list) do
-      local name, a = e[1], e[2]
-      for _, key in ipairs(a.keys) do
-        if input.KeyCode == key or input.UserInputType == key then
-          a.fn(name, begin and Enum.UserInputState.Begin or Enum.UserInputState.End, input)
-          break
-        end
+    for _, a in pairs(actions) do list[#list + 1] = a end
+    table.sort(list, function(x, y)
+      if x.priority ~= y.priority then return x.priority > y.priority end
+      return x.order > y.order
+    end)
+    return list
+  end
+  -- runs the handler up to its first yield; returns ok, firstReturnValue
+  local function runHandler(a, state, inp)
+    local co = co_create(a.fn)
+    local res = { co_resume(co, a.name, state, inp) }
+    if not res[1] then report(res[2], co); return true, nil end
+    if co_status(co) == "suspended" then
+      local req = res[2]
+      if type(req) == "table" and req.__wait then waiting[#waiting + 1] = { co = co, wake = now + req.t, start = now } end
+      return true, nil
+    end
+    return true, res[2]
+  end
+  -- called by the host for every key / mouse button; returns true when an action "sank" it (default controls then ignore it)
+  function __cas_input(wire, begin)
+    local inp = dec(wire)
+    local state = begin and Enum.UserInputState.Begin or Enum.UserInputState.End
+    inp.UserInputState = state
+    local sunk = false
+    for _, a in ipairs(sortedList()) do
+      if matches(a, inp) then
+        local _, res = runHandler(a, state, inp)
+        if res ~= Enum.ContextActionResult.Pass then sunk = true; break end
       end
     end
+    return sunk
   end
-  local function hook()
-    if hooked then return end
-    hooked = true
-    local uis = host("service", { n = "UserInputService" })
-    uis = wrap(uis)
-    uis.InputBegan:Connect(function(input) dispatch(input, true) end)
-    uis.InputEnded:Connect(function(input) dispatch(input, false) end)
+  function __cas_touch(name, begin)
+    local a = actions[name]
+    if not a then return end
+    local state = begin and Enum.UserInputState.Begin or Enum.UserInputState.End
+    runHandler(a, state, { KeyCode = Enum.KeyCode.Unknown, UserInputType = Enum.UserInputType.Touch, UserInputState = state, Position = newV3(0, 0, 0), Delta = newV3(0, 0, 0) })
+  end
+  local function bind(name, fn, touch, priority, keys)
+    if type(fn) ~= "function" then error("BindAction needs a function", 3) end
+    order = order + 1
+    actions[name] = { name = name, fn = fn, keys = keys, priority = priority, order = order }
+    if touch then host("touchbtn", { name = name, on = true, title = name }) end
   end
   ContextActionService = {
-    BindAction = function(_, name, fn, createTouchButton, ...)
-      actions[name] = { fn = fn, keys = { ... } }
-      hook()
+    BindAction = function(_, name, fn, touch, ...) bind(name, fn, touch, 2000, { ... }) end,
+    BindActionAtPriority = function(_, name, fn, touch, priority, ...)
+      if type(priority) == "table" then priority = priority.Value end
+      bind(name, fn, touch, tonumber(priority) or 2000, { ... })
     end,
-    UnbindAction = function(_, name) actions[name] = nil end,
-    UnbindAllActions = function() actions = {} end,
+    UnbindAction = function(_, name) actions[name] = nil; host("touchbtn", { name = name, on = false }) end,
+    UnbindAllActions = function() for n in pairs(actions) do host("touchbtn", { name = n, on = false }) end; actions = {} end,
+    GetBoundActionInfo = function(_, name)
+      local a = actions[name]
+      if not a then return {} end
+      return { priority = a.priority, inputTypes = a.keys, stackOrder = a.order }
+    end,
+    GetAllBoundActionInfo = function()
+      local out = {}
+      for n, a in pairs(actions) do out[n] = { priority = a.priority, inputTypes = a.keys, stackOrder = a.order } end
+      return out
+    end,
+    SetTitle = function(_, name, title) host("touchbtn", { name = name, on = true, title = title }) end,
+    SetPosition = function(_, name, pos) host("touchbtn", { name = name, on = true, pos = enc(pos) }) end,
+    SetImage = function(_, name, img) host("touchbtn", { name = name, on = true, image = img }) end,
   }
+end
+
+---------------------------------------------------------------- extra services written in Lua
+local CollectionService
+do
+  local tagged, tagsOf, addedSig, removedSig = {}, {}, {}, {}
+  local function sig(t, tag) if not t[tag] then t[tag] = newSignal() end return t[tag] end
+  local function idOf(inst) return rawget(inst, "__id") end
+  CollectionService = {
+    AddTag = function(_, inst, tag)
+      local id = idOf(inst)
+      tagged[tag] = tagged[tag] or {}
+      if tagged[tag][id] then return end
+      tagged[tag][id] = true
+      tagsOf[id] = tagsOf[id] or {}
+      tagsOf[id][tag] = true
+      if addedSig[tag] then addedSig[tag]:Fire(inst) end
+    end,
+    RemoveTag = function(_, inst, tag)
+      local id = idOf(inst)
+      if tagged[tag] and tagged[tag][id] then
+        tagged[tag][id] = nil
+        if tagsOf[id] then tagsOf[id][tag] = nil end
+        if removedSig[tag] then removedSig[tag]:Fire(inst) end
+      end
+    end,
+    HasTag = function(_, inst, tag) return tagged[tag] ~= nil and tagged[tag][idOf(inst)] == true end,
+    GetTagged = function(_, tag)
+      local out = {}
+      for id in pairs(tagged[tag] or {}) do out[#out + 1] = wrap(id) end
+      return out
+    end,
+    GetTags = function(_, inst)
+      local out = {}
+      for tag in pairs(tagsOf[idOf(inst)] or {}) do out[#out + 1] = tag end
+      return out
+    end,
+    GetInstanceAddedSignal = function(_, tag) return sig(addedSig, tag) end,
+    GetInstanceRemovedSignal = function(_, tag) return sig(removedSig, tag) end,
+  }
+end
+
+local DataStoreService
+do
+  local stores = {}
+  local function getStore(name)
+    if stores[name] then return stores[name] end
+    local ds = {}
+    function ds:GetAsync(key) return dec(host("dsget", { s = name, k = tostring(key) }).v) end
+    function ds:SetAsync(key, value) host("dsset", { s = name, k = tostring(key), v = enc(value) }); return value end
+    function ds:UpdateAsync(key, fn)
+      local new = fn(self:GetAsync(key))
+      if new ~= nil then self:SetAsync(key, new) end
+      return new
+    end
+    function ds:IncrementAsync(key, delta)
+      local v = (self:GetAsync(key) or 0) + (delta or 1)
+      self:SetAsync(key, v)
+      return v
+    end
+    function ds:RemoveAsync(key)
+      local old = self:GetAsync(key)
+      host("dsremove", { s = name, k = tostring(key) })
+      return old
+    end
+    stores[name] = ds
+    return ds
+  end
+  DataStoreService = {
+    GetDataStore = function(_, name) return getStore(tostring(name)) end,
+    GetOrderedDataStore = function(_, name) return getStore("ordered:" .. tostring(name)) end,
+  }
+end
+
+---------------------------------------------------------------- Player:GetMouse()
+local MouseObj
+function __getMouse()
+  if MouseObj then return MouseObj end
+  local sigs = { Button1Down = newSignal(), Button1Up = newSignal(), Button2Down = newSignal(), Button2Up = newSignal(),
+                 Move = newSignal(), WheelForward = newSignal(), WheelBackward = newSignal() }
+  local m = setmetatable({}, { __index = function(_, k)
+    if sigs[k] then return sigs[k] end
+    if k == "X" or k == "Y" or k == "ViewSizeX" or k == "ViewSizeY" then
+      local r = host("mouse", {})
+      if k == "X" then return r.x elseif k == "Y" then return r.y elseif k == "ViewSizeX" then return r.w end
+      return r.h
+    end
+    if k == "Hit" or k == "Target" or k == "Origin" or k == "UnitRay" or k == "Normal" then
+      local r = dec(host("mouseray", {}))
+      return r[k]
+    end
+    if k == "Icon" then return "" end
+  end })
+  MouseObj = m
+  local uis = wrap("svc:UserInputService")
+  uis.InputBegan:Connect(function(inp)
+    local t = inp.UserInputType
+    if t == Enum.UserInputType.MouseButton1 then sigs.Button1Down:Fire()
+    elseif t == Enum.UserInputType.MouseButton2 then sigs.Button2Down:Fire() end
+  end)
+  uis.InputEnded:Connect(function(inp)
+    local t = inp.UserInputType
+    if t == Enum.UserInputType.MouseButton1 then sigs.Button1Up:Fire()
+    elseif t == Enum.UserInputType.MouseButton2 then sigs.Button2Up:Fire() end
+  end)
+  uis.InputChanged:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseMovement then sigs.Move:Fire()
+    elseif inp.UserInputType == Enum.UserInputType.MouseWheel then
+      if inp.Position.Z > 0 then sigs.WheelForward:Fire() else sigs.WheelBackward:Fire() end
+    end
+  end)
+  return m
 end
 
 local function serviceFor(name)
   if name == "TweenService" then return TweenService end
   if name == "ContextActionService" then return ContextActionService end
+  if name == "CollectionService" then return CollectionService end
+  if name == "DataStoreService" then return DataStoreService end
   if name == "Debris" then
     if not Debris then
       Debris = { AddItem = function(_, inst, t) task.delay(t or 10, function() pcall(function() inst:Destroy() end) end) end }
@@ -1862,7 +2141,8 @@ end
 baseEnv.typeof = function(v)
   local mt = getmetatable(v)
   if mt == V3 then return "Vector3" elseif mt == C3 then return "Color3" elseif mt == CF then return "CFrame" elseif mt == BC then return "BrickColor"
-  elseif mt == instMT then return "Instance" elseif mt == EnumItemMT then return "EnumItem" end
+  elseif mt == instMT then return "Instance" elseif mt == EnumItemMT then return "EnumItem"
+  elseif mt == V2 then return "Vector2" elseif mt == UD2 then return "UDim2" elseif mt == UD then return "UDim" elseif mt == RayMT then return "Ray" elseif mt == RectMT then return "Rect" end
   return type(v)
 end
 baseEnv.unpack = table.unpack
@@ -1944,6 +2224,121 @@ baseEnv.Signal = nil
 -- BindableEvent-like helper that works without a host instance
 baseEnv.__newsignal = nil
 
+-- ---- extra globals ----
+baseEnv.Vector2 = Vector2
+baseEnv.UDim = UDim
+baseEnv.UDim2 = UDim2
+baseEnv.Rect = Rect
+baseEnv.Ray = Ray
+baseEnv.NumberRange = NumberRange
+baseEnv.RaycastParams = { new = function()
+  return { FilterDescendantsInstances = {}, FilterType = Enum.RaycastFilterType.Exclude, IgnoreWater = false }
+end }
+baseEnv.shared = {}
+-- array part first (1, 2, 3...), then every other key: the order Roblox gives for pairs() and generalized iteration
+local function orderedIter(t)
+  local n = #t
+  local idx, k, phase = 0, nil, 1
+  return function()
+    if phase == 1 then
+      idx = idx + 1
+      if idx <= n then return idx, t[idx] end
+      phase = 2
+    end
+    repeat k = next(t, k) until k == nil or type(k) ~= "number" or k < 1 or k > n or k ~= mfloor(k)
+    if k == nil then return nil end
+    return k, t[k]
+  end
+end
+baseEnv.__iter = function(t)
+  if type(t) ~= "table" then return t end
+  local mt = getmetatable(t)
+  if mt and mt.__iter then return mt.__iter(t) end
+  if mt and mt.__pairs then return mt.__pairs(t) end
+  return orderedIter(t), t, nil
+end
+baseEnv.pairs = function(t)
+  if type(t) ~= "table" then error("bad argument #1 to 'pairs' (table expected, got " .. type(t) .. ")", 2) end
+  local mt = getmetatable(t)
+  if mt and mt.__pairs then return mt.__pairs(t) end
+  return orderedIter(t), t, nil
+end
+
+-- bit32 (Lua 5.3 has native operators; this is the Roblox library on top of them)
+baseEnv.bit32 = {
+  band = function(a, b, ...) local r = (a & b) & 0xFFFFFFFF; for _, x in ipairs({ ... }) do r = r & x end return r end,
+  bor = function(a, b, ...) local r = (a | b) & 0xFFFFFFFF; for _, x in ipairs({ ... }) do r = r | x end return r & 0xFFFFFFFF end,
+  bxor = function(a, b, ...) local r = (a ~ b) & 0xFFFFFFFF; for _, x in ipairs({ ... }) do r = r ~ x end return r & 0xFFFFFFFF end,
+  bnot = function(a) return (~a) & 0xFFFFFFFF end,
+  lshift = function(a, n) if n >= 32 then return 0 end return (a << n) & 0xFFFFFFFF end,
+  rshift = function(a, n) if n >= 32 then return 0 end return (a & 0xFFFFFFFF) >> n end,
+  arshift = function(a, n) a = a & 0xFFFFFFFF; if n >= 32 then return a >= 0x80000000 and 0xFFFFFFFF or 0 end
+    local r = a >> n; if a >= 0x80000000 then r = r | ((0xFFFFFFFF << (32 - n)) & 0xFFFFFFFF) end return r end,
+  btest = function(a, b) return (a & b) & 0xFFFFFFFF ~= 0 end,
+  extract = function(n, f, w) w = w or 1; return (n >> f) & ((1 << w) - 1) end,
+  replace = function(n, v, f, w) w = w or 1; local mask = ((1 << w) - 1) << f; return ((n & ~mask) | ((v << f) & mask)) & 0xFFFFFFFF end,
+  lrotate = function(a, n) n = n % 32; a = a & 0xFFFFFFFF; return ((a << n) | (a >> (32 - n))) & 0xFFFFFFFF end,
+  rrotate = function(a, n) n = n % 32; a = a & 0xFFFFFFFF; return ((a >> n) | (a << (32 - n))) & 0xFFFFFFFF end,
+}
+
+-- os.date through the host (supports %Y %m %d %H %M %S %p %A %a %B %b %y %j %c %x %X, "*t" and "!*t")
+baseEnv.os.date = function(fmt, t)
+  local r = host("date", { f = fmt or "%c", t = t })
+  return r.v
+end
+
+-- table extras
+local frozenSet = setmetatable({}, { __mode = "k" })
+tableLib.freeze = function(t) local p = setmetatable({}, { __index = t, __newindex = function() error("Attempt to modify a readonly table", 2) end, __len = function() return #t end, __pairs = function() return next, t end }); frozenSet[p] = true; return p end
+tableLib.isfrozen = function(t) return frozenSet[t] == true end
+tableLib.move = table.move
+tableLib.pack = table.pack
+tableLib.getn = function(t) return #t end
+
+-- Random with a real seed (xorshift), so Random.new(5) always gives the same numbers
+baseEnv.Random = {
+  new = function(seed)
+    local s = math.tointeger(mfloor(tonumber(seed) or 1234567)) or 1234567
+    s = (s ~ 0x5DEECE66D) & 0xFFFFFFFFFFFF
+    if s == 0 then s = 88172645463325252 end
+    local r = {}
+    local function nextf()
+      s = (s ~ (s << 13)) & 0x7FFFFFFFFFFFFFFF
+      s = s ~ (s >> 7)
+      s = (s ~ (s << 17)) & 0x7FFFFFFFFFFFFFFF
+      return (s % 1000000007) / 1000000007
+    end
+    function r:NextNumber(a, b) if a then return a + nextf() * (b - a) end return nextf() end
+    function r:NextInteger(a, b) return a + mfloor(nextf() * (b - a + 1)) end
+    function r:NextUnitVector()
+      local z = nextf() * 2 - 1
+      local th = nextf() * 6.283185307179586
+      local rr = msqrt(1 - z * z)
+      return newV3(rr * mcos(th), rr * msin(th), z)
+    end
+    function r:Shuffle(t) for i = #t, 2, -1 do local j = r:NextInteger(1, i); t[i], t[j] = t[j], t[i] end end
+    function r:Clone() return baseEnv.Random.new(s) end
+    return r
+  end
+}
+
+mathLib.noise = function(x, y, z)
+  y = y or 0; z = z or 0
+  local function hash(i, j, k) local n = mfloor(i) * 374761393 + mfloor(j) * 668265263 + mfloor(k) * 2147483647; n = (n ~ (n >> 13)) * 1274126177; return ((n ~ (n >> 16)) & 0xFFFF) / 65535 end
+  local xi, yi, zi = mfloor(x), mfloor(y), mfloor(z)
+  local xf, yf, zf = x - xi, y - yi, z - zi
+  local function sm(t) return t * t * (3 - 2 * t) end
+  local u, v, w = sm(xf), sm(yf), sm(zf)
+  local function l(a, b, t) return a + (b - a) * t end
+  local c = l(l(l(hash(xi, yi, zi), hash(xi + 1, yi, zi), u), l(hash(xi, yi + 1, zi), hash(xi + 1, yi + 1, zi), u), v),
+              l(l(hash(xi, yi, zi + 1), hash(xi + 1, yi, zi + 1), u), l(hash(xi, yi + 1, zi + 1), hash(xi + 1, yi + 1, zi + 1), u), v), w)
+  return (c - 0.5) * 1.6
+end
+mathLib.log = function(x, b) if b then return math.log(x) / math.log(b) end return math.log(x) end
+mathLib.fmod = math.fmod
+mathLib.map = function(x, a, b, c, d) return c + (x - a) * (d - c) / (b - a) end
+
+
 return true
 
 </script>
@@ -1952,7 +2347,7 @@ return true
    Two separate Lua VMs, like Roblox: "server" (Script) and "client" (LocalScript). They share the world
    but only see what Roblox lets them see, and talk through RemoteEvent / RemoteFunction.
    `A` is the adapter the Studio page provides (parts, nodes, player, lighting, logging). */
-function luauToLua(src){
+function luauToLuaCore(src){
   // 1) mask strings & comments so keyword/operator searches never hit text inside them
   const n = src.length; const mask = new Array(n);
   let i = 0;
@@ -2030,6 +2425,263 @@ function luauToLua(src){
   return out;
 }
 
+/* ---- Luau -> Lua 5.3 passes: string interpolation, if-expressions, type annotations, generalized iteration ---- */
+function luauMask(src, strFill){
+  const n = src.length, mask = new Array(n);
+  let i = 0;
+  const blank = (a, b, ch) => { for(let k = a; k < b; k++) mask[k] = (src[k] === "\n" ? "\n" : ch); };
+  while(i < n){
+    const c = src[i];
+    if(c === "-" && src[i+1] === "-"){
+      const m = /^--\[(=*)\[/.exec(src.slice(i, i + 40));
+      if(m){ const close = "]" + m[1] + "]"; let e = src.indexOf(close, i + m[0].length); e = e === -1 ? n : e + close.length; blank(i, e, " "); i = e; continue; }
+      let e = src.indexOf("\n", i); if(e === -1) e = n; blank(i, e, " "); i = e; continue;
+    }
+    if(c === "\"" || c === "'"){
+      let j = i + 1;
+      while(j < n && src[j] !== c && src[j] !== "\n"){ if(src[j] === "\\") j++; j++; }
+      j = Math.min(n, j + 1); blank(i, j, strFill ? "\"" : " "); i = j; continue;
+    }
+    if(c === "["){
+      const m = /^\[(=*)\[/.exec(src.slice(i, i + 40));
+      if(m){ const close = "]" + m[1] + "]"; let e = src.indexOf(close, i + m[0].length); e = e === -1 ? n : e + close.length; blank(i, e, strFill ? "\"" : " "); i = e; continue; }
+    }
+    mask[i] = c; i++;
+  }
+  return mask.join("");
+}
+function luauBackticks(src){
+  if(src.indexOf("`") < 0) return src;
+  const n = src.length; let out = "", i = 0;
+  while(i < n){
+    const c = src[i];
+    if(c === "-" && src[i+1] === "-"){
+      const m = /^--\[(=*)\[/.exec(src.slice(i, i + 40)); let e;
+      if(m){ const close = "]" + m[1] + "]"; e = src.indexOf(close, i + m[0].length); e = e === -1 ? n : e + close.length; }
+      else { e = src.indexOf("\n", i); if(e === -1) e = n; }
+      out += src.slice(i, e); i = e; continue;
+    }
+    if(c === "\"" || c === "'"){ let j = i + 1; while(j < n && src[j] !== c && src[j] !== "\n"){ if(src[j] === "\\") j++; j++; } j = Math.min(n, j + 1); out += src.slice(i, j); i = j; continue; }
+    if(c === "["){ const m = /^\[(=*)\[/.exec(src.slice(i, i + 40)); if(m){ const close = "]" + m[1] + "]"; let e = src.indexOf(close, i + m[0].length); e = e === -1 ? n : e + close.length; out += src.slice(i, e); i = e; continue; } }
+    if(c === "`"){
+      let j = i + 1, lit = ""; const parts = [];
+      while(j < n && src[j] !== "`"){
+        if(src[j] === "\\" && j + 1 < n){ const d = src[j+1]; lit += d === "n" ? "\n" : d === "t" ? "\t" : d; j += 2; continue; }
+        if(src[j] === "{"){
+          let depth = 1, k = j + 1;
+          while(k < n && depth > 0){ if(src[k] === "{") depth++; else if(src[k] === "}") depth--; k++; }
+          if(lit){ parts.push(JSON.stringify(lit)); lit = ""; }
+          parts.push("tostring(" + src.slice(j + 1, k - 1) + ")");
+          j = k; continue;
+        }
+        lit += src[j]; j++;
+      }
+      if(lit || !parts.length) parts.push(JSON.stringify(lit));
+      out += "(" + parts.join(" .. ") + ")"; i = j + 1; continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
+function luauIfExpr(src){
+  for(let iter = 0; iter < 60; iter++){
+    const ms = luauMask(src, true);
+    const re = /\bif\b/g; let m, hit = null;
+    while((m = re.exec(ms))){
+      const at = m.index;
+      if(ms[at - 1] === "." || ms[at - 1] === ":") continue;
+      let p = at - 1; while(p >= 0 && /\s/.test(ms[p])) p--;
+      if(p < 0) continue;
+      const before = ms.slice(Math.max(0, p - 7), p + 1);
+      if(/\b(then|do|else|end|repeat)$/.test(before)) continue;
+      if(/[=(,{\[+\-*\/%^<>~]$/.test(before) || /\.\.$/.test(before) || /\b(return|and|or|not)$/.test(before)) hit = at;
+    }
+    if(hit === null) return src;
+    const r = luauBuildIfExpr(src, ms, hit);
+    if(!r) return src;
+    src = src.slice(0, hit) + r.text + src.slice(r.end);
+  }
+  return src;
+}
+function luauBuildIfExpr(src, ms, at){
+  const n = ms.length, marks = [];
+  // stack of the ifs being read: [0] is the one at `at`; nested if-expressions (no brackets) push their own entry
+  const stack = [{ thenExp: true, hasElse: false }];
+  let i = at + 2, depth = 0, end = n;
+  const owner = (fn) => { for(let k = stack.length - 1; k >= 0; k--) if(fn(stack[k])) return k; return -1; };
+  while(i < n){
+    const c = ms[i];
+    if(c === "(" || c === "[" || c === "{"){ depth++; i++; continue; }
+    if(c === ")" || c === "]" || c === "}"){ if(depth === 0){ end = i; break; } depth--; i++; continue; }
+    if(depth === 0){
+      if((c === "," || c === ";") && stack[0].hasElse && stack.every(e => e.hasElse || e.thenExp === false && false || e.hasElse)){ end = i; break; }
+      if(c === "\n" && stack.every(e => e.hasElse)){
+        let j = i + 1; while(j < n && /\s/.test(ms[j])) j++;
+        if(!/^(and\b|or\b|\.\.|[+\-*\/%^<>=~])/.test(ms.slice(j, j + 4))){ end = i; break; }
+      }
+      if(/[A-Za-z_]/.test(c) && (i === 0 || !/[\w.:]/.test(ms[i - 1]))){
+        const w = /^[A-Za-z_]\w*/.exec(ms.slice(i, i + 24))[0];
+        if(w === "if"){ stack.push({ thenExp: true, hasElse: false }); i += 2; continue; }
+        if(w === "then"){
+          const k = owner(e => e.thenExp);
+          if(k >= 0){ stack[k].thenExp = false; if(k === 0) marks.push({ kw: "then", pos: i }); }
+          i += 4; continue;
+        }
+        if(w === "elseif"){
+          const k = owner(e => !e.thenExp && !e.hasElse);
+          if(k >= 0){ stack[k].thenExp = true; if(k === 0) marks.push({ kw: "elseif", pos: i }); i += 6; continue; }
+          end = i; break;
+        }
+        if(w === "else"){
+          const k = owner(e => !e.thenExp && !e.hasElse);
+          if(k >= 0){ stack[k].hasElse = true; if(k === 0) marks.push({ kw: "else", pos: i }); i += 4; continue; }
+          end = i; break;                    // belongs to an enclosing statement
+        }
+        if(stack.every(e => e.hasElse) && (w === "end" || w === "do" || w === "until")){ end = i; break; }
+        i += w.length; continue;
+      }
+    }
+    i++;
+  }
+  if(!marks.length || marks[0].kw !== "then" || !stack[0].hasElse) return null;
+  while(end > at && /\s/.test(ms[end - 1])) end--;
+  let text = "(function() if " + src.slice(at + 2, marks[0].pos);
+  marks.forEach((mk, k) => {
+    const seg = src.slice(mk.pos + mk.kw.length, k + 1 < marks.length ? marks[k + 1].pos : end);
+    if(mk.kw === "then") text += " then return " + seg;
+    else if(mk.kw === "elseif") text += " elseif " + seg;
+    else text += " else return " + seg;
+  });
+  text += " end end)()";
+  return { text, end };
+}
+function luauMatchClose(s, i){
+  const pairs = { "(": ")", "{": "}", "<": ">", "[": "]" };
+  const stack = [], n = s.length;
+  for(let k = i; k < n; k++){
+    const c = s[k];
+    if(pairs[c]) stack.push(pairs[c]);
+    else if(c === ">" && s[k - 1] === "-") continue;
+    else if(c === ")" || c === "}" || c === "]" || c === ">"){
+      if(stack[stack.length - 1] === c){ stack.pop(); if(!stack.length) return k + 1; }
+    }
+  }
+  return n;
+}
+function luauSkipType(s, i){
+  const n = s.length;
+  for(;;){
+    while(i < n && (s[i] === " " || s[i] === "\t")) i++;
+    if(s[i] === "(" || s[i] === "{" || s[i] === "<") i = luauMatchClose(s, i);
+    else if(s[i] === "\""){ while(s[i] === "\"") i++; }
+    else {
+      const m = /^[A-Za-z_][\w.]*/.exec(s.slice(i, i + 80));
+      if(!m) return i;
+      i += m[0].length;
+      if(m[0] === "typeof" && s[i] === "(") i = luauMatchClose(s, i);
+      else if(s[i] === "<") i = luauMatchClose(s, i);
+    }
+    while(s[i] === "?") i++;
+    let j = i; while(j < n && (s[j] === " " || s[j] === "\t")) j++;
+    if(s[j] === "-" && s[j + 1] === ">"){ i = j + 2; continue; }
+    if(s[j] === "|" || s[j] === "&"){ i = j + 1; continue; }
+    let k = j; while(k < n && /\s/.test(s[k])) k++;
+    if(k > j && (s[k] === "|" || s[k] === "&")){ i = k + 1; continue; }
+    return i;
+  }
+}
+function luauTypes(src){
+  const ms = luauMask(src, true);
+  const edits = [];
+  const del = (a, b) => { if(b > a) edits.push({ at: a, del: b - a, text: src.slice(a, b).replace(/[^\n]/g, "") }); };
+  let m;
+  // numbers: 1_000_000 and 0b1010
+  const rBin = /\b0[bB]([01_]+)\b/g;
+  while((m = rBin.exec(ms))) edits.push({ at: m.index, del: m[0].length, text: String(parseInt(m[1].replace(/_/g, ""), 2)) });
+  const rUnd = /\b\d+(?:_\d+)+(?=\b|\.\d)/g;
+  while((m = rUnd.exec(ms))) edits.push({ at: m.index, del: m[0].length, text: m[0].replace(/_/g, "") });
+  // type aliases:  type X = ...   /   export type X<T> = ...
+  const rType = /(^|\n)([ \t]*)(?:export[ \t]+)?type[ \t]+[A-Za-z_]\w*/g;
+  while((m = rType.exec(ms))){
+    const start = m.index + m[1].length + m[2].length;
+    let i = m.index + m[0].length;
+    while(ms[i] === " " || ms[i] === "\t") i++;
+    if(ms[i] === "<") i = luauMatchClose(ms, i);
+    while(ms[i] === " " || ms[i] === "\t") i++;
+    if(ms[i] !== "=") continue;
+    const e = luauSkipType(ms, i + 1);
+    del(start, e); rType.lastIndex = e;
+  }
+  // local x: T, y: U = ...
+  const rLocal = /\blocal[ \t]+(?!function\b)/g;
+  while((m = rLocal.exec(ms))){
+    let i = m.index + m[0].length;
+    for(;;){
+      const id = /^[A-Za-z_]\w*/.exec(ms.slice(i, i + 80));
+      if(!id) break;
+      i += id[0].length;
+      let j = i; while(ms[j] === " " || ms[j] === "\t") j++;
+      if(ms[j] === ":" && ms[j + 1] !== ":"){ const e = luauSkipType(ms, j + 1); del(j, e); i = e; }
+      while(ms[i] === " " || ms[i] === "\t") i++;
+      if(ms[i] === ","){ i++; while(ms[i] === " " || ms[i] === "\t") i++; continue; }
+      break;
+    }
+  }
+  // function f<T>(a: number, b: string?): boolean
+  const rFn = /\bfunction\b[ \t]*([A-Za-z_][\w.:]*)?[ \t]*/g;
+  while((m = rFn.exec(ms))){
+    let i = m.index + m[0].length;
+    if(ms[i] === "<"){ const e = luauMatchClose(ms, i); del(i, e); i = e; while(ms[i] === " ") i++; }
+    if(ms[i] !== "(") continue;
+    const close = luauMatchClose(ms, i) - 1;
+    let p = i + 1;
+    while(p < close){
+      let depth = 0, q = p;
+      while(q < close){
+        const c = ms[q];
+        if(c === "(" || c === "{" || c === "<" || c === "[") depth++;
+        else if(c === ")" || c === "}" || c === "]" || (c === ">" && ms[q - 1] !== "-")) depth--;
+        else if(c === "," && depth === 0) break;
+        q++;
+      }
+      const cm = /^\s*(?:\.\.\.|[A-Za-z_]\w*)[ \t]*(:)/.exec(ms.slice(p, q));
+      if(cm){ const colon = p + cm[0].length - 1; const e = luauSkipType(ms, colon + 1); del(colon, Math.min(e, q)); }
+      p = q + 1;
+    }
+    let r = close + 1; while(ms[r] === " " || ms[r] === "\t") r++;
+    if(ms[r] === ":" && ms[r + 1] !== ":"){ const e = luauSkipType(ms, r + 1); del(r, e); }
+    rFn.lastIndex = close + 1;
+  }
+  // casts:  value :: Type   (but not ::label::)
+  const rCast = /::[ \t]*/g;
+  while((m = rCast.exec(ms))){
+    const after = m.index + m[0].length;
+    const lab = /^[A-Za-z_]\w*[ \t]*::/.exec(ms.slice(after, after + 80));
+    if(lab){ rCast.lastIndex = after + lab[0].length; continue; }
+    const e = luauSkipType(ms, after);
+    del(m.index, e); rCast.lastIndex = e;
+  }
+  // for k, v in tbl do   ->   for k, v in __iter(tbl) do
+  const rFor = /\bfor\s+([\w\s,]+?)\s+in\s+([A-Za-z_][\w.]*)\s+do\b/g;
+  while((m = rFor.exec(ms))){
+    const full = m[0], doIdx = full.lastIndexOf("do");
+    let eEnd = doIdx; while(/\s/.test(full[eEnd - 1])) eEnd--;
+    const eStart = eEnd - m[2].length;
+    edits.push({ at: m.index + eStart, del: 0, text: "__iter(" });
+    edits.push({ at: m.index + eEnd, del: 0, text: ")" });
+  }
+  if(!edits.length) return src;
+  edits.sort((a, b) => a.at - b.at || a.del - b.del);
+  const kept = []; let lastEnd = -1;
+  edits.forEach(e => { if(e.at >= lastEnd){ kept.push(e); lastEnd = e.at + e.del; } });
+  let out = src;
+  for(let k = kept.length - 1; k >= 0; k--){ const e = kept[k]; out = out.slice(0, e.at) + e.text + out.slice(e.at + e.del); }
+  return out;
+}
+function luauToLua(src){
+  return luauToLuaCore(luauTypes(luauIfExpr(luauBackticks(String(src == null ? "" : src)))));
+}
+
 function createLuaRuntime(fengari, A, preludeSrc){
   const { lua, lauxlib, lualib, to_luastring, to_jsstring } = fengari;
   const rt = {
@@ -2047,7 +2699,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     { id: "lleg:1", name: "Left Leg", key: "lLeg" }, { id: "rleg:1", name: "Right Leg", key: "rLeg" }
   ];
   const bodyById = (id) => BODY.find(b => b.id === id) || null;
-  const SERVICES = ["Workspace", "Players", "ReplicatedStorage", "ServerScriptService", "StarterPlayer", "StarterPlayerScripts", "Lighting", "RunService", "UserInputService", "HttpService"];
+  const SERVICES = ["Workspace", "Players", "ReplicatedStorage", "ServerScriptService", "StarterPlayer", "StarterPlayerScripts", "StarterGui", "Lighting", "RunService", "UserInputService", "HttpService", "SoundService"];
 
   /* ---------------- JS <-> Lua value marshalling ---------------- */
   function push(L, v){
@@ -2180,13 +2832,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(id === "svc:Game") out = SERVICES.map(s => "svc:" + s);
     else if(id === "svc:Workspace"){
       out = A.parts().filter(p => !p.pending && (!p.props || !p.props.svc || p.props.svc === "svc:Workspace")).map(p => p.id);
-      out.push(CHAR_ID);
+      out.push(CHAR_ID); out.push(CAM_ID);
       allNodes().forEach(n => { if(n.parent === "svc:Workspace") out.push(n.id); });
     }
     else if(id === "svc:Players") out = [PLAYER_ID];
     else if(id === "svc:StarterPlayer") out = ["svc:StarterPlayerScripts"];
     else if(id === CHAR_ID) out = BODY.map(b => b.id).concat([HRP_ID, HUM_ID]);
-    else if(id === PLAYER_ID) out = [];
+    else if(id === PLAYER_ID) out = [PLAYERGUI_ID];
     else if(id.startsWith("svc:") || isPartId(id) || findNode(id)){
       allNodes().forEach(n => { if(n.parent === id) out.push(n.id); });
     }
@@ -2194,6 +2846,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
   function nameOf(id){
     if(id === "svc:Game") return "game";
+    if(id === CAM_ID) return "Camera";
     if(id.startsWith("svc:")) return id.slice(4);
     if(id === PLAYER_ID) return A.player.name;
     if(id === CHAR_ID) return A.player.name;
@@ -2205,6 +2858,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
   function classOfId(id){
     if(id === "svc:Game") return "DataModel";
+    if(id === CAM_ID) return "Camera";
     if(id.startsWith("svc:")) return id === "svc:StarterPlayerScripts" ? "StarterPlayerScripts" : id.slice(4);
     if(id === PLAYER_ID) return "Player";
     if(id === CHAR_ID) return "Model";
@@ -2215,6 +2869,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
   function parentOf(id){
     if(id === "svc:Game") return null;
+    if(id === PLAYERGUI_ID) return PLAYER_ID;
+    if(id === CAM_ID) return "svc:Workspace";
     if(id.startsWith("svc:")){
       if(id === "svc:StarterPlayerScripts") return "svc:StarterPlayer";
       return "svc:Game";
@@ -2232,6 +2888,9 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(cn === "LuaSourceContainer" && /Script$/.test(c)) return true;
     if(cn === "Script" && c === "Script") return true;
     if(cn === "Model" && c === "Model") return true;
+    const nn = findNode(id);
+    if(nn){ const r = CLS[nn.className]; if(r && r.isa && r.isa.indexOf(cn) >= 0) return true; if(cn === "ValueBase" && VALUE_CLASSES.indexOf(nn.className) >= 0) return true; }
+    if(id === PLAYERGUI_ID && (cn === "BasePlayerGui")) return true;
     return false;
   };
   const fullName = (id) => { const p = parentOf(id); const nm = nameOf(id); return (p && p !== "svc:Game" ? fullName(p) + "." : "") + nm; };
@@ -2243,6 +2902,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const cid = rt.nextConn++;
     if(!rt.signals.has(key)) rt.signals.set(key, new Map());
     rt.signals.get(key).set(cid, { vm, h });
+    if(gui.els.has(id)) guiDirty(id);
     rt.conns.set(cid, key);
     return cid;
   }
@@ -2394,8 +3054,9 @@ function createLuaRuntime(fengari, A, preludeSrc){
   /* ---------------- host ops ---------------- */
   function member(vm, id, k){
     const cn = classOfId(id);
+    { const ex = extMember(vm, id, k); if(ex) return ex; }
     // generic methods
-    const GEN = ["Destroy", "Clone", "FindFirstChild", "FindFirstChildOfClass", "FindFirstChildWhichIsA", "GetChildren", "GetDescendants", "IsA", "GetFullName", "ClearAllChildren", "SetAttribute", "GetAttribute", "GetAttributes", "IsDescendantOf", "IsAncestorOf"];
+    const GEN = ["Destroy", "Clone", "FindFirstChild", "FindFirstChildOfClass", "FindFirstChildWhichIsA", "GetChildren", "GetDescendants", "IsA", "GetFullName", "ClearAllChildren", "SetAttribute", "GetAttribute", "GetAttributes", "IsDescendantOf", "IsAncestorOf", "FindFirstAncestor", "FindFirstAncestorOfClass", "FindFirstAncestorWhichIsA"];
     // kind-specific
     if(id === "svc:Game"){
       if(k === "Name") return { k: "prop", v: "game" };
@@ -2482,8 +3143,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
         if(k === "InvokeServer") return { k: "method" };
         if(k === "OnServerInvoke") return { k: "prop", v: null };
       }
-      if(/^(Number|String|Bool)Value$/.test(node.className)){
-        if(k === "Value") return { k: "prop", v: node.value === undefined ? (node.className === "NumberValue" ? 0 : node.className === "BoolValue" ? false : "") : node.value };
+      if(VALUE_CLASSES.indexOf(node.className) >= 0){
+        if(k === "Value") return { k: "prop", v: node.value === undefined ? VALUE_DEFAULT[node.className] : node.value };
         if(k === "Changed") return { k: "signal" };
       }
     }
@@ -2500,6 +3161,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
 
   function getAttrs(id){ if(!rt.attrs.has(id)) rt.attrs.set(id, {}); return rt.attrs.get(id); }
   function destroyId(id){
+    guiDrop(id); { const sn = sounds.get(id); if(sn){ try{ sn.pause(); }catch(e){} sounds.delete(id); } }
     if(isPartId(id)){ A.part.destroy(A.partById(id)); }
     else {
       rt.tmpNodes = rt.tmpNodes.filter(n => n.id !== id);
@@ -2513,12 +3175,17 @@ function createLuaRuntime(fengari, A, preludeSrc){
       const np = A.part.clone(A.partById(id)); np.pending = true; np.attached = false; rt.createdParts.set(np.id, np); return np.id;
     }
     const n = findNode(id); if(!n) throw new Error("cannot clone this");
-    const c = Object.assign({}, n, { id: "tmp_" + Math.random().toString(36).slice(2, 9), parent: null });
-    rt.tmpNodes.push(c); return c.id;
+    return cloneNodeDeep(n, null);
   }
   function callMethod(vm, id, m, a){
     const args = a || [];
+    { const ex = extCall(vm, id, m, args); if(ex !== undefined) return ex; }
     switch(m){
+      case "FindFirstAncestor": case "FindFirstAncestorOfClass": case "FindFirstAncestorWhichIsA": {
+        let q = parentOf(id);
+        while(q){ if(m === "FindFirstAncestor" ? nameOf(q) === args[0] : m === "FindFirstAncestorOfClass" ? classOfId(q) === args[0] : isA(q, args[0])) return I(q); q = parentOf(q); }
+        return null;
+      }
       case "Destroy": destroyId(id); return null;
       case "Clone": return I(cloneId(id));
       case "GetChildren": return childrenOf(vm, id).map(I);
@@ -2596,6 +3263,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
 
   function setMember(vm, id, k, v){
+    if(k !== "Parent" && k !== "Name" && extSet(vm, id, k, v)) return;
     if(k === "Parent"){
       const pid = v && v.id ? v.id : null;
       const part = A.partById(id);
@@ -2606,7 +3274,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
         return;
       }
       const node = findNode(id);
-      if(node){ node.parent = pid; if(pid) fire(pid, "ChildAdded", [I(id)]); return; }
+      if(node){ const oldP = node.parent; node.parent = pid; if(oldP && oldP !== pid) fire(oldP, "ChildRemoved", [I(id)]); if(pid) fire(pid, "ChildAdded", [I(id)]); guiDirtyTree(id); return; }
       throw new Error("cannot set Parent on " + id);
     }
     if(k === "Name"){
@@ -2640,12 +3308,591 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(className === "Part" || className === "SpawnLocation" || className === "WedgePart"){
       const p = A.part.create(className === "Part" ? "Part" : className); p.pending = true; p.attached = false; rt.createdParts.set(p.id, p); return p.id;
     }
-    const okClasses = ["Folder", "Model", "RemoteEvent", "RemoteFunction", "NumberValue", "StringValue", "BoolValue", "BindableEvent", "Script", "LocalScript", "ModuleScript"];
+    const okClasses = ["Folder", "Model", "RemoteEvent", "RemoteFunction", "Script", "LocalScript", "ModuleScript"].concat(Object.keys(CLS), VALUE_CLASSES);
     if(okClasses.indexOf(className) < 0) throw new Error("Unable to create an Instance of type \"" + className + "\"");
-    const n = { id: "tmp_" + Math.random().toString(36).slice(2, 9), className, name: className, parent: null, source: "", value: className === "NumberValue" ? 0 : className === "BoolValue" ? false : "" };
+    const n = { id: "tmp_" + Math.random().toString(36).slice(2, 9), className, name: className, parent: null, source: "", p: {}, value: hasOwn(VALUE_DEFAULT, className) ? JSON.parse(JSON.stringify(VALUE_DEFAULT[className])) : "" };
     rt.tmpNodes.push(n); return n.id;
   }
 
+  /* ================= extensions: GUI, Sound, Camera, Raycast, Mouse, input, data stores ================= */
+  const PLAYERGUI_ID = "svc:PlayerGui", CAM_ID = "cam:main";
+  const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const UD2W = (xs, xo, ys, yo) => ({ __t: "UD2", xs, xo, ys, yo });
+  const UDW = (s, o) => ({ __t: "UD", s, o });
+  const V2W = (x, y) => ({ __t: "V2", x, y });
+  const C3W = (r, g, b) => ({ __t: "C3", r, g, b });
+  const ENW = (e, n) => ({ __t: "E", e, n });
+  const SIG = { k: "signal" }, METH = { k: "method" };
+  rt.sunk = new Set(); rt.mouseDelta = [0, 0]; rt.mouseBehavior = "Default"; rt.mouseIcon = true;
+  rt.cam = { type: "Custom", fov: null, cf: null }; rt.gravity = 196.2; rt.lightX = {}; rt.focusedBox = null; rt.mouse = rt.mouse || { x: 0, y: 0 };
+
+  const GUI_COMMON = { Visible: true, Position: UD2W(0, 0, 0, 0), Size: UD2W(0, 100, 0, 100), AnchorPoint: V2W(0, 0), BackgroundColor3: C3W(0.639, 0.635, 0.647), BackgroundTransparency: 0, BorderSizePixel: 1, BorderColor3: C3W(0.106, 0.165, 0.208), ZIndex: 1, LayoutOrder: 0, Rotation: 0, ClipsDescendants: false, Active: false, Interactable: true };
+  const TEXT_COMMON = { Text: "", TextColor3: C3W(0.106, 0.165, 0.208), TextSize: 14, Font: ENW("Font", "SourceSans"), TextXAlignment: ENW("TextXAlignment", "Center"), TextYAlignment: ENW("TextYAlignment", "Center"), TextWrapped: false, TextScaled: false, TextTransparency: 0, TextStrokeTransparency: 1, TextStrokeColor3: C3W(0, 0, 0), RichText: false, LineHeight: 1 };
+  const IMG_COMMON = { Image: "", ImageColor3: C3W(1, 1, 1), ImageTransparency: 0, ScaleType: ENW("ScaleType", "Stretch") };
+  const MOUSE_SIGS = ["MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "MouseButton2Click", "MouseButton2Down", "MouseButton2Up", "MouseEnter", "MouseLeave", "MouseMoved", "MouseWheelForward", "MouseWheelBackward", "Activated", "InputBegan", "InputEnded", "InputChanged"];
+  const merge = (...a) => Object.assign({}, ...a);
+  const CLS = {
+    ScreenGui: { gui: "screen", isa: ["LayerCollector", "GuiBase2d"], props: { Enabled: true, DisplayOrder: 0, ResetOnSpawn: true, IgnoreGuiInset: false, ZIndexBehavior: ENW("ZIndexBehavior", "Sibling") } },
+    Frame: { gui: "obj", isa: ["GuiObject", "GuiBase2d"], props: GUI_COMMON, signals: MOUSE_SIGS, abs: true },
+    TextLabel: { gui: "obj", isa: ["GuiObject", "GuiLabel", "GuiBase2d"], props: merge(GUI_COMMON, TEXT_COMMON), signals: MOUSE_SIGS, abs: true },
+    TextButton: { gui: "obj", isa: ["GuiObject", "GuiButton", "GuiBase2d"], props: merge(GUI_COMMON, TEXT_COMMON, { Text: "Button", AutoButtonColor: true }), signals: MOUSE_SIGS, abs: true, button: true },
+    TextBox: { gui: "obj", isa: ["GuiObject", "GuiBase2d"], props: merge(GUI_COMMON, TEXT_COMMON, { BackgroundColor3: C3W(1, 1, 1), PlaceholderText: "", PlaceholderColor3: C3W(0.7, 0.7, 0.7), ClearTextOnFocus: true, MultiLine: false, TextEditable: true, TextXAlignment: ENW("TextXAlignment", "Left") }), signals: MOUSE_SIGS.concat(["FocusLost", "Focused"]), methods: ["CaptureFocus", "ReleaseFocus", "IsFocused"], abs: true },
+    ImageLabel: { gui: "obj", isa: ["GuiObject", "GuiLabel", "GuiBase2d"], props: merge(GUI_COMMON, IMG_COMMON), signals: MOUSE_SIGS, abs: true },
+    ImageButton: { gui: "obj", isa: ["GuiObject", "GuiButton", "GuiBase2d"], props: merge(GUI_COMMON, IMG_COMMON, { AutoButtonColor: true }), signals: MOUSE_SIGS, abs: true, button: true },
+    ScrollingFrame: { gui: "obj", isa: ["GuiObject", "GuiBase2d"], props: merge(GUI_COMMON, { CanvasSize: UD2W(0, 0, 2, 0), ScrollBarThickness: 8, ScrollingEnabled: true, ScrollBarImageColor3: C3W(0, 0, 0) }), signals: MOUSE_SIGS, abs: true },
+    UICorner: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { CornerRadius: UDW(0, 8) } },
+    UIStroke: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { Color: C3W(0, 0, 0), Thickness: 1, Transparency: 0, Enabled: true } },
+    UIListLayout: { gui: "mod", isa: ["UIComponent", "UIBase", "UILayout"], props: { FillDirection: ENW("FillDirection", "Vertical"), HorizontalAlignment: ENW("HorizontalAlignment", "Left"), VerticalAlignment: ENW("VerticalAlignment", "Top"), SortOrder: ENW("SortOrder", "LayoutOrder"), Padding: UDW(0, 0), Wraps: false } },
+    UIGridLayout: { gui: "mod", isa: ["UIComponent", "UIBase", "UILayout"], props: { CellSize: UD2W(0, 100, 0, 100), CellPadding: UD2W(0, 5, 0, 5), FillDirection: ENW("FillDirection", "Horizontal"), SortOrder: ENW("SortOrder", "LayoutOrder") } },
+    UIPadding: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { PaddingTop: UDW(0, 0), PaddingBottom: UDW(0, 0), PaddingLeft: UDW(0, 0), PaddingRight: UDW(0, 0) } },
+    UIAspectRatioConstraint: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { AspectRatio: 1 } },
+    UIScale: { gui: "mod", isa: ["UIComponent", "UIBase"], props: { Scale: 1 } },
+    Sound: { isa: ["Instance"], props: { SoundId: "", Volume: 0.5, Looped: false, Playing: false, PlaybackSpeed: 1, TimePosition: 0, TimeLength: 0, IsPlaying: false, IsLoaded: true }, signals: ["Ended", "Played", "Paused", "Loaded"], methods: ["Play", "Stop", "Pause", "Resume"] },
+    BindableEvent: { props: {}, signals: ["Event"], methods: ["Fire"] },
+    BindableFunction: { props: {}, methods: ["Invoke"] }
+  };
+  const VALUE_DEFAULT = { NumberValue: 0, IntValue: 0, StringValue: "", BoolValue: false, ObjectValue: null, Vector3Value: { __t: "V3", x: 0, y: 0, z: 0 }, Color3Value: C3W(0, 0, 0) };
+  const VALUE_CLASSES = Object.keys(VALUE_DEFAULT);
+  const LIGHT_DEFAULT = { Ambient: C3W(0.27, 0.27, 0.27), OutdoorAmbient: C3W(0.5, 0.5, 0.5), FogColor: C3W(0.75, 0.75, 0.75), FogEnd: 100000, FogStart: 0, GlobalShadows: true, ExposureCompensation: 0, TimeOfDay: "14:00:00", Technology: ENW("Technology", "ShadowMap") };
+  const LIGHT_KEYS = Object.keys(LIGHT_DEFAULT);
+  const P = (n, k) => { if(n.p && n.p[k] !== undefined) return n.p[k]; const r = CLS[n.className]; return r && r.props ? r.props[k] : undefined; };
+  const cap = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+
+  /* ---------------- GUI renderer (ScreenGui / Frame / TextLabel / ... drawn as HTML on top of the game) ---------------- */
+  const gui = { root: null, els: new Map(), dirty: new Set(), raf: 0 };
+  function guiRoot(){
+    if(gui.root && gui.root.isConnected) return gui.root;
+    const r = document.createElement("div");
+    r.id = "bvLuaGui";
+    r.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;overflow:hidden;pointer-events:none;z-index:1500;font-family:'Segoe UI',system-ui,sans-serif;";
+    document.body.appendChild(r); gui.root = r;
+    window.addEventListener("resize", guiFit);
+    return r;
+  }
+  function guiFit(){
+    if(!gui.root) return;
+    let rc = null; try{ rc = A.guiRect && A.guiRect(); }catch(e){}
+    const s = gui.root.style;
+    if(rc){ s.left = rc.left + "px"; s.top = rc.top + "px"; s.width = rc.width + "px"; s.height = rc.height + "px"; }
+    else { s.left = "0"; s.top = "0"; s.width = "100vw"; s.height = "100vh"; }
+  }
+  function guiLive(id){ let cur = id, g = 0; while(cur && g++ < 80){ if(cur === PLAYERGUI_ID) return true; cur = parentOf(cur); } return false; }
+  function guiDirty(id){
+    gui.dirty.add(id);
+    if(!gui.raf && typeof requestAnimationFrame === "function") gui.raf = requestAnimationFrame(() => { gui.raf = 0; try{ guiFlush(); }catch(e){ A.log("error", "GUI: " + e.message, "client"); } });
+  }
+  function guiDirtyTree(id){
+    gui.dirty.add(id);
+    allNodes().forEach(n => { if(n.parent === id) guiDirtyTree(n.id); });
+    guiDirty(id);
+  }
+  function guiDrop(id){
+    const el = gui.els.get(id);
+    if(!el) return;
+    el.querySelectorAll(".bvg").forEach(c => gui.els.delete(c._id));
+    gui.els.delete(id);
+    if(rt.focusedBox === id) rt.focusedBox = null;
+    el.remove();
+  }
+  function guiFlush(){
+    if(!gui.dirty.size) return;
+    const ids = Array.from(gui.dirty); gui.dirty.clear();
+    if(!ids.some(id => { const n = findNode(id); return !n || guiLive(id); })) { ids.forEach(guiDrop); return; }
+    guiRoot(); guiFit();
+    const seen = new Set();
+    ids.forEach(id => {
+      const n = findNode(id);
+      if(!n || !CLS[n.className] || !CLS[n.className].gui || !guiLive(id)){ guiDrop(id); return; }
+      guiBuild(n, seen);
+    });
+  }
+  function guiChildrenNodes(id){ return allNodes().filter(k => k.parent === id); }
+  function guiMods(n){ return guiChildrenNodes(n.id).filter(k => CLS[k.className] && CLS[k.className].gui === "mod"); }
+  function guiBuild(n, seen){
+    if(seen.has(n.id)) return; seen.add(n.id);
+    const reg = CLS[n.className];
+    const pn = findNode(n.parent);
+    if(reg.gui === "mod"){
+      if(pn && CLS[pn.className] && CLS[pn.className].gui === "obj"){ seen.delete(pn.id); guiBuild(pn, seen); }
+      return;
+    }
+    let host, el = gui.els.get(n.id);
+    if(reg.gui === "screen") host = guiRoot();
+    else {
+      if(!pn || !CLS[pn.className] || !CLS[pn.className].gui || CLS[pn.className].gui === "mod"){ guiDrop(n.id); return; }
+      guiBuild(pn, seen);
+      const pel = gui.els.get(pn.id);
+      if(!pel){ return; }
+      host = pel._c;
+    }
+    if(!el){
+      el = document.createElement("div");
+      el.className = "bvg"; el._id = n.id; el.style.cssText = "position:absolute;box-sizing:border-box;";
+      const c = document.createElement("div"); c.className = "bvg-c"; c.style.cssText = "position:absolute;left:0;top:0;right:0;bottom:0;box-sizing:border-box;";
+      el.appendChild(c); el._c = c; gui.els.set(n.id, el); guiWire(n, el);
+    }
+    if(el.parentNode !== host) host.appendChild(el);
+    guiStyle(n, el);
+    guiChildrenNodes(n.id).forEach(k => { if(CLS[k.className] && CLS[k.className].gui && CLS[k.className].gui !== "mod") guiBuild(k, seen); });
+  }
+  const FONTS = { SourceSans: "'Segoe UI',system-ui,sans-serif", SourceSansBold: "'Segoe UI',system-ui,sans-serif;font-weight:700", SourceSansLight: "'Segoe UI Light','Segoe UI',system-ui,sans-serif", Gotham: "Montserrat,'Segoe UI',system-ui,sans-serif", GothamMedium: "Montserrat,'Segoe UI',system-ui,sans-serif;font-weight:500", GothamBold: "Montserrat,'Segoe UI',system-ui,sans-serif;font-weight:700", GothamBlack: "Montserrat,'Segoe UI',system-ui,sans-serif;font-weight:900", Arial: "Arial,sans-serif", ArialBold: "Arial,sans-serif;font-weight:700", Code: "ui-monospace,Consolas,monospace", RobotoMono: "ui-monospace,Consolas,monospace", Cartoon: "'Comic Sans MS','Comic Neue',cursive", Fantasy: "Papyrus,fantasy", Bangers: "Impact,sans-serif", Antique: "Georgia,serif", Highway: "'Arial Narrow',sans-serif", SciFi: "'Orbitron','Segoe UI',sans-serif", Arcade: "'Press Start 2P',monospace", Roboto: "Roboto,'Segoe UI',sans-serif", RobotoCondensed: "'Arial Narrow',sans-serif", Ubuntu: "Ubuntu,'Segoe UI',sans-serif", Nunito: "Nunito,'Segoe UI',sans-serif", FredokaOne: "'Fredoka One','Comic Sans MS',cursive" };
+  const calcX = (u, ax) => "calc(" + ((ax ? u.xs : u.ys) * 100) + "% + " + (ax ? u.xo : u.yo) + "px)";
+  const udCss = (u) => "calc(" + (u.s * 100) + "% + " + u.o + "px)";
+  const rgba = (c, a) => "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + a + ")";
+  function richText(s){
+    let h = String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    h = h.replace(/&lt;(\/?)(b|i|u|s)&gt;/g, "<$1$2>").replace(/&lt;br\s*\/?&gt;/g, "<br>");
+    h = h.replace(/&lt;font color="(#[0-9a-fA-F]{3,8}|rgb\([\d, ]+\))"&gt;/g, '<span style="color:$1">').replace(/&lt;\/font&gt;/g, "</span>");
+    return h;
+  }
+  function guiStyle(n, el){
+    const reg = CLS[n.className], s = el.style, cs = el._c.style;
+    if(reg.gui === "screen"){
+      s.left = "0"; s.top = "0"; s.width = "100%"; s.height = "100%"; s.pointerEvents = "none";
+      s.display = P(n, "Enabled") === false ? "none" : "block"; s.zIndex = String((P(n, "DisplayOrder") | 0) + 1); return;
+    }
+    const pn = findNode(n.parent);
+    const pmods = pn && CLS[pn.className].gui === "obj" ? guiMods(pn) : [];
+    const layout = pmods.find(m => m.className === "UIListLayout" || m.className === "UIGridLayout") || null;
+    const size = P(n, "Size"), pos = P(n, "Position"), anc = P(n, "AnchorPoint") || V2W(0, 0);
+    const mods = guiMods(n);
+    const aspect = mods.find(m => m.className === "UIAspectRatioConstraint");
+    const uscale = mods.find(m => m.className === "UIScale");
+    s.display = P(n, "Visible") === false ? "none" : "block";
+    s.zIndex = String(P(n, "ZIndex") | 0);
+    if(layout){
+      s.position = "relative"; s.left = ""; s.top = ""; s.flex = "0 0 auto";
+      s.order = P(layout, "SortOrder") && P(layout, "SortOrder").n === "LayoutOrder" ? String(P(n, "LayoutOrder") | 0) : "0";
+      if(layout.className === "UIGridLayout"){ const cell = P(layout, "CellSize"); s.width = calcX(cell, true); s.height = calcX(cell, false); }
+      else { s.width = calcX(size, true); s.height = aspect ? "auto" : calcX(size, false); }
+      s.transform = "";
+    } else {
+      s.position = "absolute";
+      s.left = calcX(pos, true); s.top = calcX(pos, false);
+      s.width = calcX(size, true); s.height = aspect ? "auto" : calcX(size, false);
+      s.transform = "translate(" + (-anc.x * 100) + "%," + (-anc.y * 100) + "%)" + (P(n, "Rotation") ? " rotate(" + P(n, "Rotation") + "deg)" : "") + (uscale ? " scale(" + P(uscale, "Scale") + ")" : "");
+    }
+    if(aspect) s.aspectRatio = String(P(aspect, "AspectRatio"));
+    const bt = P(n, "BackgroundTransparency");
+    s.background = bt >= 1 ? "transparent" : rgba(P(n, "BackgroundColor3"), 1 - bt);
+    const bw = P(n, "BorderSizePixel") | 0;
+    s.border = bw > 0 ? bw + "px solid " + rgba(P(n, "BorderColor3"), 1) : "none";
+    const isScroll = n.className === "ScrollingFrame";
+    s.overflow = isScroll ? (P(n, "ScrollingEnabled") === false ? "hidden" : "auto") : (P(n, "ClipsDescendants") ? "hidden" : "visible");
+    const inter = P(n, "Interactable") !== false;
+    const listens = MOUSE_SIGS.some(sg => hasListeners(n.id, sg));
+    s.pointerEvents = inter && (reg.button || P(n, "Active") || n.className === "TextBox" || isScroll || listens) ? "auto" : "none";
+    s.cursor = reg.button && inter ? "pointer" : "";
+    // modifiers
+    const corner = mods.find(m => m.className === "UICorner");
+    s.borderRadius = corner ? udCss(P(corner, "CornerRadius")) : "0";
+    const stroke = mods.find(m => m.className === "UIStroke" && P(m, "Enabled") !== false);
+    const hasTextStroke = stroke && (P(n, "Text") !== undefined && n.className !== "TextBox");
+    s.boxShadow = stroke && !hasTextStroke ? "0 0 0 " + P(stroke, "Thickness") + "px " + rgba(P(stroke, "Color"), 1 - P(stroke, "Transparency")) : "";
+    const pad = mods.find(m => m.className === "UIPadding");
+    cs.left = pad ? udCss(P(pad, "PaddingLeft")) : "0"; cs.top = pad ? udCss(P(pad, "PaddingTop")) : "0";
+    cs.right = pad ? udCss(P(pad, "PaddingRight")) : "0"; cs.bottom = pad ? udCss(P(pad, "PaddingBottom")) : "0";
+    const lay = mods.find(m => m.className === "UIListLayout" || m.className === "UIGridLayout");
+    if(lay){
+      cs.display = "flex"; cs.flexWrap = "nowrap"; cs.alignContent = "flex-start";
+      if(lay.className === "UIGridLayout"){
+        const pd = P(lay, "CellPadding"); cs.flexWrap = "wrap"; cs.flexDirection = P(lay, "FillDirection").n === "Vertical" ? "column" : "row";
+        cs.gap = calcX(pd, false) + " " + calcX(pd, true); cs.justifyContent = "flex-start"; cs.alignItems = "flex-start";
+      } else {
+        const vert = P(lay, "FillDirection").n !== "Horizontal";
+        cs.flexDirection = vert ? "column" : "row"; cs.gap = udCss(P(lay, "Padding")); cs.flexWrap = P(lay, "Wraps") ? "wrap" : "nowrap";
+        const ha = P(lay, "HorizontalAlignment").n, va = P(lay, "VerticalAlignment").n;
+        const m1 = { Left: "flex-start", Center: "center", Right: "flex-end", Top: "flex-start", Bottom: "flex-end" };
+        cs.alignItems = vert ? (m1[ha] || "flex-start") : (m1[va] || "flex-start");
+        cs.justifyContent = vert ? (m1[va] || "flex-start") : (m1[ha] || "flex-start");
+      }
+    } else { cs.display = "block"; cs.gap = ""; cs.flexDirection = ""; cs.justifyContent = ""; cs.alignItems = ""; }
+    if(isScroll){ const cv = P(n, "CanvasSize"); cs.right = "auto"; cs.bottom = "auto"; cs.position = "relative"; cs.width = calcX(cv, true); cs.height = calcX(cv, false); cs.left = "0"; cs.top = "0"; }
+    // text
+    if(P(n, "Text") !== undefined && n.className !== "TextBox"){
+      let t = el._t; if(!t){ t = document.createElement("div"); t.style.cssText = "position:absolute;left:0;top:0;right:0;bottom:0;display:flex;overflow:hidden;pointer-events:none;"; el.insertBefore(t, el._c); el._t = t; }
+      const ts = t.style, xa = P(n, "TextXAlignment").n, ya = P(n, "TextYAlignment").n;
+      ts.justifyContent = xa === "Left" ? "flex-start" : xa === "Right" ? "flex-end" : "center"; ts.textAlign = xa === "Left" ? "left" : xa === "Right" ? "right" : "center";
+      ts.alignItems = ya === "Top" ? "flex-start" : ya === "Bottom" ? "flex-end" : "center";
+      ts.color = rgba(P(n, "TextColor3"), 1 - P(n, "TextTransparency"));
+      const fam = (FONTS[P(n, "Font").n] || FONTS.SourceSans).split(";");
+      ts.fontFamily = fam[0]; ts.fontWeight = (fam[1] || "").replace("font-weight:", "") || "400";
+      if(P(n, "TextScaled")){ s.containerType = "size"; ts.fontSize = "62cqh"; } else { s.containerType = ""; ts.fontSize = P(n, "TextSize") + "px"; }
+      ts.whiteSpace = P(n, "TextWrapped") ? "pre-wrap" : "pre"; ts.lineHeight = String(P(n, "LineHeight") || 1.15);
+      const sk = P(n, "TextStrokeTransparency");
+      ts.textShadow = sk < 1 ? "0 0 2px " + rgba(P(n, "TextStrokeColor3"), 1 - sk) + ",0 0 2px " + rgba(P(n, "TextStrokeColor3"), 1 - sk) : "";
+      ts.webkitTextStroke = hasTextStroke ? P(stroke, "Thickness") + "px " + rgba(P(stroke, "Color"), 1 - P(stroke, "Transparency")) : "";
+      const txt = String(P(n, "Text"));
+      if(P(n, "RichText")){ if(t._h !== txt){ t.innerHTML = richText(txt); t._h = txt; t._plain = null; } }
+      else if(t._plain !== txt){ t.textContent = txt; t._plain = txt; t._h = null; }
+    }
+    if(n.className === "TextBox") guiTextBox(n, el);
+    if(P(n, "Image") !== undefined){
+      let im = el._img; if(!im){ im = document.createElement("div"); im.style.cssText = "position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;background-position:center;background-repeat:no-repeat;"; el.insertBefore(im, el._c); el._img = im; }
+      const url = String(P(n, "Image"));
+      im.style.backgroundImage = /^(https?:|data:|blob:)/.test(url) ? "url(\"" + url.replace(/"/g, "%22") + "\")" : "none";
+      const sc = P(n, "ScaleType").n; im.style.backgroundSize = sc === "Fit" ? "contain" : sc === "Crop" ? "cover" : sc === "Tile" ? "auto" : "100% 100%";
+      im.style.backgroundRepeat = sc === "Tile" ? "repeat" : "no-repeat"; im.style.opacity = String(1 - P(n, "ImageTransparency"));
+    }
+  }
+  function guiTextBox(n, el){
+    let inp = el._in;
+    const multi = !!P(n, "MultiLine");
+    if(!inp || inp._multi !== multi){
+      if(inp) inp.remove();
+      inp = document.createElement(multi ? "textarea" : "input"); inp._multi = multi; if(!multi) inp.type = "text";
+      inp.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;box-sizing:border-box;background:transparent;border:none;outline:none;padding:0 4px;margin:0;resize:none;";
+      el.insertBefore(inp, el._c); el._in = inp;
+      inp.addEventListener("input", () => { n.p = n.p || {}; n.p.Text = inp.value; fire(n.id, "prop:Text", []); fire(n.id, "Changed", ["Text"]); });
+      inp.addEventListener("focus", () => { rt.focusedBox = n.id; if(P(n, "ClearTextOnFocus")){ inp.value = ""; n.p = n.p || {}; n.p.Text = ""; } fire(n.id, "Focused", []); });
+      inp.addEventListener("blur", () => { if(rt.focusedBox === n.id) rt.focusedBox = null; const enter = !!inp._enter; inp._enter = false; fire(n.id, "FocusLost", [enter, { __t: "Input", key: "Return", state: "End" }]); });
+      inp.addEventListener("keydown", (e) => { e.stopPropagation(); if(e.key === "Enter" && !multi){ inp._enter = true; inp.blur(); } else if(e.key === "Escape") inp.blur(); });
+      inp.addEventListener("keyup", (e) => e.stopPropagation());
+    }
+    const ts = inp.style, xa = P(n, "TextXAlignment").n;
+    ts.color = rgba(P(n, "TextColor3"), 1 - P(n, "TextTransparency")); ts.fontSize = P(n, "TextSize") + "px"; ts.textAlign = xa === "Left" ? "left" : xa === "Right" ? "right" : "center";
+    const fam = (FONTS[P(n, "Font").n] || FONTS.SourceSans).split(";"); ts.fontFamily = fam[0]; ts.fontWeight = (fam[1] || "").replace("font-weight:", "") || "400";
+    inp.placeholder = String(P(n, "PlaceholderText") || ""); inp.readOnly = P(n, "TextEditable") === false;
+    const want = String(P(n, "Text") || "");
+    if(inp.value !== want && document.activeElement !== inp) inp.value = want;
+  }
+  function guiWire(n, el){
+    const id = n.id, pt = (e) => [e.clientX - (gui.root ? gui.root.getBoundingClientRect().left : 0), e.clientY - (gui.root ? gui.root.getBoundingClientRect().top : 0)];
+    const input = (e, st) => ({ __t: "Input", mouse: true, key: e.button === 2 ? "MouseButton2" : "MouseButton1", state: st, mx: pt(e)[0], my: pt(e)[1] });
+    el.addEventListener("mousedown", (e) => { const p = pt(e); fire(id, e.button === 2 ? "MouseButton2Down" : "MouseButton1Down", p); fire(id, "InputBegan", [input(e, "Begin")]); });
+    el.addEventListener("mouseup", (e) => { const p = pt(e); fire(id, e.button === 2 ? "MouseButton2Up" : "MouseButton1Up", p); fire(id, "InputEnded", [input(e, "End")]); });
+    el.addEventListener("click", (e) => { if(e.target.closest(".bvg") !== el && e.target !== el._c && e.target !== el) { /* click came from a child that handles it */ } fire(id, "MouseButton1Click", []); fire(id, "Activated", [input(e, "Begin")]); });
+    el.addEventListener("contextmenu", (e) => { if(hasListeners(id, "MouseButton2Click")){ e.preventDefault(); fire(id, "MouseButton2Click", []); } });
+    el.addEventListener("mouseenter", (e) => { const nn = findNode(id); if(nn && CLS[nn.className].button && P(nn, "AutoButtonColor") !== false) el.style.filter = "brightness(1.18)"; const p = pt(e); fire(id, "MouseEnter", p); });
+    el.addEventListener("mouseleave", (e) => { el.style.filter = ""; const p = pt(e); fire(id, "MouseLeave", p); });
+    el.addEventListener("mousemove", (e) => { if(hasListeners(id, "MouseMoved")) fire(id, "MouseMoved", pt(e)); });
+    el.addEventListener("wheel", (e) => { if(hasListeners(id, "MouseWheelForward") || hasListeners(id, "MouseWheelBackward")) fire(id, e.deltaY < 0 ? "MouseWheelForward" : "MouseWheelBackward", pt(e)); }, { passive: true });
+  }
+  function guiAbs(id){
+    const el = gui.els.get(id), r = gui.root ? gui.root.getBoundingClientRect() : { left: 0, top: 0 };
+    if(!el) return { pos: [0, 0], size: [0, 0], content: [0, 0] };
+    const b = el.getBoundingClientRect();
+    return { pos: [b.left - r.left, b.top - r.top], size: [b.width, b.height], content: [el._c.scrollWidth, el._c.scrollHeight] };
+  }
+  function guiClear(){
+    gui.dirty.clear();
+    gui.els.clear();
+    if(gui.root){ try{ gui.root.remove(); }catch(e){} gui.root = null; }
+    document.querySelectorAll(".bv-touch,.bv-note").forEach(e => e.remove());
+    touchBtns.clear();
+  }
+  function notify(title, text, secs){
+    const root = guiRoot();
+    const d = document.createElement("div"); d.className = "bv-note";
+    d.style.cssText = "position:absolute;right:14px;top:" + (14 + root.querySelectorAll(".bv-note").length * 74) + "px;max-width:300px;padding:10px 14px;border-radius:10px;background:rgba(18,18,20,.94);border:1px solid #36363c;color:#f2f2f4;font:13px system-ui;box-shadow:0 10px 26px rgba(0,0,0,.5);pointer-events:none;";
+    d.innerHTML = "<b style='display:block;margin-bottom:2px'></b><span></span>";
+    d.firstChild.textContent = String(title || ""); d.lastChild.textContent = String(text || "");
+    root.appendChild(d); setTimeout(() => d.remove(), Math.max(1, Number(secs) || 5) * 1000);
+  }
+  /* on-screen buttons for ContextActionService:BindAction(..., true, ...) (touch devices) */
+  const touchBtns = new Map();
+  function touchButton(p){
+    if(!p.on){ const b = touchBtns.get(p.name); if(b){ b.remove(); touchBtns.delete(p.name); } return; }
+    if(!(("ontouchstart" in window) || (navigator.maxTouchPoints > 0))) return;
+    let b = touchBtns.get(p.name);
+    if(!b){
+      b = document.createElement("button"); b.className = "bv-touch";
+      b.style.cssText = "position:fixed;right:" + (20 + (touchBtns.size % 3) * 76) + "px;bottom:" + (150 + Math.floor(touchBtns.size / 3) * 76) + "px;width:64px;height:64px;border-radius:50%;border:2px solid rgba(255,255,255,.65);background:rgba(20,20,22,.55);color:#fff;font:700 11px system-ui;z-index:1600;touch-action:none;user-select:none;padding:0;";
+      b.addEventListener("touchstart", (e) => { e.preventDefault(); callLua(rt.vms.client, "__cas_touch", [p.name, true]); }, { passive: false });
+      b.addEventListener("touchend", (e) => { e.preventDefault(); callLua(rt.vms.client, "__cas_touch", [p.name, false]); }, { passive: false });
+      document.body.appendChild(b); touchBtns.set(p.name, b);
+    }
+    if(p.title !== undefined) b.textContent = String(p.title).slice(0, 10);
+    if(p.image && /^https?:/.test(p.image)){ b.style.backgroundImage = "url(" + p.image + ")"; b.style.backgroundSize = "cover"; b.textContent = ""; }
+    if(p.pos){ b.style.right = "auto"; b.style.bottom = "auto"; b.style.left = (p.pos.xs * window.innerWidth + p.pos.xo) + "px"; b.style.top = (p.pos.ys * window.innerHeight + p.pos.yo) + "px"; }
+  }
+
+  /* ---------------- Sound ---------------- */
+  const sounds = new Map();
+  function soundEl(n){
+    let a = sounds.get(n.id); const url = String(P(n, "SoundId") || "");
+    if(!a || a._src !== url){
+      if(a){ try{ a.pause(); }catch(e){} }
+      a = new Audio(); a._src = url;
+      if(/^(https?:|data:|blob:)/.test(url)){ a.src = url; }
+      else if(url){ A.log("warn", "Sound.SoundId must be a web link (https://...); '" + url.slice(0, 40) + "' can't be played here", "client"); }
+      a.addEventListener("ended", () => { n.p = n.p || {}; n.p.Playing = false; fire(n.id, "Ended", []); });
+      sounds.set(n.id, a);
+    }
+    a.volume = Math.max(0, Math.min(1, Number(P(n, "Volume")) || 0)); a.loop = !!P(n, "Looped"); a.playbackRate = Number(P(n, "PlaybackSpeed")) || 1;
+    return a;
+  }
+  function soundCall(n, m){
+    const a = soundEl(n); n.p = n.p || {};
+    if(m === "Play"){ a.play().catch(() => {}); n.p.Playing = true; fire(n.id, "Played", []); }
+    else if(m === "Resume"){ a.play().catch(() => {}); n.p.Playing = true; }
+    else if(m === "Pause"){ a.pause(); n.p.Playing = false; fire(n.id, "Paused", []); }
+    else if(m === "Stop"){ a.pause(); try{ a.currentTime = 0; }catch(e){} n.p.Playing = false; }
+  }
+  function soundProp(n, k){
+    const a = sounds.get(n.id);
+    if(k === "Playing" || k === "IsPlaying") return a ? !a.paused && !a.ended : false;
+    if(k === "TimePosition") return a ? a.currentTime : 0;
+    if(k === "TimeLength") return a && isFinite(a.duration) ? a.duration : 0;
+    return P(n, k);
+  }
+  function soundApply(n, k){
+    if(k === "Playing"){ soundCall(n, P(n, "Playing") ? "Play" : "Pause"); }
+    else if(k === "TimePosition"){ const a = soundEl(n); try{ a.currentTime = Number(P(n, "TimePosition")) || 0; }catch(e){} }
+    else soundEl(n);
+  }
+  function soundsStop(){ sounds.forEach(a => { try{ a.pause(); }catch(e){} }); sounds.clear(); }
+
+  /* ---------------- camera, rays, mouse ---------------- */
+  const CAM_DEFAULT = { pos: [0, 10, 20], look: [0, 0, -1], fov: 70, w: 1280, h: 720 };
+  const vnorm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const vcross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const vdot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  function vpRect(){ try{ const r = A.guiRect && A.guiRect(); if(r) return r; }catch(e){} return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }; }
+  function camGet(){
+    try{ const c = A.camera && A.camera.get && A.camera.get(); if(c){ const r = vpRect(); return { pos: c.pos, look: c.look, fov: c.fov || 70, w: r.width, h: r.height }; } }catch(e){}
+    const r = vpRect(); return Object.assign({}, CAM_DEFAULT, { w: r.width, h: r.height });
+  }
+  function camBasis(c){
+    const f = vnorm(c.look); let r = vcross(f, [0, 1, 0]);
+    if(Math.hypot(r[0], r[1], r[2]) < 1e-6) r = [1, 0, 0];
+    r = vnorm(r); return { f, r, u: vcross(r, f) };
+  }
+  function camCF(c){ const b = camBasis(c); return cfOut(c.pos, [b.r[0], b.u[0], -b.f[0], b.r[1], b.u[1], -b.f[1], b.r[2], b.u[2], -b.f[2]]); }
+  function camRay(c, sx, sy){
+    const b = camBasis(c), tn = Math.tan(c.fov * DEG / 2), nx = (sx / c.w) * 2 - 1, ny = 1 - (sy / c.h) * 2, asp = c.w / c.h;
+    return { o: c.pos.slice(), d: vnorm([b.f[0] + b.r[0] * nx * tn * asp + b.u[0] * ny * tn, b.f[1] + b.r[1] * nx * tn * asp + b.u[1] * ny * tn, b.f[2] + b.r[2] * nx * tn * asp + b.u[2] * ny * tn]) };
+  }
+  const rayW = (r) => ({ __t: "RAY", ox: r.o[0], oy: r.o[1], oz: r.o[2], dx: r.d[0], dy: r.d[1], dz: r.d[2] });
+  function camPush(){
+    if(!(A.camera && A.camera.set)) return;
+    const scripted = rt.cam.type === "Scriptable", o = { scripted, fov: rt.cam.fov || null };
+    if(scripted && rt.cam.cf){ const m = cfMat(rt.cam.cf) || [1, 0, 0, 0, 1, 0, 0, 0, 1]; o.pos = [rt.cam.cf.x, rt.cam.cf.y, rt.cam.cf.z]; o.look = [-m[2], -m[5], -m[8]]; }
+    A.camera.set(o);
+  }
+  function camMember(k){
+    const c = camGet();
+    switch(k){
+      case "CFrame": return { k: "prop", v: camCF(c) };
+      case "Focus": { const p = [c.pos[0] + c.look[0] * 10, c.pos[1] + c.look[1] * 10, c.pos[2] + c.look[2] * 10]; return { k: "prop", v: cfOut(p, null) }; }
+      case "FieldOfView": return { k: "prop", v: c.fov };
+      case "CameraType": return { k: "prop", v: ENW("CameraType", rt.cam.type) };
+      case "ViewportSize": return { k: "prop", v: V2W(c.w, c.h) };
+      case "CameraSubject": return { k: "prop", v: I(HUM_ID) };
+      case "WorldToViewportPoint": case "WorldToScreenPoint": case "ViewportPointToRay": case "ScreenPointToRay": return METH;
+    }
+    return null;
+  }
+  function camSet(k, v){
+    if(k === "CameraType"){ rt.cam.type = (v && v.n) || String(v); camPush(); }
+    else if(k === "FieldOfView"){ rt.cam.fov = Math.max(1, Math.min(120, Number(v) || 70)); camPush(); }
+    else if(k === "CFrame"){ rt.cam.cf = v; camPush(); }
+    else if(k === "CameraSubject" || k === "Focus" || k === "HeadLocked") return;
+    else throw new Error(k + " is not a valid member of Camera");
+  }
+  function camCall(m, a){
+    const c = camGet(), b = camBasis(c);
+    if(m === "WorldToViewportPoint" || m === "WorldToScreenPoint"){
+      const p = a[0], v = [p.x - c.pos[0], p.y - c.pos[1], p.z - c.pos[2]];
+      const z = vdot(v, b.f), tn = Math.tan(c.fov * DEG / 2), asp = c.w / c.h;
+      const nx = z > 1e-6 ? vdot(v, b.r) / (z * tn * asp) : 0, ny = z > 1e-6 ? vdot(v, b.u) / (z * tn) : 0;
+      const sx = (nx + 1) / 2 * c.w, sy = (1 - ny) / 2 * c.h;
+      return { __t: "MULTI", v: [{ __t: "V3", x: sx, y: sy, z }, z > 0 && Math.abs(nx) <= 1 && Math.abs(ny) <= 1] };
+    }
+    if(m === "ViewportPointToRay" || m === "ScreenPointToRay") return rayW(camRay(c, Number(a[0]) || 0, Number(a[1]) || 0));
+    return undefined;
+  }
+  function orientMat(p){ const o = A.part.get(p, "Orientation") || [0, 0, 0]; return eulerToMat(o[0] * DEG, o[1] * DEG, o[2] * DEG); }
+  function rayVsBox(o, d, pos, size, m){
+    const dx = o[0] - pos[0], dy = o[1] - pos[1], dz = o[2] - pos[2];
+    const lo = [m[0] * dx + m[3] * dy + m[6] * dz, m[1] * dx + m[4] * dy + m[7] * dz, m[2] * dx + m[5] * dy + m[8] * dz];
+    const ld = [m[0] * d[0] + m[3] * d[1] + m[6] * d[2], m[1] * d[0] + m[4] * d[1] + m[7] * d[2], m[2] * d[0] + m[5] * d[1] + m[8] * d[2]];
+    let tmin = -Infinity, tmax = Infinity, axis = -1, sign = 1;
+    for(let i = 0; i < 3; i++){
+      const h = size[i] / 2;
+      if(Math.abs(ld[i]) < 1e-9){ if(lo[i] < -h || lo[i] > h) return null; continue; }
+      let t1 = (-h - lo[i]) / ld[i], t2 = (h - lo[i]) / ld[i], sg = -1;
+      if(t1 > t2){ const tmp = t1; t1 = t2; t2 = tmp; sg = 1; }
+      if(t1 > tmin){ tmin = t1; axis = i; sign = sg; }
+      if(t2 < tmax) tmax = t2;
+      if(tmin > tmax) return null;
+    }
+    if(tmax < 0 || tmin < 0 || axis < 0) return null;
+    const nl = [0, 0, 0]; nl[axis] = sign;
+    return { t: tmin, n: [m[0] * nl[0] + m[1] * nl[1] + m[2] * nl[2], m[3] * nl[0] + m[4] * nl[1] + m[5] * nl[2], m[6] * nl[0] + m[7] * nl[1] + m[8] * nl[2]] };
+  }
+  function filterFn(params){
+    const list = params && params.FilterDescendantsInstances ? params.FilterDescendantsInstances : [];
+    const set = new Set((Array.isArray(list) ? list : []).map(x => x && x.id).filter(Boolean));
+    const include = !!(params && params.FilterType && params.FilterType.n === "Include");
+    return (id) => {
+      let cur = id, g = 0, inSet = false;
+      while(cur && g++ < 40){ if(set.has(cur)){ inSet = true; break; } cur = parentOf(cur); }
+      return include ? inSet : !inSet;
+    };
+  }
+  function castRay(o, d, maxT, params){
+    const ok = filterFn(params);
+    let best = null;
+    A.parts().forEach(p => {
+      if(p.pending || p.attached === false || A.part.get(p, "CanQuery") === false || !ok(p.id)) return;
+      const hit = rayVsBox(o, d, A.part.get(p, "Position"), A.part.get(p, "Size"), orientMat(p));
+      if(hit && hit.t <= maxT && (!best || hit.t < best.t)) best = Object.assign({ p }, hit);
+    });
+    return best;
+  }
+  function doRaycast(origin, dir, params){
+    if(!origin || !dir) throw new Error("Raycast needs an origin and a direction (Vector3)");
+    const o = [origin.x, origin.y, origin.z], d = [dir.x, dir.y, dir.z], len = Math.hypot(d[0], d[1], d[2]);
+    if(len === 0) return null;
+    const hit = castRay(o, d, 1, params);
+    if(!hit) return null;
+    return { Instance: I(hit.p.id), Position: { __t: "V3", x: o[0] + d[0] * hit.t, y: o[1] + d[1] * hit.t, z: o[2] + d[2] * hit.t }, Normal: { __t: "V3", x: hit.n[0], y: hit.n[1], z: hit.n[2] }, Distance: hit.t * len, Material: ENW("Material", cap(A.part.get(hit.p, "Material") || "plastic")) };
+  }
+  function doBounds(cf, size, params){
+    if(!cf || !size) return [];
+    const m = cfMat(cf) || [1, 0, 0, 0, 1, 0, 0, 0, 1], ok = filterFn(params), out = [];
+    A.parts().forEach(p => {
+      if(p.pending || p.attached === false || !ok(p.id)) return;
+      const pos = A.part.get(p, "Position"), dx = pos[0] - cf.x, dy = pos[1] - cf.y, dz = pos[2] - cf.z;
+      const l = [m[0] * dx + m[3] * dy + m[6] * dz, m[1] * dx + m[4] * dy + m[7] * dz, m[2] * dx + m[5] * dy + m[8] * dz];
+      if(Math.abs(l[0]) <= size.x / 2 && Math.abs(l[1]) <= size.y / 2 && Math.abs(l[2]) <= size.z / 2) out.push(I(p.id));
+    });
+    return out;
+  }
+  function mouseRayInfo(){
+    const c = camGet(), vp = vpRect(), r = camRay(c, rt.mouse.x, rt.mouse.y);
+    const hit = castRay(r.o, r.d, 1000, null);
+    const at = hit ? [r.o[0] + r.d[0] * hit.t, r.o[1] + r.d[1] * hit.t, r.o[2] + r.d[2] * hit.t] : [r.o[0] + r.d[0] * 1000, r.o[1] + r.d[1] * 1000, r.o[2] + r.d[2] * 1000];
+    void vp;
+    return { Hit: cfOut(at, null), Target: hit ? I(hit.p.id) : null, Origin: cfOut(r.o, null), UnitRay: rayW(r), Normal: hit ? { __t: "V3", x: hit.n[0], y: hit.n[1], z: hit.n[2] } : { __t: "V3", x: 0, y: 1, z: 0 } };
+  }
+
+  /* ---------------- DataStoreService (saved in this browser per game) + os.date ---------------- */
+  function dsKey(s, k){ let pre = "default"; try{ pre = (A.storagePrefix && A.storagePrefix()) || "default"; }catch(e){} return "bvds:" + pre + ":" + s + ":" + k; }
+  function fmtDate(fmt, t, utc){
+    const d = new Date((t === undefined || t === null ? Date.now() / 1000 : t) * 1000);
+    const g = (loc, u) => utc ? d["getUTC" + u]() : d["get" + u]();
+    const pad = (n, w) => String(n).padStart(w || 2, "0");
+    const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], MONS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const Y = g(0, "FullYear"), Mo = g(0, "Month"), D = g(0, "Date"), H = g(0, "Hours"), Mi = g(0, "Minutes"), S = g(0, "Seconds"), W = g(0, "Day");
+    if(fmt === "*t" || fmt === "!*t") return { year: Y, month: Mo + 1, day: D, hour: H, min: Mi, sec: S, wday: W + 1, yday: Math.floor((Date.UTC(Y, Mo, D) - Date.UTC(Y, 0, 0)) / 864e5), isdst: false };
+    const map = { Y: pad(Y, 4), y: pad(Y % 100), m: pad(Mo + 1), d: pad(D), H: pad(H), M: pad(Mi), S: pad(S), p: H < 12 ? "AM" : "PM", I: pad(H % 12 || 12), A: DAYS[W], a: DAYS[W].slice(0, 3), B: MONS[Mo], b: MONS[Mo].slice(0, 3), j: pad(Math.floor((Date.UTC(Y, Mo, D) - Date.UTC(Y, 0, 0)) / 864e5), 3), "%": "%" };
+    map.c = map.a + " " + map.b + " " + map.d + " " + map.H + ":" + map.M + ":" + map.S + " " + map.Y; map.x = map.m + "/" + map.d + "/" + map.y; map.X = map.H + ":" + map.M + ":" + map.S;
+    return String(fmt).replace(/^!/, "").replace(/%(.)/g, (m0, c) => map[c] !== undefined ? map[c] : m0);
+  }
+
+  /* ---------------- hooks used by member / callMethod / setMember ---------------- */
+  function extMember(vm, id, k){
+    if(id === "svc:Workspace"){
+      if(k === "CurrentCamera") return { k: "child", id: CAM_ID };
+      if(k === "Raycast" || k === "GetPartBoundsInBox") return METH;
+      if(k === "Gravity") return { k: "prop", v: rt.gravity };
+    }
+    if(id === "svc:Lighting" && LIGHT_KEYS.indexOf(k) >= 0) return { k: "prop", v: rt.lightX[k] !== undefined ? rt.lightX[k] : LIGHT_DEFAULT[k] };
+    if(id === "svc:UserInputService"){
+      if(k === "InputChanged" || k === "WindowFocused" || k === "WindowFocusReleased" || k === "TextBoxFocused" || k === "TextBoxFocusReleased") return SIG;
+      if(k === "GetKeysPressed" || k === "GetMouseDelta" || k === "GetFocusedTextBox" || k === "GetMouseLocation") return METH;
+      if(k === "MouseBehavior") return { k: "prop", v: ENW("MouseBehavior", rt.mouseBehavior) };
+      if(k === "MouseIconEnabled") return { k: "prop", v: rt.mouseIcon };
+      const touch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+      if(k === "TouchEnabled") return { k: "prop", v: touch };
+      if(k === "KeyboardEnabled" || k === "MouseEnabled") return { k: "prop", v: !touch };
+      if(k === "GamepadEnabled" || k === "GyroscopeEnabled" || k === "AccelerometerEnabled" || k === "VREnabled") return { k: "prop", v: false };
+      if(k === "MouseDeltaSensitivity") return { k: "prop", v: 1 };
+    }
+    if(id === "svc:StarterGui" && (k === "SetCore" || k === "GetCore" || k === "SetCoreGuiEnabled" || k === "GetCoreGuiEnabled")) return METH;
+    if(id === "svc:SoundService" && k === "PlayLocalSound") return METH;
+    if(id === PLAYER_ID){ if(k === "PlayerGui") return { k: "child", id: PLAYERGUI_ID }; if(k === "Chatted") return SIG; if(k === "CameraMode" || k === "CameraMaxZoomDistance" || k === "CameraMinZoomDistance") return { k: "prop", v: k === "CameraMode" ? ENW("CameraMode", "Classic") : (k === "CameraMaxZoomDistance" ? 128 : 0.5) }; }
+    if(id === CAM_ID){ const r = camMember(k); if(r) return r; }
+    const node = findNode(id);
+    if(node){
+      const reg = CLS[node.className];
+      if(reg){
+        if(reg.props && hasOwn(reg.props, k)) return { k: "prop", v: node.className === "Sound" ? soundProp(node, k) : P(node, k) };
+        if(reg.abs && (k === "AbsoluteSize" || k === "AbsolutePosition" || k === "AbsoluteContentSize")){ const a = guiAbs(id); return { k: "prop", v: V2W(...(k === "AbsoluteSize" ? a.size : k === "AbsolutePosition" ? a.pos : a.content)) }; }
+        if(reg.signals && reg.signals.indexOf(k) >= 0) return SIG;
+        if(reg.methods && reg.methods.indexOf(k) >= 0) return METH;
+      }
+    }
+    if(k === "ChildAdded" || k === "ChildRemoved" || k === "DescendantAdded" || k === "DescendantRemoving" || k === "Changed" || k === "AncestryChanged" || k === "Destroying") return SIG;
+    return undefined;
+  }
+  function extCall(vm, id, m, args){
+    if(id === "svc:Workspace"){
+      if(m === "Raycast") return doRaycast(args[0], args[1], args[2]);
+      if(m === "GetPartBoundsInBox") return doBounds(args[0], args[1], args[2]);
+    }
+    if(id === "svc:UserInputService"){
+      if(m === "GetKeysPressed") return Array.from(rt.keysDown).map(k => ({ __t: "Input", key: k, state: "Begin" }));
+      if(m === "GetMouseDelta"){ const d = rt.mouseDelta; rt.mouseDelta = [0, 0]; return V2W(d[0], d[1]); }
+      if(m === "GetMouseLocation") return V2W(rt.mouse.x, rt.mouse.y);
+      if(m === "GetFocusedTextBox") return rt.focusedBox ? I(rt.focusedBox) : null;
+    }
+    if(id === "svc:StarterGui"){
+      if(m === "SetCore"){ if(args[0] === "SendNotification" && args[1]) notify(args[1].Title, args[1].Text, args[1].Duration); return null; }
+      return null;
+    }
+    if(id === "svc:SoundService" && m === "PlayLocalSound"){ const sn = args[0] && findNode(args[0].id); if(sn) soundCall(sn, "Play"); return null; }
+    if(id === CAM_ID){ const r = camCall(m, args); if(r !== undefined) return r; }
+    const node = findNode(id);
+    if(node){
+      if(m === "Clone") return I(cloneNodeDeep(node, null));
+      if(node.className === "Sound" && (m === "Play" || m === "Stop" || m === "Pause" || m === "Resume")){ soundCall(node, m); return null; }
+      if(node.className === "BindableEvent" && m === "Fire"){ fire(id, "Event", args); return null; }
+      if(node.className === "BindableFunction" && m === "Invoke"){
+        const h = rt.invoke.get(id); if(!h) throw new Error("Invoke: OnInvoke has not been set on " + node.name);
+        return callLua(h.vm, "__invoke", [h.h, args], true);
+      }
+      if(node.className === "TextBox"){
+        const el = gui.els.get(id);
+        if(m === "CaptureFocus"){ if(el && el._in) el._in.focus(); return null; }
+        if(m === "ReleaseFocus"){ if(el && el._in) el._in.blur(); return null; }
+        if(m === "IsFocused") return rt.focusedBox === id;
+      }
+    }
+    return undefined;
+  }
+  function extSet(vm, id, k, v){
+    if(id === "svc:Lighting" && LIGHT_KEYS.indexOf(k) >= 0){ rt.lightX[k] = v; try{ if(A.lighting && A.lighting.set) A.lighting.set(k, v); }catch(e){} return true; }
+    if(id === "svc:Workspace" && k === "Gravity"){ rt.gravity = Math.max(0, Number(v) || 0); try{ if(A.physics && A.physics.setGravity) A.physics.setGravity(rt.gravity); }catch(e){} return true; }
+    if(id === "svc:UserInputService"){
+      if(k === "MouseBehavior"){ rt.mouseBehavior = (v && v.n) || "Default"; try{ A.input && A.input.setMouseBehavior && A.input.setMouseBehavior(rt.mouseBehavior); }catch(e){} return true; }
+      if(k === "MouseIconEnabled"){ rt.mouseIcon = !!v; try{ A.input && A.input.setMouseIcon && A.input.setMouseIcon(!!v); }catch(e){} return true; }
+      if(k === "MouseDeltaSensitivity") return true;
+    }
+    if(id === CAM_ID){ camSet(k, v); return true; }
+    const node = findNode(id);
+    if(node){
+      const reg = CLS[node.className];
+      if(reg && reg.props && hasOwn(reg.props, k)){
+        node.p = node.p || {}; node.p[k] = v;
+        if(node.className === "Sound") soundApply(node, k);
+        if(reg.gui){ if(reg.gui === "mod"){ const pn = findNode(node.parent); if(pn) guiDirtyTree(pn.id); } else guiDirty(id); }
+        fire(id, "prop:" + k, []); fire(id, "Changed", [k]);
+        return true;
+      }
+      if(k === "OnInvoke" && node.className === "BindableFunction"){ if(v && v.__t === "F"){ rt.invoke.set(id, { vm, h: v.h }); return true; } }
+    }
+    return false;
+  }
+  function cloneNodeDeep(n, parentId){
+    const c = Object.assign({}, n, { id: "tmp_" + Math.random().toString(36).slice(2, 9), parent: parentId });
+    if(n.p) c.p = JSON.parse(JSON.stringify(n.p));
+    rt.tmpNodes.push(c);
+    allNodes().filter(k => k.parent === n.id && k !== c).forEach(k => cloneNodeDeep(k, c.id));
+    if(parentId) guiDirtyTree(c.id);
+    return c.id;
+  }
+  function extCleanup(){
+    guiClear(); soundsStop();
+    try{ if(A.camera && A.camera.release) A.camera.release(); }catch(e){}
+    try{ if(A.input && A.input.setMouseBehavior) A.input.setMouseBehavior("Default"); if(A.input && A.input.setMouseIcon) A.input.setMouseIcon(true); }catch(e){}
+    rt.sunk.clear(); rt.cam = { type: "Custom", fov: null, cf: null }; rt.mouseBehavior = "Default"; rt.mouseIcon = true; rt.lightX = {}; rt.focusedBox = null;
+  }
+
+
+  rt.CLS = CLS;
   function hostOp(vm, op, p){
     switch(op){
       case "log": A.log(p.k, String(p.s), vm.name); return null;
@@ -2655,6 +3902,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
         if(SERVICES.indexOf(name) < 0) throw new Error(String(name) + " is not a valid service name");
         return "svc:" + name;
       }
+      case "date": return { v: fmtDate(p.f, p.t, String(p.f).charAt(0) === "!") };
+      case "mouse": { const r = vpRect(); return { x: rt.mouse.x, y: rt.mouse.y, w: r.width, h: r.height }; }
+      case "mouseray": return mouseRayInfo();
+      case "dsget": { let v = null; try{ const t = localStorage.getItem(dsKey(p.s, p.k)); if(t !== null) v = JSON.parse(t); }catch(e){} return { v }; }
+      case "dsset": try{ localStorage.setItem(dsKey(p.s, p.k), JSON.stringify(p.v === undefined ? null : p.v)); }catch(e){ throw new Error("DataStore: couldn't save (storage full or blocked)"); } return null;
+      case "dsremove": try{ localStorage.removeItem(dsKey(p.s, p.k)); }catch(e){} return null;
+      case "touchbtn": touchButton(p); return null;
       case "member": return member(vm, p.id, p.k);
       case "call": return callMethod(vm, p.id, p.m, p.a);
       case "set": setMember(vm, p.id, p.k, p.v); return null;
@@ -2676,7 +3930,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       if(n.disabled) return;
       const c = containerOf("server", n.id);
       if(kind === "server" && n.className === "Script" && (c === "svc:ServerScriptService" || c === "svc:Workspace")) out.push(n);
-      if(kind === "client" && n.className === "LocalScript" && c === "svc:StarterPlayerScripts") out.push(n);
+      if(kind === "client" && n.className === "LocalScript" && (c === "svc:StarterPlayerScripts" || c === "svc:PlayerGui")) out.push(n);
     });
     // ServerScriptService before Workspace, like Roblox
     return out;
@@ -2692,6 +3946,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     // the player joins after the server scripts have run
     fire("svc:Players", "PlayerAdded", [I(PLAYER_ID)], "server");
     fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)], "server");
+    allNodes().filter(n => n.parent === "svc:StarterGui").forEach(n => cloneNodeDeep(n, PLAYERGUI_ID));   // StarterGui -> PlayerGui
     rt.vms.client = makeVM("client");
     scriptsFor("client").forEach(n => callLua(rt.vms.client, "__start", [n.id, n.name, luauToLua(n.source || "")], false));
     callLua(rt.vms.client, "__step", [0]);
@@ -2699,6 +3954,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     return { server: servers.length, client: scriptsFor("client").length };
   }
   function stop(){
+    extCleanup();
     ["server", "client"].forEach(k => { const vm = rt.vms[k]; if(vm && !vm.closed){ vm.closed = true; try{ lua.lua_close(vm.L); }catch(e){} } });
     rt.vms = {};
     const tmpParts = Array.from(rt.createdParts.values());
@@ -2733,6 +3989,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     callLua(rt.vms.server, "__step", [dt]);
     callLua(rt.vms.client, "__step", [dt]);
     updateTouches();
+    guiFlush();
     // respawn a few seconds after dying
     if(rt.hum.dead && rt.now - rt.hum.deadAt > 3){
       rt.hum.dead = false; rt.hum.Health = rt.hum.MaxHealth; rt.hum.Sit = false; rt.hum.PlatformStand = false; rt.hum.moveTarget = null;
@@ -2741,24 +3998,50 @@ function createLuaRuntime(fengari, A, preludeSrc){
       fire(PLAYER_ID, "CharacterAdded", [I(CHAR_ID)]);
     }
   }
-  function keyEvent(key, down){
-    key = String(key).toUpperCase();
-    const map = { " ": "Space", "SHIFT": "LeftShift", "ENTER": "Return", "ARROWUP": "Up", "ARROWDOWN": "Down", "ARROWLEFT": "Left", "ARROWRIGHT": "Right", "CONTROL": "LeftControl", "TAB": "Tab", "ESCAPE": "Escape" };
-    const name = map[key] || (key.length === 1 && /[0-9]/.test(key) ? ["Zero","One","Two","Three","Four","Five","Six","Seven","Eight","Nine"][+key] : key.charAt(0) + key.slice(1).toLowerCase());
-    const nm = key.length === 1 && /[A-Z]/.test(key) ? key : name;
-    if(down) rt.keysDown.add(nm); else rt.keysDown.delete(nm);
-    if(!rt.running) return;
-    fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [{ __t: "Input", key: nm, state: down ? "Begin" : "End" }, false], "client");
+  const KEY_MAP = { " ": "Space", SHIFT: "LeftShift", CONTROL: "LeftControl", ALT: "LeftAlt", META: "LeftMeta", ENTER: "Return", ARROWUP: "Up", ARROWDOWN: "Down", ARROWLEFT: "Left", ARROWRIGHT: "Right", TAB: "Tab", ESCAPE: "Escape", BACKSPACE: "Backspace", DELETE: "Delete", HOME: "Home", END: "End", PAGEUP: "PageUp", PAGEDOWN: "PageDown", INSERT: "Insert", CAPSLOCK: "CapsLock", "-": "Minus", "=": "Equals", "[": "LeftBracket", "]": "RightBracket", ";": "Semicolon", "'": "Quote", ",": "Comma", ".": "Period", "/": "Slash", "\\": "BackSlash", "`": "Backquote" };
+  const DIGITS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+  function keyName(key){
+    const raw = String(key), up = raw.toUpperCase();
+    if(KEY_MAP[up] !== undefined) return KEY_MAP[up];
+    if(/^F\d{1,2}$/.test(up)) return up;
+    if(raw.length === 1 && /[0-9]/.test(raw)) return DIGITS[+raw];
+    if(raw.length === 1 && /[a-zA-Z]/.test(raw)) return up;
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
   }
+  // returns true when a ContextActionService action "sank" the key (the default controls then ignore it)
+  function keyEvent(key, down){
+    const nm = keyName(key), raw = String(key).toLowerCase();
+    if(down) rt.keysDown.add(nm); else rt.keysDown.delete(nm);
+    if(!rt.running) return false;
+    const wire = { __t: "Input", key: nm, state: down ? "Begin" : "End" };
+    const sunk = !!(rt.vms.client && callLua(rt.vms.client, "__cas_input", [wire, down], true));
+    if(down){ if(sunk) rt.sunk.add(raw); } else rt.sunk.delete(raw);
+    fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [wire, sunk], "client");
+    return sunk;
+  }
+  const isSunk = (k) => rt.sunk.has(String(k).toLowerCase());
   // the player pressed jump (Space, the on-screen jump button or a gamepad): scripts see UserInputService.JumpRequest
   function jumpRequest(){ if(rt.running) fire("svc:UserInputService", "JumpRequest", [], "client"); }
   // button: the DOM's MouseEvent.button (0 left, 1 middle, 2 right)
   function mouseEvent(button, down, x, y){
     const nm = button === 2 ? "MouseButton2" : button === 1 ? "MouseButton3" : "MouseButton1";
-    rt.mouse.x = x || 0; rt.mouse.y = y || 0;
+    const vp = vpRect();
+    rt.mouse.x = (x || 0) - vp.left; rt.mouse.y = (y || 0) - vp.top;
     if(down) rt.mouseDown.add(nm); else rt.mouseDown.delete(nm);
-    if(!rt.running) return;
-    fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [{ __t: "Input", mouse: true, key: nm, state: down ? "Begin" : "End", mx: rt.mouse.x, my: rt.mouse.y }, false], "client");
+    if(!rt.running) return false;
+    const wire = { __t: "Input", mouse: true, key: nm, state: down ? "Begin" : "End", mx: rt.mouse.x, my: rt.mouse.y };
+    const sunk = !!(rt.vms.client && callLua(rt.vms.client, "__cas_input", [wire, down], true));
+    fire("svc:UserInputService", down ? "InputBegan" : "InputEnded", [wire, sunk], "client");
+    return sunk;
+  }
+  function mouseMove(x, y, dx, dy){
+    const vp = vpRect();
+    rt.mouse.x = (x || 0) - vp.left; rt.mouse.y = (y || 0) - vp.top;
+    rt.mouseDelta[0] += dx || 0; rt.mouseDelta[1] += dy || 0;
+    if(rt.running) fire("svc:UserInputService", "InputChanged", [{ __t: "Input", mouse: true, key: "MouseMovement", state: "Change", mx: rt.mouse.x, my: rt.mouse.y, dx: dx || 0, dy: dy || 0 }, false], "client");
+  }
+  function wheelEvent(delta){
+    if(rt.running) fire("svc:UserInputService", "InputChanged", [{ __t: "Input", mouse: true, key: "MouseWheel", state: "Change", mx: rt.mouse.x, my: rt.mouse.y, mz: delta > 0 ? 1 : -1 }, false], "client");
   }
   function checkSyntax(src, name){
     try{
@@ -2766,7 +4049,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       return callLua(rt.checkVM, "__check", [luauToLua(src), name || "script"], true);
     }catch(e){ return null; }
   }
-  rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.mouseEvent = mouseEvent; rt.jumpRequest = jumpRequest; rt.checkSyntax = checkSyntax;
+  rt.start = start; rt.stop = stop; rt.step = step; rt.keyEvent = keyEvent; rt.mouseEvent = mouseEvent; rt.mouseMove = mouseMove; rt.wheel = wheelEvent; rt.isSunk = isSunk; rt.jumpRequest = jumpRequest; rt.checkSyntax = checkSyntax;
   rt.setHum = setHum; rt.humFrame = humFrame; rt.humMoveDone = humMoveDone; rt.JUMP_K = JUMP_K; rt.markCreated = (p) => rt.createdParts.set(p.id, p);
   return rt;
 }
@@ -4455,6 +5738,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
     window.addEventListener("mouseup", (e) => {
       if(playMode.active && LuaRT && LuaRT.running) LuaRT.mouseEvent(e.button, false, e.clientX, e.clientY);
     });
+    window.addEventListener("mousemove", (e) => { if(playMode.active && LuaRT && LuaRT.running) LuaRT.mouseMove(e.clientX, e.clientY, e.movementX || 0, e.movementY || 0); });
+    window.addEventListener("wheel", (e) => { if(playMode.active && LuaRT && LuaRT.running && e.target === renderer.domElement) LuaRT.wheel(-e.deltaY); }, { passive: true });
 
     window.addEventListener("resize", onResize);
 
@@ -4521,6 +5806,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
     ).multiplyScalar(playMode.camDist);
     camera.position.copy(pivot).add(camOffset);
     camera.lookAt(pivot);
+    if(luaCam.on){ camera.position.set(luaCam.pos[0], luaCam.pos[1], luaCam.pos[2]); camera.lookAt(luaCam.pos[0] + luaCam.look[0], luaCam.pos[1] + luaCam.look[1], luaCam.pos[2] + luaCam.look[2]); }
 
     // movement relative to camera facing (forward = where camera looks, flattened)
     const flatForward = new THREE.Vector3(-Math.sin(playMode.camYaw), 0, -Math.cos(playMode.camYaw));
@@ -4528,10 +5814,11 @@ function createLuaRuntime(fengari, A, preludeSrc){
     const moveDir = new THREE.Vector3();
     const HM = (LuaRT && LuaRT.running) ? LuaRT.hum : null;     // the Humanoid (scripts and the Properties panel change this live)
     const inputOn = !playMode.menuOpen && !(HM && (HM.dead || HM.Sit || HM.PlatformStand));
-    if(inputOn && keysDown["w"]) moveDir.add(flatForward);
-    if(inputOn && keysDown["s"]) moveDir.sub(flatForward);
-    if(inputOn && keysDown["d"]) moveDir.add(flatRight);
-    if(inputOn && keysDown["a"]) moveDir.sub(flatRight);
+    const SK = (k) => !!(LuaRT && LuaRT.running && LuaRT.isSunk(k));      // a script bound this key with ContextActionService: no default move/jump
+    if(inputOn && keysDown["w"] && !SK("w")) moveDir.add(flatForward);
+    if(inputOn && keysDown["s"] && !SK("s")) moveDir.sub(flatForward);
+    if(inputOn && keysDown["d"] && !SK("d")) moveDir.add(flatRight);
+    if(inputOn && keysDown["a"] && !SK("a")) moveDir.sub(flatRight);
     // scripts: Humanoid:Move(dir, relativeToCamera) and Humanoid:MoveTo(position)
     if(HM && !HM.dead && !HM.Sit && !HM.PlatformStand){
       if(HM.moveVec && LuaRT.now < HM.moveUntil){
@@ -4564,7 +5851,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
       HM.forceJump = false; HM.Jump = false;
       if(HM.JumpPower > 0){ playMode.velocityY = 10 * (HM.JumpPower / 50); playMode.onGround = false; playJumpSound(); }
     }
-    const wantJump = inputOn && (keysDown[" "] || (HM && HM.Jump));
+    const wantJump = inputOn && ((keysDown[" "] && !SK(" ")) || (HM && HM.Jump));
     if(HM && HM.Jump && playMode.onGround) HM.Jump = false;   // like Roblox: Jump flips back to false once the jump happens
     if(wantJump && playMode.onGround && (!HM || HM.JumpPower > 0)){
       playMode.emote = null;                             // jumping cancels a dance too
@@ -5106,6 +6393,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   let playNodes = [];        // the copy scripts see during a play test (so a script can never damage your project)
   let playSnap = null;       // world snapshot taken when play starts, restored when it ends
   let LuaRT = null;
+  const luaCam = { on: false, pos: [0, 0, 0], look: [0, 0, -1], baseFov: null, fovOn: false };   // a script took over the camera
 
   const SVG = (d) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
   const NODE_ICONS = {
@@ -5119,17 +6407,25 @@ function createLuaRuntime(fengari, A, preludeSrc){
     StringValue: SVG('<path d="M4 7V5h16v2M12 5v14M9 19h6"/>'),
     BoolValue: SVG('<rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="16" cy="12" r="2.5"/>')
   };
+  (function(){
+    const box = SVG('<rect x="3" y="5" width="18" height="14" rx="2"/>'), txt = SVG('<path d="M5 7V5h14v2M12 5v14M9 19h6"/>'), mod = SVG('<path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/>');
+    Object.assign(NODE_ICONS, { ScreenGui: SVG('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/>'), Frame: box, TextLabel: txt, TextButton: SVG('<rect x="3" y="7" width="18" height="10" rx="3"/><path d="M8 12h8"/>'), TextBox: SVG('<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 10v4"/>'), ImageLabel: SVG('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/>'), ImageButton: SVG('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/>'), ScrollingFrame: SVG('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M17 8v8"/>'), UICorner: mod, UIStroke: mod, UIListLayout: mod, UIGridLayout: mod, UIPadding: mod, UIAspectRatioConstraint: mod, UIScale: mod, Sound: SVG('<path d="M11 5L6 9H3v6h3l5 4V5zM15 9a4 4 0 010 6M18 6a8 8 0 010 12"/>'), BindableEvent: NODE_ICONS.RemoteEvent, BindableFunction: NODE_ICONS.RemoteFunction, IntValue: NODE_ICONS.NumberValue, ObjectValue: NODE_ICONS.StringValue, Vector3Value: NODE_ICONS.NumberValue, Color3Value: NODE_ICONS.StringValue });
+  })();
   const SERVICE_DEFS = [
     { id: "svc:ReplicatedStorage", name: "ReplicatedStorage", icon: SVG('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>'), hint: "Shared: both the server and every player can see these" },
     { id: "svc:StarterPlayerScripts", name: "StarterPlayerScripts", icon: SVG('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/>'), hint: "LocalScripts here run on each player's device" },
-    { id: "svc:ServerScriptService", name: "ServerScriptService", icon: SVG('<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>'), hint: "Scripts here run only on the server, hidden from players" }
+    { id: "svc:ServerScriptService", name: "ServerScriptService", icon: SVG('<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>'), hint: "Scripts here run only on the server, hidden from players" },
+    { id: "svc:StarterGui", name: "StarterGui", icon: SVG('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/>'), hint: "ScreenGuis here are copied to every player's screen (PlayerGui) when the game starts" }
   ];
   const INSERT_OPTIONS = {
     "svc:Workspace": ["Script", "Folder"],
     "svc:ServerScriptService": ["Script", "ModuleScript", "Folder"],
     "svc:StarterPlayerScripts": ["LocalScript", "ModuleScript", "Folder"],
-    "svc:ReplicatedStorage": ["ModuleScript", "RemoteEvent", "RemoteFunction", "Folder", "NumberValue", "StringValue", "BoolValue"]
+    "svc:ReplicatedStorage": ["ModuleScript", "RemoteEvent", "RemoteFunction", "BindableEvent", "BindableFunction", "Folder", "NumberValue", "IntValue", "StringValue", "BoolValue", "ObjectValue", "Vector3Value", "Color3Value", "Sound"],
+    "svc:StarterGui": ["ScreenGui", "LocalScript", "ModuleScript", "Folder"]
   };
+  const GUI_CONTAINERS = new Set(["ScreenGui", "Frame", "ScrollingFrame", "TextButton", "ImageButton", "TextLabel", "ImageLabel", "TextBox"]);
+  const GUI_KIDS = ["Frame", "TextLabel", "TextButton", "TextBox", "ImageLabel", "ImageButton", "ScrollingFrame", "UICorner", "UIStroke", "UIListLayout", "UIGridLayout", "UIPadding", "UIAspectRatioConstraint", "UIScale", "LocalScript", "Sound"];
   const DEFAULT_SOURCE = {
     Script: 'print("Hello world!")\n',
     LocalScript: 'print("Hello from the client!")\n',
@@ -5152,12 +6448,13 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(sceneObjects.some(o => o.id === pid)) return ["Script"];
     const n = nodeById(pid);
     if(n && n.className === "Folder") return INSERT_OPTIONS[serviceOfParent(pid)] || [];
+    if(n && GUI_CONTAINERS.has(n.className)) return n.className === "ScreenGui" ? GUI_KIDS : GUI_KIDS;
     return [];
   }
   function whereItRuns(n){
     const svc = serviceOfParent(n.parent);
     if(n.className === "Script") return (svc === "svc:ServerScriptService" || svc === "svc:Workspace") ? "Runs on the server" : "Inactive here - Scripts run from ServerScriptService or Workspace";
-    if(n.className === "LocalScript") return svc === "svc:StarterPlayerScripts" ? "Runs on each player's device" : "Inactive here - LocalScripts run from StarterPlayerScripts";
+    if(n.className === "LocalScript") return (svc === "svc:StarterPlayerScripts" || svc === "svc:StarterGui") ? "Runs on each player's device" : "Inactive here - LocalScripts run from StarterPlayerScripts";
     if(n.className === "ModuleScript") return "Runs when another script calls require() on it";
     return "";
   }
@@ -5167,6 +6464,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
     if(className === "NumberValue") n.value = 0;
     if(className === "BoolValue") n.value = false;
     if(className === "StringValue") n.value = "";
+    if(className === "IntValue") n.value = 0;
+    n.p = {};
     projectNodes.push(n);
     selectedId = n.id;
     renderExplorer(); renderProperties();
@@ -5247,8 +6546,8 @@ function createLuaRuntime(fengari, A, preludeSrc){
       row.addEventListener("click", () => { if(!playMode.active) selectObject(n.id); });
       row.addEventListener("dblclick", () => { if(!playMode.active && isScriptClass(n.className)) openLuaEditor(n); });
       row.addEventListener("contextmenu", (e) => { e.preventDefault(); if(playMode.active) return; selectObject(n.id); showNodeMenu(n, e.clientX, e.clientY); });
-      if(n.className === "Folder") addPlusButton(row, n.id);
-      wireExplorerDrag(row, { kind: "node", id: n.id }, n.className === "Folder" ? n.id : null);
+      if(n.className === "Folder" || GUI_CONTAINERS.has(n.className)) addPlusButton(row, n.id);
+      wireExplorerDrag(row, { kind: "node", id: n.id }, (n.className === "Folder" || GUI_CONTAINERS.has(n.className)) ? n.id : null);
       container.appendChild(row);
       const kids = projectNodes.filter(k => k.parent === n.id);
       if(kids.length){ const sub = document.createElement("div"); sub.className = "exp-nested"; container.appendChild(sub); appendNodeRows(sub, n.id); }
@@ -5256,6 +6555,48 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
 
   /* ---------- properties panel for these objects ---------- */
+  /* generic property editor for GUI objects / Sound (the property list comes from the Lua engine, so it is always in sync) */
+  function wireText(v){
+    if(v && typeof v === "object"){
+      if(v.__t === "E") return v.n;
+      if(v.__t === "UD2") return v.xs + ", " + v.xo + ", " + v.ys + ", " + v.yo;
+      if(v.__t === "UD") return v.s + ", " + v.o;
+      if(v.__t === "V2") return v.x + ", " + v.y;
+    }
+    return String(v);
+  }
+  const wireHex = (v) => "#" + [v.r, v.g, v.b].map(x => Math.max(0, Math.min(255, Math.round(x * 255))).toString(16).padStart(2, "0")).join("");
+  function parseWire(def, text){
+    if(typeof def === "boolean") return text === true || text === "true" || text === "1";
+    if(typeof def === "number") return parseFloat(text) || 0;
+    if(typeof def === "string") return String(text);
+    if(def && def.__t === "E") return { __t: "E", e: def.e, n: String(text).trim() || def.n };
+    const nums = String(text).split(",").map(x => parseFloat(x));
+    if(def && def.__t === "UD2") return { __t: "UD2", xs: nums[0] || 0, xo: nums[1] || 0, ys: nums[2] || 0, yo: nums[3] || 0 };
+    if(def && def.__t === "UD") return { __t: "UD", s: nums[0] || 0, o: nums[1] || 0 };
+    if(def && def.__t === "V2") return { __t: "V2", x: nums[0] || 0, y: nums[1] || 0 };
+    return def;
+  }
+  const HIDDEN_NODE_PROPS = { Sound: ["Playing", "TimePosition", "TimeLength", "IsPlaying", "IsLoaded"] };
+  function nodePropRows(body, n){
+    const lua = ensureLua(); const reg = lua && lua.CLS && lua.CLS[n.className];
+    if(!reg || !reg.props) return;
+    const keys = Object.keys(reg.props).filter(k => (HIDDEN_NODE_PROPS[n.className] || []).indexOf(k) < 0);
+    if(!keys.length) return;
+    const g = document.createElement("div"); g.className = "prop-group-label"; g.textContent = "Properties"; body.appendChild(g);
+    n.p = n.p || {};
+    keys.forEach(k => {
+      const def = reg.props[k], cur = n.p[k] !== undefined ? n.p[k] : def;
+      const r = document.createElement("div"); r.className = "prop-row" + (typeof def === "boolean" ? " prop-row-bool" : "");
+      const l = document.createElement("label"); l.textContent = k; r.appendChild(l);
+      let inp;
+      if(typeof def === "boolean"){ inp = document.createElement("input"); inp.type = "checkbox"; inp.checked = !!cur; inp.addEventListener("change", () => { n.p[k] = inp.checked; saveWorld(false); }); }
+      else if(def && def.__t === "C3"){ inp = document.createElement("input"); inp.type = "color"; inp.value = wireHex(cur); inp.addEventListener("input", () => { const h = parseInt(inp.value.slice(1), 16); n.p[k] = { __t: "C3", r: ((h >> 16) & 255) / 255, g: ((h >> 8) & 255) / 255, b: (h & 255) / 255 }; saveWorld(false); }); }
+      else { inp = document.createElement("input"); inp.type = "text"; inp.value = wireText(cur); inp.title = def && def.__t === "UD2" ? "scaleX, offsetX, scaleY, offsetY" : def && def.__t === "UD" ? "scale, offset" : ""; inp.addEventListener("change", () => { n.p[k] = parseWire(def, inp.value); inp.value = wireText(n.p[k]); saveWorld(false); }); }
+      r.appendChild(inp); body.appendChild(r);
+    });
+  }
+
   function renderNodeProperties(body, n){
     const label = (t) => { const g = document.createElement("div"); g.className = "prop-group-label"; g.textContent = t; body.appendChild(g); };
     const row = (lbl, val, onChange, ro) => {
@@ -5286,10 +6627,10 @@ function createLuaRuntime(fengari, A, preludeSrc){
         r.appendChild(l); r.appendChild(cb); body.appendChild(r);
       }
     }
-    if(/Value$/.test(n.className)){
+    if(/^(Number|Int|String|Bool)Value$/.test(n.className)){
       label("Data");
       row("Value", String(n.value === undefined ? "" : n.value), (v) => {
-        n.value = n.className === "NumberValue" ? (parseFloat(v) || 0) : n.className === "BoolValue" ? (v === "true" || v === "1") : v;
+        n.value = (n.className === "NumberValue" || n.className === "IntValue") ? (parseFloat(v) || 0) : n.className === "BoolValue" ? (v === "true" || v === "1") : v;
         saveWorld(false);
       });
     }
@@ -5300,6 +6641,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
         : "Server sets remote.OnServerInvoke = function(player, ...) return ... end  |  Client calls remote:InvokeServer(...)";
       body.appendChild(hint);
     }
+    nodePropRows(body, n);
     const del = document.createElement("button");
     del.className = "script-editor-save"; del.textContent = "Delete"; del.style.cssText = "width:100%;margin-top:14px;background:#3a1d1d;color:#ff9a9a;";
     del.addEventListener("click", () => deleteNode(n.id));
@@ -5308,17 +6650,17 @@ function createLuaRuntime(fengari, A, preludeSrc){
 
   /* ---------- Lua editor: colors, squiggles, Tab suggestions ---------- */
   const LUA_KW = new Set(["and","break","do","else","elseif","end","false","for","function","if","in","local","nil","not","or","repeat","return","then","true","until","while","continue"]);
-  const LUA_GLOBALS = ["game","workspace","script","print","warn","error","wait","spawn","delay","tick","time","tostring","tonumber","typeof","type","pairs","ipairs","next","select","pcall","xpcall","assert","require","unpack","setmetatable","getmetatable","rawget","rawset","rawequal","collectgarbage","task","Instance","Vector3","Color3","BrickColor","CFrame","Enum","TweenInfo","Random","math","string","table","os","coroutine","Workspace","newproxy","Signal","_G","_VERSION"];
+  const LUA_GLOBALS = ["game","workspace","script","print","warn","error","wait","spawn","delay","tick","time","tostring","tonumber","typeof","type","pairs","ipairs","next","select","pcall","xpcall","assert","require","unpack","setmetatable","getmetatable","rawget","rawset","rawequal","collectgarbage","task","Instance","Vector3","Color3","BrickColor","CFrame","Enum","TweenInfo","Random","math","string","table","os","coroutine","Workspace","newproxy","Signal","_G","_VERSION","Vector2","UDim","UDim2","Rect","Ray","NumberRange","RaycastParams","bit32","shared"];
   const LUA_KNOWN = new Set(LUA_GLOBALS.concat(["self"]));
-  const LUA_SERVICES = ["Players","Workspace","ReplicatedStorage","ServerScriptService","StarterPlayer","Lighting","RunService","UserInputService","HttpService"];
-  const LUA_METHODS = ["FindFirstChild","FindFirstChildOfClass","GetChildren","GetDescendants","WaitForChild","Destroy","Clone","IsA","ClearAllChildren","GetFullName","GetAttribute","SetAttribute","GetService","Connect","Once","Wait","Disconnect"];
-  const LUA_PROPS = ["Parent","Name","ClassName","Position","Size","Color","Transparency","Anchored","CanCollide","Material","Orientation","Rotation","CFrame","Shape","Reflectance","LookVector","RightVector","UpVector","Touched"];
+  const LUA_SERVICES = ["Players","Workspace","ReplicatedStorage","ServerScriptService","StarterPlayer","StarterGui","Lighting","RunService","UserInputService","ContextActionService","TweenService","CollectionService","DataStoreService","SoundService","HttpService","Debris"];
+  const LUA_METHODS = ["FindFirstChild","FindFirstChildOfClass","GetChildren","GetDescendants","WaitForChild","Destroy","Clone","IsA","ClearAllChildren","GetFullName","GetAttribute","SetAttribute","GetService","Connect","Once","Wait","Disconnect","Raycast","BindAction","BindActionAtPriority","UnbindAction","GetAsync","SetAsync","UpdateAsync","IncrementAsync","RemoveAsync","AddTag","RemoveTag","HasTag","GetTagged","GetMouse","Fire","Invoke","Play","Stop","Pause","FindFirstAncestor","FindFirstAncestorOfClass","GetPropertyChangedSignal","WorldToViewportPoint","ViewportPointToRay","ScreenPointToRay","SetCore","GetKeysPressed","IsKeyDown","GetMouseLocation","GetMouseDelta","CaptureFocus","ReleaseFocus","GetDataStore","Create","Move","MoveTo","TakeDamage"];
+  const LUA_PROPS = ["Parent","Name","ClassName","Position","Size","Color","Transparency","Anchored","CanCollide","Material","Orientation","Rotation","CFrame","Shape","Reflectance","LookVector","RightVector","UpVector","Touched","Text","TextColor3","TextSize","Font","AnchorPoint","BackgroundColor3","BackgroundTransparency","Visible","ZIndex","Image","FieldOfView","CameraType","CurrentCamera","PlayerGui","LocalPlayer","MouseBehavior","Value","SoundId","Volume","Looped","Playing","Event","InputBegan","InputEnded","InputChanged","MouseButton1Click","MouseEnter","MouseLeave","Activated","Hit","Target","UnitRay","Gravity","Humanoid","WalkSpeed","JumpPower","Health","KeyCode","UserInputType","Heartbeat","RenderStepped","CharacterAdded","PlayerAdded","Changed","ChildAdded","Position"];
   const LUA_LIBS = {
     math:["abs","ceil","floor","sqrt","sin","cos","tan","asin","acos","atan","atan2","exp","log","max","min","random","randomseed","huge","pi","clamp","sign","round"],
     string:["format","sub","upper","lower","len","rep","find","match","gmatch","gsub","byte","char","reverse","split"],
-    table:["insert","remove","concat","sort","unpack","find","clear","clone","create"],
-    task:["wait","spawn","delay","defer"],
-    Vector3:["new","zero","one"], Color3:["new","fromRGB","fromHSV","fromHex"], BrickColor:["new","Random","palette","White","Black","Red","Blue","Green","Yellow","Orange","Gray","Purple","Pink"], CFrame:["new","lookAt","Angles","fromOrientation","fromEulerAnglesXYZ","fromEulerAnglesYXZ","fromAxisAngle","identity"], Instance:["new"], os:["time","clock","date"],
+    table:["insert","remove","concat","sort","unpack","find","clear","clone","create","freeze","isfrozen","move","pack"],
+    task:["wait","spawn","delay","defer","cancel"],
+    Vector3:["new","zero","one"], Vector2:["new","zero","one"], UDim2:["new","fromScale","fromOffset"], UDim:["new"], Ray:["new"], Rect:["new"], NumberRange:["new"], Random:["new"], RaycastParams:["new"], bit32:["band","bor","bxor","bnot","lshift","rshift","btest","extract"], TweenInfo:["new"], Color3:["new","fromRGB","fromHSV","fromHex"], BrickColor:["new","Random","palette","White","Black","Red","Blue","Green","Yellow","Orange","Gray","Purple","Pink"], CFrame:["new","lookAt","Angles","fromOrientation","fromEulerAnglesXYZ","fromEulerAnglesYXZ","fromAxisAngle","identity"], Instance:["new"], os:["time","clock","date"],
     game:["GetService","Workspace"]
   };
   const escHtml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -5658,7 +7000,22 @@ function createLuaRuntime(fengari, A, preludeSrc){
         get(k){ return k === "ClockTime" ? lightState.time : lightState.brightness; },
         set(k, v){ if(k === "ClockTime") lightState.time = ((v % 24) + 24) % 24; else lightState.brightness = Math.max(0, v); updateSunAndSky(); }
       },
-      respawn(){ phRespawn(); phAddChat("", "You respawned.", true); }
+      respawn(){ phRespawn(); phAddChat("", "You respawned.", true); },
+      camera: {
+        get(){ const d = new THREE.Vector3(); camera.getWorldDirection(d); return { pos: [camera.position.x, camera.position.y, camera.position.z], look: [d.x, d.y, d.z], fov: camera.fov }; },
+        set(o){
+          luaCam.on = !!o.scripted; if(o.pos) luaCam.pos = o.pos; if(o.look) luaCam.look = o.look;
+          if(o.fov){ if(luaCam.baseFov === null) luaCam.baseFov = camera.fov; camera.fov = o.fov; camera.updateProjectionMatrix(); luaCam.fovOn = true; }
+          else if(luaCam.fovOn){ camera.fov = luaCam.baseFov; camera.updateProjectionMatrix(); luaCam.fovOn = false; }
+        },
+        release(){ luaCam.on = false; if(luaCam.fovOn && luaCam.baseFov){ camera.fov = luaCam.baseFov; camera.updateProjectionMatrix(); } luaCam.fovOn = false; luaCam.baseFov = null; }
+      },
+      guiRect(){ const r = renderer.domElement.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; },
+      storagePrefix(){ return currentGame ? currentGame.id : "studio"; },
+      input: {
+        setMouseBehavior(m){ try{ if(m === "LockCenter") renderer.domElement.requestPointerLock(); else if(document.pointerLockElement) document.exitPointerLock(); }catch(e){} },
+        setMouseIcon(on){ renderer.domElement.style.cursor = on ? "" : "none"; }
+      }
     };
   }
   function snapshotPlayWorld(){
@@ -6892,7 +8249,7 @@ function createLuaRuntime(fengari, A, preludeSrc){
   }
 
   /* ---------- drag & drop: hold a row, move over another parent, let go ---------- */
-  const EXP_SERVICES = ["svc:Workspace", "svc:ServerScriptService", "svc:StarterPlayerScripts", "svc:ReplicatedStorage"];
+  const EXP_SERVICES = ["svc:Workspace", "svc:ServerScriptService", "svc:StarterPlayerScripts", "svc:ReplicatedStorage", "svc:StarterGui"];
   const expName = (id) => String(id).startsWith("svc:") ? String(id).slice(4) : ((sceneObjects.find(o => o.id === id) || nodeById(id) || {}).name || "?");
   function isInsideNode(id, ancestorId){      // is `id` the same as, or somewhere below, `ancestorId`?
     let cur = id, guard = 0;
