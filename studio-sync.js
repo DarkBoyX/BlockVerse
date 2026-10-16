@@ -1,4 +1,3 @@
-
 (function(){
   "use strict";
   var tries = 0;
@@ -129,12 +128,72 @@
       }).then(function(){ busy = false; });
     }
 
-    window.bvSyncNow = sync;
+    /* ---- big audio files: Studio keeps uploaded sounds in the browser's file storage (SoundId "bvaudio:<id>");
+           when the game is live they are copied to the cloud in pieces so players can hear them.
+           Needs the game_audio rules (see the comment at the top of this block in the chat message / README). ---- */
+    var audioSent = {};      // "gameId/audioId" -> true once it is in the cloud
+    var audioRetryAt = {};   // "gameId/audioId" -> time (ms) before which we don't try again after a failure
+    var audioBusy = false;
+    var AUDIO_CHUNK = 525000;   // multiple of 3, so every piece is exactly 700000 base64 characters
+
+    function readB64(blob){
+      return new Promise(function(res, rej){
+        var fr = new FileReader();
+        fr.onload = function(){ var r = String(fr.result); res(r.slice(r.indexOf(",") + 1)); };
+        fr.onerror = function(){ rej(fr.error); };
+        fr.readAsDataURL(blob);
+      });
+    }
+    function uploadAudio(r){
+      var key = r.gid + "/" + r.aid, base = db.ref("game_audio/" + r.gid + "/" + r.aid);
+      return base.child("meta").once("value").then(function(snap){
+        if(snap.exists()){ audioSent[key] = true; return; }
+        return window.bvAudioDB.get(r.aid).then(function(blob){
+          if(!blob) return;                       // that file was added on another device - it uploads from there
+          var n = Math.max(1, Math.ceil(blob.size / AUDIO_CHUNK)), i = 0;
+          function next(){
+            if(i >= n){
+              return base.child("meta").set({ n: n, mime: blob.type || "audio/mpeg", size: blob.size, owner: auth.currentUser.uid, ts: firebase.database.ServerValue.TIMESTAMP })
+                .then(function(){ audioSent[key] = true; note("Audio uploaded (" + (blob.size / 1048576).toFixed(1) + " MB) - players can hear it now."); });
+            }
+            note("Uploading audio... " + (i + 1) + "/" + n);
+            return readB64(blob.slice(i * AUDIO_CHUNK, (i + 1) * AUDIO_CHUNK)).then(function(b64){ return base.child("c/" + i).set(b64); }).then(function(){ i++; return next(); });
+          }
+          return next();
+        });
+      }).catch(function(err){
+        audioRetryAt[key] = Date.now() + 120000;
+        var code = err && (err.code || err.message) || String(err);
+        note("Audio upload failed: " + code + (/permission/i.test(code) ? " - paste the new database rules (game_audio) in Firebase and press Publish." : ""), true);
+      });
+    }
+    function syncAudio(){
+      if(audioBusy || !window.bvAudioDB) return;
+      var refs = [], seen = {};
+      gamesToSync().forEach(function(e){
+        ((e.world && e.world.nodes) || []).forEach(function(nd){
+          var id = nd && nd.className === "Sound" && nd.p && String(nd.p.SoundId || "");
+          if(!id || !/^bvaudio:/i.test(id)) return;
+          var key = e.game.id + "/" + id.slice(8);
+          if(seen[key] || audioSent[key] || (audioRetryAt[key] || 0) > Date.now()) return;
+          seen[key] = true; refs.push({ gid: e.game.id, aid: id.slice(8) });
+        });
+      });
+      if(!refs.length) return;
+      audioBusy = true;
+      ensureAuth().then(function(){
+        return refs.reduce(function(chain, r){ return chain.then(function(){ return uploadAudio(r); }); }, Promise.resolve());
+      }).catch(function(err){ note("Audio sync error: " + (err && (err.code || err.message) || err), true); }).then(function(){ audioBusy = false; });
+    }
+
+    window.bvSyncNow = function(){ sync(); syncAudio(); };
     setTimeout(sync, 3000);
     setInterval(sync, 15000);
+    setTimeout(syncAudio, 3500);
+    setInterval(syncAudio, 15000);
     document.addEventListener("click", function(e){
       var t = e.target;
-      if(t && t.closest && t.closest("#gsPublishBtn")) setTimeout(sync, 1500);
+      if(t && t.closest && t.closest("#gsPublishBtn")) setTimeout(function(){ sync(); syncAudio(); }, 1500);
     }, true);
   }
 })();
