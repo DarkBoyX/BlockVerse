@@ -1303,6 +1303,44 @@
   .profile-status{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); }
   .profile-joined{ font-size:11.5px; color:var(--text-3); margin-top:4px; }
 
+  /* ---------- full-screen friend profile + badges ---------- */
+  .bv-badge{ display:inline-flex; align-items:center; justify-content:center; width:1.35em; height:1.35em; margin-left:5px; border-radius:6px; vertical-align:-0.22em; flex-shrink:0; }
+  .bv-badge svg{ width:72%; height:72%; display:block; }
+  .bv-badge.owner{ color:#ffd479; background:rgba(255,196,77,.16); box-shadow:inset 0 0 0 1px rgba(255,196,77,.4); }
+  .bv-badge.dev{ color:#a9c4ff; background:rgba(120,160,255,.15); box-shadow:inset 0 0 0 1px rgba(140,175,255,.38); }
+  #pageFriendProfile:not(.hidden){
+    position:fixed; inset:0; z-index:2500; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;
+    padding:calc(env(safe-area-inset-top,0px) + 16px) 22px calc(env(safe-area-inset-bottom,0px) + 28px);
+    background:radial-gradient(ellipse 70% 60% at 28% 30%, #2a2a31 0%, #131316 55%, #070708 100%);
+    animation:fpIn .38s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes fpIn{ from{ opacity:0; transform:scale(1.025); } to{ opacity:1; transform:none; } }
+  #pageFriendProfile .back-link{ align-self:flex-start; margin:0 0 6px; padding:8px 14px 8px 10px; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); }
+  #pageFriendProfile .main-header{ display:none; }
+  #pageFriendProfile .friend-profile-panel{
+    flex:1; width:100%; max-width:1020px; margin:auto; background:transparent; border:none; border-radius:0; overflow:visible; animation:none;
+    flex-direction:row-reverse; align-items:center; justify-content:center; gap:clamp(24px,5vw,64px);
+  }
+  #pageFriendProfile .friend-profile-info{ flex:1; max-width:440px; align-items:flex-start; text-align:left; padding:10px 0; gap:12px; }
+  #pageFriendProfile .profile-big-avatar{ width:72px; height:72px; }
+  #pageFriendProfile .profile-name{ font-size:clamp(26px,4.2vw,40px); font-weight:800; margin-top:4px; line-height:1.1; display:flex; align-items:center; flex-wrap:wrap; }
+  #pageFriendProfile .profile-name .bv-badge{ font-size:clamp(20px,3vw,28px); }
+  .profile-user{ font-size:15px; color:var(--text-2); margin-top:-6px; }
+  #pageFriendProfile .friend-profile-viewer{ width:auto; flex-shrink:0; border:none; background:transparent; padding:0; }
+  #pageFriendProfile .profile-viewer-canvas-wrap{
+    width:min(44vw, 56vh, 460px); height:min(44vw, 56vh, 460px); border-radius:28px; position:relative;
+    background:radial-gradient(circle at 50% 38%, #8fd0f2 0%, #5aa6d4 55%, #3b78a6 100%); box-shadow:0 30px 80px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.12);
+  }
+  #pageFriendProfile .friend-profile-info #friendProfileActions{ max-width:340px; }
+  .fp-join{ width:100%; margin-bottom:10px; padding:13px; border:none; border-radius:12px; background:#f2f2f4; color:#0a0a0b; font-weight:800; font-size:14px; cursor:pointer; transition:transform .12s, background .15s; }
+  .fp-join:hover{ background:#fff; transform:translateY(-1px); }
+  @media (max-width:860px){
+    #pageFriendProfile .friend-profile-panel{ flex-direction:column-reverse; justify-content:flex-start; gap:18px; margin-top:6px; }
+    #pageFriendProfile .friend-profile-info{ align-items:center; text-align:center; max-width:420px; }
+    #pageFriendProfile .profile-name{ justify-content:center; }
+    #pageFriendProfile .profile-viewer-canvas-wrap{ width:min(78vw, 46vh, 380px); height:min(78vw, 46vh, 380px); }
+  }
+
   /* ---------- Studio download page ---------- */
   .sdp-hero{ max-width:440px; margin:40px auto 0; text-align:center; padding:0 20px; }
   .sdp-icon{
@@ -2097,6 +2135,7 @@
         <div class="friend-profile-info">
           <div class="profile-big-avatar" id="friendProfileAvatar"></div>
           <div class="profile-name" id="friendProfileName">Player</div>
+          <div class="profile-user" id="friendProfileUser"></div>
           <div class="profile-status" id="friendProfileStatus"><span class="status-dot"></span>Offline</div>
           <div class="profile-joined" id="friendProfileJoined"></div>
           <div id="friendProfileActions" style="margin-top:14px; width:100%; max-width:260px;"></div>
@@ -4520,6 +4559,33 @@
   }
   function isKeyOnline(key){ return onlineUsernameKeys.has(key); }
 
+  /* ---- badges: owner (house) + dev (hammer), given from the admin panel at blockverse_badges/<account> ---- */
+  const badgeMap = {};
+  let badgeListenerOn = false, fpOpenKey = null, profileReturnPage = "friends";
+  const BADGE_ICON = {
+    owner: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2l9 7.9h-2.6V20h-5.1v-5.8h-2.6V20H5.6v-8.9H3z"/></svg>',
+    dev: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14.3 3.4l6.3 6.3-2.7 2.7-1.2-1.2-1.7 1.7 1.2 1.2-6.9 6.9a2.3 2.3 0 01-3.3-3.3l6.9-6.9 1.2 1.2 1.7-1.7-1.2-1.2z"/></svg>'
+  };
+  function badgesHtml(key){
+    const b = key && badgeMap[key];
+    if(!b) return "";
+    return (b.owner ? '<span class="bv-badge owner" title="Owner">' + BADGE_ICON.owner + '</span>' : "") +
+           (b.dev ? '<span class="bv-badge dev" title="Developer">' + BADGE_ICON.dev + '</span>' : "");
+  }
+  function startBadgeListener(){
+    if(badgeListenerOn) return; badgeListenerOn = true;
+    fbDb.ref("blockverse_badges").on("value", (snap) => {
+      Object.keys(badgeMap).forEach(k => delete badgeMap[k]);
+      const v = snap.val() || {};
+      Object.keys(v).forEach(k => { if(v[k] && (v[k].owner || v[k].dev)) badgeMap[k] = { owner: !!v[k].owner, dev: !!v[k].dev }; });
+      try{ renderHomeFriendsStrip(); }catch(e){}
+      try{ if(pages.friends && !pages.friends.classList.contains("hidden")) renderFriendsPage(); }catch(e){}
+      try{
+        const nm = document.getElementById("friendProfileName");
+        if(fpOpenKey && nm && pages.friendProfile && !pages.friendProfile.classList.contains("hidden")) nm.innerHTML = escapeHtml(displayNameFor(fpOpenKey)) + badgesHtml(fpOpenKey);
+      }catch(e){}
+    }, () => { badgeListenerOn = false; });
+  }
   function displayNameFor(key){
     return (fbUsernameDirectory[key] && fbUsernameDirectory[key].username)
       || (getAccounts()[key] && getAccounts()[key].username)
@@ -4545,6 +4611,7 @@
     });
   }
   function startFriendListeners(myKey){
+    startBadgeListener();
     friendListenersKey = myKey;
     friendListenersReady = false;
 
@@ -4880,8 +4947,9 @@
     dismissInviteToast(inviteId);
     closeNotifPanel();
     // Everyone plays in the same shared Baseplate room, so "joining their
-    // server" just means making sure we're in the game ourselves.
-    if(!BaseplateGame.isRunning()) BaseplateGame.start();
+    // server" just means making sure we're in the game ourselves - and that only
+    // works in the real app, so a browser tab gets handed to the app / download page.
+    if(!BaseplateGame.isRunning()) attemptJoinGame("baseplate");
   }
 
   function ignoreGameInvite(inviteId){
@@ -4903,7 +4971,7 @@
       '<div class="friend-row' + (clickable ? ' clickable' : '') + '" data-user="' + key + '"' + (clickable ? ' data-open-profile="' + key + '"' : '') + '>' +
         '<div class="friend-avatar"><div class="avatar-img">' + avatarFaceSvg(key) + '</div>' + dotHtml + '</div>' +
         '<div class="friend-info">' +
-          '<div class="f-name">' + escapeHtml(displayNameFor(key)) + '</div>' +
+          '<div class="f-name">' + escapeHtml(displayNameFor(key)) + badgesHtml(key) + '</div>' +
           subHtml +
         '</div>' +
         '<div class="friend-actions">' + actionsHtml + '</div>' +
@@ -5035,7 +5103,7 @@
             '<div class="avatar-img">' + avatarFaceSvg(k) + '</div>' +
             '<span class="hf-dot' + (online ? ' online' : '') + '"></span>' +
           '</div>' +
-          '<div class="hf-name">' + escapeHtml(displayNameFor(k)) + '</div>' +
+          '<div class="hf-name">' + escapeHtml(displayNameFor(k)) + badgesHtml(k) + '</div>' +
         '</div>'
       );
     }).join("");
@@ -5043,10 +5111,8 @@
     strip.querySelectorAll("[data-hf-circle]").forEach(circle => {
       circle.addEventListener("click", (e) => {
         e.stopPropagation();
-        const key = circle.getAttribute("data-hf-circle");
-        if(hfOpenPopoverKey === key){ closeHomeFriendPopover(); return; }
-        if(!isKeyOnline(key)) return; // offline friends have nowhere to join
-        openHomeFriendPopover(key);
+        closeHomeFriendPopover();
+        openFriendProfilePage(circle.getAttribute("data-hf-circle"));   // full-screen profile (has a Join button when they're online)
       });
     });
   }
@@ -5069,7 +5135,7 @@
     item.appendChild(pop);
     document.getElementById("hfPopoverJoin").addEventListener("click", () => {
       closeHomeFriendPopover();
-      game.start(); // same shared Baseplate room, so joining puts you right alongside them
+      attemptJoinGame(game.id); // same shared Baseplate room (app only - a browser tab gets the download page)
     });
     setTimeout(() => document.addEventListener("click", hfOutsideClickHandler), 0);
   }
@@ -5120,7 +5186,8 @@
 
   function initProfileViewer(canvas, custom){
     const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
-    renderer.setSize(170, 170, false);
+    const vsz = Math.max(170, Math.min(640, Math.round(canvas.clientWidth || 170)));   // big enough for the full-screen profile
+    renderer.setSize(vsz, vsz, false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
@@ -5401,8 +5468,16 @@
   function openFriendProfilePage(key){
     const name = displayNameFor(key);
     const online = isKeyOnline(key);
+    fpOpenKey = key;
+    { // remember where we came from so Back returns there (home or friends)
+      const cur = Object.keys(pages).find(k => !pages[k].classList.contains("hidden"));
+      if(cur && cur !== "friendProfile") profileReturnPage = cur;
+      const back = document.querySelector("#pageFriendProfile .back-link");
+      if(back){ back.setAttribute("data-back", profileReturnPage); const sp = back.querySelector("span"); if(sp) sp.textContent = profileReturnPage === "home" ? "Back" : "Back to friends"; }
+    }
     document.getElementById("friendProfileHeading").textContent = name;
-    document.getElementById("friendProfileName").textContent = name;
+    document.getElementById("friendProfileName").innerHTML = escapeHtml(name) + badgesHtml(key);
+    document.getElementById("friendProfileUser").textContent = "@" + key;
     document.getElementById("friendProfileAvatar").innerHTML = avatarFaceSvg(key);
     const statusEl = document.getElementById("friendProfileStatus");
     statusEl.innerHTML = '<span class="status-dot' + (online ? " online" : "") + '"></span>' + (online ? t("online") : t("offline"));
@@ -5482,12 +5557,15 @@
       friendBtnHtml = '<button class="char-preview-action" id="fpAddFriendBtn">' + t("addFriend") + '</button>';
     }
     const blocked = isBlocked(key);
-    wrap.innerHTML =
+    const canJoin = isKeyOnline(key) && fbFriendMirror.friends.includes(key);
+    wrap.innerHTML = (canJoin ? '<button class="fp-join" id="fpJoinBtn">Join ' + escapeHtml(displayNameFor(key)) + '</button>' : "") +
       '<div class="char-preview-actions">' + friendBtnHtml +
       '<button class="char-preview-action block' + (blocked ? " active" : "") + '" id="fpBlockBtn">' + (blocked ? "Unblock" : "Block") + '</button>' +
       '</div>';
 
     const rerender = () => renderFriendProfileActions(key);
+    const joinBtn = document.getElementById("fpJoinBtn");
+    if(joinBtn) joinBtn.addEventListener("click", () => { showPage(profileReturnPage || "home"); attemptJoinGame("baseplate"); });
     const unfriendBtn = document.getElementById("fpUnfriendBtn");
     if(unfriendBtn) unfriendBtn.addEventListener("click", () => { unfriendUser(key); rerender(); });
     const acceptBtn = document.getElementById("fpAcceptBtn");
@@ -6385,7 +6463,8 @@
     let worldParts = [];            // the parts of the loaded world (scripts see these)
     let worldNodes = [];            // scripts / folders / values of the loaded world
     let boxesDirty = false;         // a script moved something: rebuild the collision boxes before the next step
-    let luaRt = null, luaEngine = null, luaKeyDown = null, luaKeyUp = null, luaMouseDown = null, luaMouseUp = null, lastHumHealth = 100, luaErrAt = 0;
+    let luaRt = null, luaEngine = null, luaKeyDown = null, luaKeyUp = null, luaMouseDown = null, luaMouseUp = null, luaMouseMove = null, luaWheel = null, lastHumHealth = 100, luaErrAt = 0;
+    const luaCam = { on: false, pos: [0, 0, 0], look: [0, 0, -1], baseFov: null, fovOn: false };   // a Lua script took over the camera
     const envObjects = [];          // grass field / mountains / trees / etc. (hidden inside a custom world)
     let animId = null;
     let sunLight = null, hemiLight = null, fillLight = null, moonLight = null, moonMesh = null, sunMesh = null, starField = null;
@@ -7867,7 +7946,7 @@
     // plain substring on purpose, so compound/concatenated profanity like
     // "dogshit" or "fuckthis" still gets caught even though "shit"/"fuck"
     // never appear as a standalone word there.
-    const BOUNDARY_PROTECTED = new Set(["ass"]);
+    const BOUNDARY_PROTECTED = new Set(["ass","mf"]);   // "mf" only counts as a standalone word ("imf", "i am f" are fine)
     function buildProfanityPattern(){
       const parts = PROFANITY_LIST.map(w => {
         const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
@@ -7886,11 +7965,18 @@
     // spaces in multi-word entries like "ass hole" are just removed instead
     // of turned into \s+, since there's nothing left to match against
     function buildNoSpacePattern(list){
-      const parts = list.map(w => {
-        const norm = normalizeForFilter(w).replace(/\s+/g, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        return BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      const long = [], short = [];
+      list.forEach(w => {
+        const norm = normalizeForFilter(w).replace(/\s+/g, "");
+        const esc = norm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const src = BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + esc + "(?![\\p{L}\\p{N}])" : esc;
+        ([...norm].length <= 3 ? short : long).push(src);
       });
-      return "(" + parts.join("|") + ")";
+      // With the spaces squashed out, a 2-3 letter term shows up by accident all the time
+      // ("i am f" -> "iamf" has "mf", "is exactly" has "sex", "my toy" has "yt"). So those short
+      // terms only count here when they ARE the whole message; the normal pass above still
+      // catches them as real words in a sentence. Longer terms keep the letter-spacing check.
+      return "(" + long.join("|") + ")" + (short.length ? "|^(?:" + short.join("|") + ")$" : "");
     }
     const profanityPatternNoSpaceSrc = buildNoSpacePattern(PROFANITY_LIST);
 
@@ -8017,7 +8103,7 @@
       const clickable = accountKey && accountKey !== mine && !isWhisper; // keep whisper-row names non-clickable to avoid mangled display names as whisper targets
       row.innerHTML =
         "<b" + (clickable ? ' class="cm-name" data-key="' + escapeHtml(accountKey) + '" data-name="' + escapeHtml(name) + '"' : "") + ">" +
-        escapeHtml(name) + ":</b> " + escapeHtml(censorText(text));
+        escapeHtml(name) + badgesHtml(accountKey) + ":</b> " + escapeHtml(censorText(text));
       log.appendChild(row);
       while(log.children.length > 100) log.removeChild(log.firstChild);
       if(wasNearBottom){
@@ -8622,6 +8708,11 @@
         camera.position.y = groundFloor;
         camera.lookAt(tx, ty, tz);
       }
+      if(luaCam.on){      // workspace.CurrentCamera.CameraType = Scriptable
+        camera.position.set(luaCam.pos[0], luaCam.pos[1], luaCam.pos[2]);
+        camera.lookAt(luaCam.pos[0] + luaCam.look[0], luaCam.pos[1] + luaCam.look[1], luaCam.pos[2] + luaCam.look[2]);
+        if(character) character.visible = true;
+      }
 
       // once zoomed in close enough it reads as first-person - hide your own
       // body so it doesn't block the view (remote players still see you normally)
@@ -8676,10 +8767,11 @@
       // even though nothing is actually being pressed anymore
       const typingInField = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
       if(!typingInField){
-        if(keys["w"]||keys["arrowup"]) inputForward += 1;
-        if(keys["s"]||keys["arrowdown"]) inputForward -= 1;
-        if(keys["d"]||keys["arrowright"]) inputRight += 1;
-        if(keys["a"]||keys["arrowleft"]) inputRight -= 1;
+        const sk = (k) => !!(luaRt && luaRt.running && luaRt.isSunk(k));   // sunk = a script bound this key (ContextActionService)
+        if((keys["w"] && !sk("w")) || (keys["arrowup"] && !sk("arrowup"))) inputForward += 1;
+        if((keys["s"] && !sk("s")) || (keys["arrowdown"] && !sk("arrowdown"))) inputForward -= 1;
+        if((keys["d"] && !sk("d")) || (keys["arrowright"] && !sk("arrowright"))) inputRight += 1;
+        if((keys["a"] && !sk("a")) || (keys["arrowleft"] && !sk("arrowleft"))) inputRight -= 1;
       }
       inputForward += -move.z; // joystick: pushing up (negative z) = forward
       inputRight += move.x;
@@ -9165,7 +9257,22 @@
           get(k){ return k === "ClockTime" ? worldClock : 1; },
           set(k, v){ if(k === "ClockTime"){ worldClock = ((Number(v) % 24) + 24) % 24; lastSkyRedrawAt = 0; } }
         },
-        respawn(){ placeAtSpawn(); vy = 0; onGround = true; }
+        respawn(){ placeAtSpawn(); vy = 0; onGround = true; },
+        camera: {
+          get(){ const d = new THREE.Vector3(); camera.getWorldDirection(d); return { pos: [camera.position.x, camera.position.y, camera.position.z], look: [d.x, d.y, d.z], fov: camera.fov }; },
+          set(o){
+            luaCam.on = !!o.scripted; if(o.pos) luaCam.pos = o.pos; if(o.look) luaCam.look = o.look;
+            if(o.fov){ if(luaCam.baseFov === null) luaCam.baseFov = camera.fov; camera.fov = o.fov; camera.updateProjectionMatrix(); luaCam.fovOn = true; }
+            else if(luaCam.fovOn){ camera.fov = luaCam.baseFov; camera.updateProjectionMatrix(); luaCam.fovOn = false; }
+          },
+          release(){ luaCam.on = false; if(luaCam.fovOn && luaCam.baseFov){ camera.fov = luaCam.baseFov; camera.updateProjectionMatrix(); } luaCam.fovOn = false; luaCam.baseFov = null; }
+        },
+        guiRect(){ const r = renderer.domElement.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; },
+        storagePrefix(){ return ROOM.slice(6); },
+        input: {
+          setMouseBehavior(m){ try{ if(m === "LockCenter") renderer.domElement.requestPointerLock(); else if(document.pointerLockElement) document.exitPointerLock(); }catch(e){} },
+          setMouseIcon(on){ renderer.domElement.style.cursor = on ? "" : "none"; }
+        }
       };
     }
     function lookupKey(e){ return e.key; }
@@ -9185,12 +9292,16 @@
         console.log("Lua: running " + info.server + " server script(s) and " + info.client + " local script(s)");
         luaKeyDown = (e) => { if(!isTypingField() && !e.repeat) luaRt && luaRt.running && luaRt.keyEvent(e.key, true); };
         luaKeyUp = (e) => { luaRt && luaRt.running && luaRt.keyEvent(e.key, false); };
-        window.addEventListener("keydown", luaKeyDown);
-        window.addEventListener("keyup", luaKeyUp);
+        window.addEventListener("keydown", luaKeyDown, true);
+        window.addEventListener("keyup", luaKeyUp, true);
         luaMouseDown = (e) => { if(luaRt && luaRt.running && renderer && e.target === renderer.domElement) luaRt.mouseEvent(e.button, true, e.clientX, e.clientY); };
         luaMouseUp = (e) => { if(luaRt && luaRt.running) luaRt.mouseEvent(e.button, false, e.clientX, e.clientY); };
         window.addEventListener("mousedown", luaMouseDown);
         window.addEventListener("mouseup", luaMouseUp);
+        luaMouseMove = (e) => { if(luaRt && luaRt.running) luaRt.mouseMove(e.clientX, e.clientY, e.movementX || 0, e.movementY || 0); };
+        luaWheel = (e) => { if(luaRt && luaRt.running && renderer && e.target === renderer.domElement) luaRt.wheel(-e.deltaY); };
+        window.addEventListener("mousemove", luaMouseMove);
+        window.addEventListener("wheel", luaWheel, { passive: true });
       }catch(err){
         console.error("Scripts couldn't start:", err);
         luaRt = null; devEngineState = "failed";
@@ -9204,8 +9315,10 @@
     }
     function stopLua(){
       closeDevConsole();
-      if(luaKeyDown){ window.removeEventListener("keydown", luaKeyDown); luaKeyDown = null; }
-      if(luaKeyUp){ window.removeEventListener("keyup", luaKeyUp); luaKeyUp = null; }
+      if(luaKeyDown){ window.removeEventListener("keydown", luaKeyDown, true); luaKeyDown = null; }
+      if(luaKeyUp){ window.removeEventListener("keyup", luaKeyUp, true); luaKeyUp = null; }
+      if(luaMouseMove){ window.removeEventListener("mousemove", luaMouseMove); luaMouseMove = null; }
+      if(luaWheel){ window.removeEventListener("wheel", luaWheel); luaWheel = null; }
       if(luaMouseDown){ window.removeEventListener("mousedown", luaMouseDown); luaMouseDown = null; }
       if(luaMouseUp){ window.removeEventListener("mouseup", luaMouseUp); luaMouseUp = null; }
       if(luaRt){ try{ luaRt.stop(); }catch(e){ console.error(e); } luaRt = null; }
@@ -9289,7 +9402,7 @@
         else if(n.disabled){ state = "idle"; note = "Disabled"; }
         else if(!c){ state = "bad"; note = "Not running - its parent wasn't found (a script inside a part needs Studio's part-ID update; re-add it after updating)"; }
         else if(n.className === "Script" && c !== "svc:ServerScriptService" && c !== "svc:Workspace"){ state = "bad"; note = "Not running - a Script only runs in ServerScriptService or Workspace"; }
-        else if(n.className === "LocalScript" && c !== "svc:StarterPlayerScripts"){ state = "bad"; note = "Not running - a LocalScript only runs in StarterPlayerScripts"; }
+        else if(n.className === "LocalScript" && c !== "svc:StarterPlayerScripts" && c !== "svc:StarterGui"){ state = "bad"; note = "Not running - a LocalScript only runs in StarterPlayerScripts or StarterGui"; }
         else if(devErr[n.name]){ state = "bad"; note = "Error: " + devErr[n.name].replace(/\s+/g, " ").slice(0, 200); }
         else if(!luaRt){ state = "idle"; note = devEngineState === "failed" ? "Not started - the Lua engine failed (see output)" : "Waiting for the Lua engine..."; }
         rows.push({ name: n.name || n.className, cls: n.className, where, state, note });
@@ -9868,7 +9981,7 @@
           return;
         }
         keys[e.key.toLowerCase()] = true;
-        if(e.key === " ") doJump(e.repeat);
+        if(e.key === " " && !(luaRt && luaRt.running && luaRt.isSunk(" "))) doJump(e.repeat);
       });
       window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
       window.addEventListener("resize", onResize);
@@ -10510,6 +10623,12 @@
     function start(opts){
       opts = opts || {};
       const gid = opts.id || "baseplate";
+      // BlockVerse can only be played in the official app. Every way into a game (Play buttons, friend
+      // invites, the friend Join popover, deep links) ends up here, so this is the one place it's enforced.
+      if(typeof IS_DESKTOP_APP !== "undefined" && !IS_DESKTOP_APP){
+        try{ tryOpenDesktopApp(gid === "baseplate" ? "baseplate" : gid).then((opened) => { if(!opened) showAppDownloadPage(gid); }); }catch(e){ try{ showAppDownloadPage(gid); }catch(_){} }
+        return;
+      }
       ROOM = "rooms/" + gid;
       devLog = []; devStartInfo = null; devEngineState = "not started"; Object.keys(devErr).forEach(k => delete devErr[k]);
       devOwner = !!(opts.ownerKey && typeof currentAccountKey === "function" && currentAccountKey() && String(currentAccountKey()).toLowerCase() === String(opts.ownerKey).toLowerCase());
