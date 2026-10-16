@@ -2437,6 +2437,10 @@
           <label><span>Mouse sensitivity</span><span id="sensValue">1.0x</span></label>
           <input type="range" id="sensRange" min="0.2" max="3" step="0.1" value="1">
         </div>
+        <div class="game-settings-row">
+          <label><span>Volume</span><span id="volValue">100%</span></label>
+          <input type="range" id="volRange" min="0" max="100" step="1" value="100">
+        </div>
         <div class="game-settings-row game-toggle-row desktop-only">
           <label><span>Shiftlock</span></label>
           <p class="s-desc" style="margin:0 0 8px;">Press Shift to lock the camera to the crosshair and look around without holding the mouse. Press Shift again to release. Turn this off if you don't want Shift to do anything.</p>
@@ -9469,7 +9473,8 @@
       const myGen = ++luaGen;
       const hasScripts = worldNodes.some(n => (n.className === "Script" || n.className === "LocalScript") && !n.disabled);
       logDev("info", "World loaded: " + worldParts.length + " part(s), " + worldNodes.length + " other object(s).");
-      if(!hasScripts){ devEngineState = "no scripts"; logDev("info", "This world has no enabled Script or LocalScript."); return; }
+      const hasSounds = worldNodes.some(n => n.className === "Sound" && !n.disabled);
+      if(!hasScripts && !hasSounds){ devEngineState = "no scripts"; logDev("info", "This world has no enabled Script or LocalScript."); return; }
       try{
         devEngineState = "loading"; logDev("info", "Loading the Lua engine...");
         const eng = await ensureLuaEngine();
@@ -9744,6 +9749,22 @@
       if(audioCtx.state === "suspended") audioCtx.resume();
       return audioCtx;
     }
+    // ---- master volume (the Volume slider in the in-game Settings tab) ----
+    // applies to the built-in sounds AND to sounds a game's creator added in Studio
+    let masterVol = 1;
+    try{ const sv = parseFloat(localStorage.getItem("bv_master_volume")); if(isFinite(sv)) masterVol = Math.max(0, Math.min(1, sv)); }catch(e){}
+    window.bvMasterVolume = masterVol;
+    function bvOut(ctx){
+      if(!ctx._bvMaster){ const g = ctx.createGain(); g.gain.value = masterVol; g.connect(ctx.destination); ctx._bvMaster = g; }
+      return ctx._bvMaster;
+    }
+    function setMasterVolume(v){
+      masterVol = Math.max(0, Math.min(1, Number(v) || 0));
+      window.bvMasterVolume = masterVol;
+      try{ localStorage.setItem("bv_master_volume", String(masterVol)); }catch(e){}
+      if(audioCtx && audioCtx._bvMaster){ try{ audioCtx._bvMaster.gain.setTargetAtTime(masterVol, audioCtx.currentTime, 0.01); }catch(e){ audioCtx._bvMaster.gain.value = masterVol; } }
+      if(luaRt && luaRt.refreshVolumes){ try{ luaRt.refreshVolumes(); }catch(e){} }
+    }
     // short filtered noise burst - used as the "thud" texture under both
     // footsteps and landing so they sound like an actual contact, not a beep
     function playNoiseThud(freq, gainAmt, dur, ctx){
@@ -9758,7 +9779,7 @@
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(gainAmt, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-      noise.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+      noise.connect(filter); filter.connect(gain); gain.connect(bvOut(ctx));
       noise.start();
     }
     // one soft burst of filtered noise = the "swish" of a foot brushing through grass blades
@@ -9775,8 +9796,8 @@
       g.gain.exponentialRampToValueAtTime(gainAmt, t0 + attack);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
       src.connect(bp); bp.connect(g);
-      if(ctx.createStereoPanner){ const p = ctx.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(ctx.destination); }
-      else g.connect(ctx.destination);
+      if(ctx.createStereoPanner){ const p = ctx.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(bvOut(ctx)); }
+      else g.connect(bvOut(ctx));
       src.start(t0);
     }
     let stepSide = 1;
@@ -9791,7 +9812,7 @@
       osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.08);
       gain.gain.setValueAtTime(0.045 * v, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
-      osc.connect(gain); gain.connect(ctx.destination);
+      osc.connect(gain); gain.connect(bvOut(ctx));
       osc.start(); osc.stop(ctx.currentTime + 0.09);
       // grass: a broad bright swish + a lower rustle body + a couple of tiny crisp blade ticks
       playGrassSwish(ctx, 2600 + Math.random()*1500, 0.6, 0.05 * v, 0.012, 0.17, 0, pan);
@@ -9809,7 +9830,7 @@
         osc.frequency.exponentialRampToValueAtTime(430 * mult, ctx.currentTime + 0.11);
         gain.gain.setValueAtTime(i === 0 ? 0.08 : 0.035, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.17);
-        osc.connect(gain); gain.connect(ctx.destination);
+        osc.connect(gain); gain.connect(bvOut(ctx));
         osc.start(); osc.stop(ctx.currentTime + 0.17);
       });
       playNoiseThud(1400, 0.015, 0.09, ctx);
@@ -9822,7 +9843,7 @@
       osc.frequency.exponentialRampToValueAtTime(48, ctx.currentTime + 0.14);
       gain.gain.setValueAtTime(0.09, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
-      osc.connect(gain); gain.connect(ctx.destination);
+      osc.connect(gain); gain.connect(bvOut(ctx));
       osc.start(); osc.stop(ctx.currentTime + 0.16);
       // grass crush: a wide swish plus a scatter of blade ticks
       playGrassSwish(ctx, 1800, 0.5, 0.07, 0.01, 0.24, 0, 0);
@@ -9887,7 +9908,7 @@
       filter.type = "lowpass"; filter.frequency.value = 380;
       windGain = ctx.createGain();
       windGain.gain.value = 0.02;
-      noise.connect(filter); filter.connect(windGain); windGain.connect(ctx.destination);
+      noise.connect(filter); filter.connect(windGain); windGain.connect(bvOut(ctx));
       noise.start();
       windNode = noise;
     }
@@ -10761,6 +10782,15 @@
         sensValue.textContent = mouseSensitivity.toFixed(1) + "x";
       });
 
+      const volRange = document.getElementById("volRange");
+      const volValue = document.getElementById("volValue");
+      volRange.value = Math.round(masterVol * 100);
+      volValue.textContent = Math.round(masterVol * 100) + "%";
+      volRange.addEventListener("input", () => {
+        setMasterVolume(parseFloat(volRange.value) / 100);
+        volValue.textContent = Math.round(masterVol * 100) + "%";
+      });
+
       document.getElementById("reportSubmitBtn").addEventListener("click", (e) => {
         const btn = e.currentTarget;
         const text = document.getElementById("reportReasonText").value.trim();
@@ -10890,6 +10920,7 @@
     function stop(){
       stopDance();
       unwatchShutdown();
+      stopLua();      // ends the game's scripts AND every sound they started - they used to keep playing on the dashboard
       const screen = document.getElementById("gameScreen");
       const loading = document.getElementById("gameLoading");
       const bar = document.getElementById("gameLoadBar");
@@ -10942,6 +10973,7 @@
     function forceDisconnect(message, alsoLogout){
       if(!running){ if(alsoLogout) doLogout(); return; }
       const screen = document.getElementById("gameScreen");
+      stopLua();
       closeMenu();
       closeCharacterPreview();
       disconnectMultiplayer();
