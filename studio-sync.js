@@ -1,10 +1,4 @@
-/* BlockVerse Studio -> cloud world sync.
-   Loaded by studio.html (one <script src="studio-sync.js"> line). It looks at the games saved by Studio on this
-   computer, and for every game that is pending review or published it uploads a compact copy of the world
-   (parts, colours, shapes, scripts) to Firebase at game_worlds/<gameId>. The home page loads that copy when
-   someone presses Play. It re-uploads automatically whenever you change the world, so a published game
-   stays up to date while you build.
-   A small message appears in the bottom-left corner of Studio telling you whether the upload worked. */
+
 (function(){
   "use strict";
   var tries = 0;
@@ -52,6 +46,7 @@
           p: pr.position, r: pr.rotation, z: pr.size,
           k: pr.color, m: pr.material, t: pr.transparency || 0,
           cc: pr.canCollide === false ? 0 : 1,
+          an: pr.anchored === false ? 0 : 1,          // loose (unanchored) parts get physics in the app too
           cs: pr.castShadow === false ? 0 : 1
         };
       });
