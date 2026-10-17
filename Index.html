@@ -1146,7 +1146,8 @@
 
 
   /* ---------- Home footer + Forum ---------- */
-  .home-footer{ margin-top:36px; padding:18px 4px 6px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:12px; }
+  .main{ display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; box-sizing:border-box; }
+  .home-footer{ margin-top:auto; padding:18px 4px 6px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:12px; }
   .home-footer-links{ display:flex; flex-wrap:wrap; gap:22px; }
   .home-footer-links a{ color:var(--text-1); font-size:13px; text-decoration:none; cursor:pointer; }
   .home-footer-links a:hover{ color:var(--text-0); text-decoration:underline; }
@@ -1154,25 +1155,6 @@
   .home-footer-social a{ display:inline-flex; color:var(--text-1); transition:color .15s, transform .15s; }
   .home-footer-social a:hover{ color:#ff3b3b; transform:translateY(-1px); }
   .home-footer-social svg{ width:24px; height:24px; }
-  .forum-bar{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
-  .forum-btn{ padding:9px 14px; border-radius:9px; border:1px solid var(--border); background:var(--bg-3); color:var(--text-0); font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; }
-  .forum-btn:hover{ border-color:var(--grey-3); }
-  .forum-btn.primary{ background:#e8e8ec; color:#0b0b0c; border-color:#e8e8ec; }
-  .forum-btn:disabled{ opacity:.5; cursor:default; }
-  .forum-topic{ padding:13px 15px; border:1px solid var(--border); background:var(--bg-2); border-radius:11px; margin-bottom:9px; cursor:pointer; transition:border-color .15s, transform .15s; }
-  .forum-topic:hover{ border-color:var(--grey-3); transform:translateY(-1px); }
-  .forum-topic-title{ font-size:14.5px; font-weight:600; color:var(--text-0); margin-bottom:4px; word-break:break-word; }
-  .forum-topic-meta{ font-size:12px; color:var(--text-2); display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
-  .forum-author{ color:var(--text-1); font-weight:600; }
-  .forum-empty{ padding:26px 10px; text-align:center; color:var(--text-2); font-size:13px; }
-  .forum-card{ padding:16px; border:1px solid var(--border); background:var(--bg-2); border-radius:12px; margin-bottom:12px; }
-  .forum-card h3{ margin:0 0 6px; font-size:18px; color:var(--text-0); word-break:break-word; }
-  .forum-body{ white-space:pre-wrap; word-break:break-word; font-size:13.5px; line-height:1.5; color:var(--text-1); margin-top:8px; }
-  .forum-post{ padding:12px 14px; border:1px solid var(--border); background:var(--bg-2); border-radius:10px; margin-bottom:8px; }
-  .forum-input{ width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg-1); color:var(--text-0); font-size:13.5px; font-family:inherit; margin-bottom:10px; resize:vertical; }
-  .forum-del{ margin-top:10px; padding:6px 10px; border-radius:8px; border:1px solid rgba(229,72,77,.4); background:rgba(229,72,77,.1); color:#ff8b8f; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; }
-  .forum-del.small{ margin:0 0 0 auto; padding:3px 8px; font-size:11px; }
-  .forum-toast{ position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:9999; background:rgba(10,10,11,.94); color:#fff; padding:11px 16px; border-radius:10px; font-size:12.5px; border:1px solid rgba(255,255,255,.15); max-width:90vw; }
 
   /* ---------- Settings hub (3 buttons) ---------- */
   .settings-hub{
@@ -2030,47 +2012,17 @@
       </div>
       </div>
 
-      <footer class="home-footer">
-        <div class="home-footer-links"><a id="footerForumLink" href="#forum">Forum</a></div>
-        <div class="home-footer-bottom">
-          <span>&copy; 2026 BlockVerse. All rights reserved.</span>
-          <span class="home-footer-social">
-            <a href="https://www.youtube.com/channel/UCBxfcql01YiHKtDX7adAjeA" target="_blank" rel="noopener noreferrer" title="BlockVerse on YouTube" aria-label="BlockVerse on YouTube"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.76-1.77C18.25 5 12 5 12 5s-6.25 0-7.84.43A2.5 2.5 0 0 0 2.4 7.2C2 8.8 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.76 1.77C5.75 19 12 19 12 19s6.25 0 7.84-.43a2.5 2.5 0 0 0 1.76-1.77C22 15.2 22 12 22 12s0-3.2-.4-4.8zM10 15V9l5.2 3L10 15z"/></svg></a>
-          </span>
-        </div>
-      </footer>
     </div>
 
-    <!-- FORUM -->
-    <div id="pageForum" class="hidden">
-      <div class="main-header">
-        <h2>Forum</h2>
-        <p>Share your ideas and talk about them with other players.</p>
+        <footer class="home-footer hidden" id="homeFooter">
+      <div class="home-footer-links"><a id="footerForumLink" href="forum.html" target="_blank" rel="noopener">Forum</a></div>
+      <div class="home-footer-bottom">
+        <span>&copy; 2026 BlockVerse. All rights reserved.</span>
+        <span class="home-footer-social">
+          <a href="https://www.youtube.com/channel/UCBxfcql01YiHKtDX7adAjeA" target="_blank" rel="noopener noreferrer" title="BlockVerse on YouTube" aria-label="BlockVerse on YouTube"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.76-1.77C18.25 5 12 5 12 5s-6.25 0-7.84.43A2.5 2.5 0 0 0 2.4 7.2C2 8.8 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.76 1.77C5.75 19 12 19 12 19s6.25 0 7.84-.43a2.5 2.5 0 0 0 1.76-1.77C22 15.2 22 12 22 12s0-3.2-.4-4.8zM10 15V9l5.2 3L10 15z"/></svg></a>
+        </span>
       </div>
-      <div id="forumListView">
-        <div class="forum-bar">
-          <button type="button" class="forum-btn" id="forumBackHome">&#8592; Home</button>
-          <button type="button" class="forum-btn primary" id="forumNewOpen">New topic</button>
-        </div>
-        <div id="forumTopics"></div>
-      </div>
-      <div id="forumNewView" class="hidden">
-        <div class="forum-card">
-          <input class="forum-input" id="forumNewTitle" maxlength="80" placeholder="Topic title (e.g. Idea: new obstacle course game)">
-          <textarea class="forum-input" id="forumNewBody" rows="7" maxlength="2000" placeholder="Describe your idea..."></textarea>
-          <div style="display:flex;gap:8px"><button type="button" class="forum-btn primary" id="forumNewBtn">Post topic</button><button type="button" class="forum-btn" id="forumNewCancel">Cancel</button></div>
-        </div>
-      </div>
-      <div id="forumTopicView" class="hidden">
-        <div class="forum-bar"><button type="button" class="forum-btn" id="forumTopicBack">&#8592; All topics</button></div>
-        <div class="forum-card" id="forumTopicHead"></div>
-        <div id="forumPosts"></div>
-        <div class="forum-card">
-          <textarea class="forum-input" id="forumReplyText" rows="3" maxlength="1000" placeholder="Write a reply..."></textarea>
-          <button type="button" class="forum-btn primary" id="forumReplyBtn">Reply</button>
-        </div>
-      </div>
-    </div>
+    </footer>
 
     <div id="gamePanelRoot"></div>
     <div id="serversPageRoot"></div>
@@ -5922,13 +5874,32 @@
     studioDownload: document.getElementById("pageStudioDownload"),
     friends: document.getElementById("pageFriends"),
     friendProfile: document.getElementById("pageFriendProfile"),
-    customize: document.getElementById("pageCustomize"),
-    forum: document.getElementById("pageForum")
+    customize: document.getElementById("pageCustomize")
   };
+  // The footer (Forum + YouTube) is for the website only - never inside the Android app, the Windows apps or an installed (standalone) web app
+  const bvIsApp = (function(){
+    try{
+      if(/BlockVerse(Android|Desktop|Studio)/i.test(navigator.userAgent)) return true;
+      if(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform()) return true;
+      if(window.navigator.standalone === true) return true;
+      return ["standalone", "fullscreen", "minimal-ui", "window-controls-overlay"].some(m => window.matchMedia("(display-mode: " + m + ")").matches);
+    }catch(e){ return false; }
+  })();
+  window.bvIsApp = bvIsApp;
+  (function placeFooter(){
+    const f = document.getElementById("homeFooter"), m = document.querySelector(".main");
+    if(!f) return;
+    if(bvIsApp){ f.remove(); return; }
+    if(m) m.appendChild(f);   // very end of the page
+  })();
+  function bvUpdateFooter(name){
+    const f = document.getElementById("homeFooter");
+    if(f) f.classList.toggle("hidden", name !== "home");
+  }
   function showPage(name){
     if(name !== "friendProfile" && profileViewer) stopProfileViewer(); // free the WebGL context when leaving the profile page
     if(name !== "customize" && typeof stopCustomizeViewer === "function") stopCustomizeViewer();
-    if(name !== "forum" && window.bvForumStop) window.bvForumStop();   // stop the live forum listeners when leaving it
+    bvUpdateFooter(name);
     Object.keys(pages).forEach(k => pages[k].classList.toggle("hidden", k !== name));
     const settingsPages = ["settingsHub", "security", "account", "switchAccount"];
     document.querySelectorAll(".sb-item").forEach(i => {
@@ -5945,198 +5916,6 @@
     if(name === "friends"){ renderFriendsPage(); }
     if(name === "customize" && typeof openCustomizePage === "function") openCustomizePage();
   }
-
-  /* ============ Forum ============
-     A place to share ideas and chat about them. Anyone logged in can start a topic and reply; you can delete your own.
-     Needs these rules added inside "rules" in the Firebase Realtime Database rules (then press Publish):
-
-       "bv_forum": {
-         ".read": "auth != null",
-         "topics": {
-           ".indexOn": ["lastTs"],
-           "$tid": {
-             ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid)",
-             ".validate": "newData.hasChildren(['title','body','author','uid','ts','lastTs'])",
-             "title": { ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 80" },
-             "body": { ".validate": "newData.isString() && newData.val().length <= 2000" },
-             "replies": { ".write": "auth != null", ".validate": "newData.isNumber()" },
-             "lastTs": { ".write": "auth != null", ".validate": "newData.isNumber()" }
-           }
-         },
-         "posts": {
-           "$tid": {
-             ".indexOn": ["ts"],
-             ".write": "auth != null && root.child('bv_forum/topics/' + $tid + '/uid').val() === auth.uid",
-             "$pid": {
-               ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid)",
-               ".validate": "newData.hasChildren(['author','uid','text','ts']) && newData.child('text').isString() && newData.child('text').val().length <= 1000"
-             }
-           }
-         }
-       }
-  */
-  (function(){
-    const el = (id) => document.getElementById(id);
-    let listRef = null, topicRef = null, postsRef = null, curTid = null, lastSend = 0, token = 0;
-    const COOLDOWN = 15000;
-
-    function who(){ const key = getSession(); const acc = getAccounts(); return { key: key || "", name: (key && acc[key] && acc[key].username) || key || "Player" }; }
-    function censor(t){ return typeof window.bvCensor === "function" ? window.bvCensor(t) : t; }
-    function ago(ts){
-      if(!ts) return "just now";
-      const s = Math.max(0, (Date.now() - ts) / 1000);
-      if(s < 60) return "just now";
-      if(s < 3600) return Math.floor(s / 60) + "m ago";
-      if(s < 86400) return Math.floor(s / 3600) + "h ago";
-      if(s < 2592000) return Math.floor(s / 86400) + "d ago";
-      return new Date(ts).toLocaleDateString();
-    }
-    function nameNode(name, key){
-      const sp = document.createElement("span"); sp.className = "forum-author";
-      sp.appendChild(document.createTextNode(name || "Player"));
-      if(key && typeof badgesHtml === "function"){ try{ const b = document.createElement("span"); b.innerHTML = badgesHtml(key); sp.appendChild(b); }catch(e){} }
-      return sp;
-    }
-    function toast(text){
-      const t = document.createElement("div"); t.className = "forum-toast"; t.textContent = text;
-      document.body.appendChild(t); setTimeout(() => t.remove(), 3200);
-    }
-    function msg(box, text){ box.innerHTML = ""; const d = document.createElement("div"); d.className = "forum-empty"; d.textContent = text; box.appendChild(d); }
-    function friendlyErr(err){
-      return /permission/i.test((err && (err.code || err.message)) || "")
-        ? "The forum isn't switched on yet - the owner needs to add the forum rules in Firebase (bv_forum)."
-        : "Couldn't reach the forum - check your connection.";
-    }
-    function show(v){ ["List", "New", "Topic"].forEach(x => el("forum" + x + "View").classList.toggle("hidden", x !== v)); }
-    function stopList(){ if(listRef){ listRef.off(); listRef = null; } }
-    function stopTopic(){ if(topicRef){ topicRef.off(); topicRef = null; } if(postsRef){ postsRef.off(); postsRef = null; } curTid = null; }
-    function stopAll(){ token++; stopList(); stopTopic(); }
-
-    function openList(){
-      stopAll(); const my = token; show("List");
-      const box = el("forumTopics"); msg(box, "Loading...");
-      fbReady.then(() => {
-        if(my !== token) return;
-        listRef = fbDb.ref("bv_forum/topics").orderByChild("lastTs").limitToLast(60);
-        listRef.on("value", (snap) => {
-          const arr = []; snap.forEach(c => { const v = c.val(); if(v) arr.push(Object.assign({ id: c.key }, v)); });
-          arr.sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0));
-          if(!arr.length){ msg(box, "No topics yet - start the first one!"); return; }
-          box.innerHTML = "";
-          arr.forEach(t => {
-            const row = document.createElement("div"); row.className = "forum-topic";
-            const ti = document.createElement("div"); ti.className = "forum-topic-title"; ti.textContent = t.title || "(untitled)";
-            const meta = document.createElement("div"); meta.className = "forum-topic-meta";
-            meta.appendChild(document.createTextNode("by ")); meta.appendChild(nameNode(t.author, t.authorKey));
-            meta.appendChild(document.createTextNode(" \u00b7 " + (t.replies || 0) + (t.replies === 1 ? " reply" : " replies") + " \u00b7 " + ago(t.lastTs || t.ts)));
-            row.appendChild(ti); row.appendChild(meta);
-            row.addEventListener("click", () => openTopic(t.id));
-            box.appendChild(row);
-          });
-        }, (err) => msg(box, friendlyErr(err)));
-      });
-    }
-
-    function openTopic(tid){
-      stopAll(); const my = token; curTid = tid; show("Topic");
-      el("forumTopicHead").innerHTML = ""; msg(el("forumPosts"), "Loading...");
-      el("forumReplyText").value = "";
-      fbReady.then(() => {
-        if(my !== token) return;
-        topicRef = fbDb.ref("bv_forum/topics/" + tid);
-        topicRef.on("value", (snap) => {
-          const v = snap.val();
-          if(!v){ toast("That topic was deleted."); openList(); return; }
-          const head = el("forumTopicHead"); head.innerHTML = "";
-          const h = document.createElement("h3"); h.textContent = v.title || "";
-          const meta = document.createElement("div"); meta.className = "forum-topic-meta";
-          meta.appendChild(document.createTextNode("by ")); meta.appendChild(nameNode(v.author, v.authorKey));
-          meta.appendChild(document.createTextNode(" \u00b7 " + ago(v.ts)));
-          const body = document.createElement("div"); body.className = "forum-body"; body.textContent = v.body || "";
-          head.appendChild(h); head.appendChild(meta); head.appendChild(body);
-          if(v.uid && v.uid === fbUid){
-            const del = document.createElement("button"); del.type = "button"; del.className = "forum-del"; del.textContent = "Delete topic";
-            del.addEventListener("click", async () => {
-              if(!confirm("Delete this topic and all its replies?")) return;
-              try{ await fbDb.ref("bv_forum/posts/" + tid).remove(); await fbDb.ref("bv_forum/topics/" + tid).remove(); }catch(err){ toast(friendlyErr(err)); }
-            });
-            head.appendChild(del);
-          }
-        }, (err) => toast(friendlyErr(err)));
-        postsRef = fbDb.ref("bv_forum/posts/" + tid).orderByChild("ts").limitToLast(300);
-        postsRef.on("value", (snap) => {
-          const box = el("forumPosts"); const arr = [];
-          snap.forEach(c => { const v = c.val(); if(v) arr.push(Object.assign({ id: c.key }, v)); });
-          arr.sort((a, b) => (a.ts || 0) - (b.ts || 0));
-          if(!arr.length){ msg(box, "No replies yet - be the first to answer."); return; }
-          box.innerHTML = "";
-          arr.forEach(p => {
-            const row = document.createElement("div"); row.className = "forum-post";
-            const hd = document.createElement("div"); hd.className = "forum-topic-meta";
-            hd.appendChild(nameNode(p.author, p.authorKey)); hd.appendChild(document.createTextNode(" \u00b7 " + ago(p.ts)));
-            if(p.uid && p.uid === fbUid){
-              const del = document.createElement("button"); del.type = "button"; del.className = "forum-del small"; del.textContent = "Delete";
-              del.addEventListener("click", async () => {
-                try{
-                  await fbDb.ref("bv_forum/posts/" + tid + "/" + p.id).remove();
-                  fbDb.ref("bv_forum/topics/" + tid + "/replies").transaction(n => Math.max(0, (n || 0) - 1));
-                }catch(err){ toast(friendlyErr(err)); }
-              });
-              hd.appendChild(del);
-            }
-            const tx = document.createElement("div"); tx.className = "forum-body"; tx.textContent = p.text || "";
-            row.appendChild(hd); row.appendChild(tx); box.appendChild(row);
-          });
-        }, (err) => msg(el("forumPosts"), friendlyErr(err)));
-      });
-    }
-
-    async function sendReply(){
-      const box = el("forumReplyText"); const text = box.value.trim().slice(0, 1000);
-      if(!text || !curTid) return;
-      if(Date.now() - lastSend < COOLDOWN){ toast("Slow down - wait a few seconds between posts."); return; }
-      const btn = el("forumReplyBtn"); btn.disabled = true;
-      const u = who(), tid = curTid;
-      try{
-        await fbReady;
-        await fbDb.ref("bv_forum/posts/" + tid).push().set({ author: u.name, authorKey: u.key, uid: fbUid, text: censor(text), ts: firebase.database.ServerValue.TIMESTAMP });
-        fbDb.ref("bv_forum/topics/" + tid + "/replies").transaction(n => (n || 0) + 1);
-        fbDb.ref("bv_forum/topics/" + tid + "/lastTs").set(firebase.database.ServerValue.TIMESTAMP);
-        lastSend = Date.now(); box.value = "";
-      }catch(err){ toast(friendlyErr(err)); }
-      btn.disabled = false;
-    }
-
-    async function createTopic(){
-      const title = censor(el("forumNewTitle").value.trim().slice(0, 80));
-      const body = censor(el("forumNewBody").value.trim().slice(0, 2000));
-      if(title.length < 3){ toast("Give your topic a title (at least 3 characters)."); return; }
-      if(!body){ toast("Write what you want to discuss."); return; }
-      if(Date.now() - lastSend < COOLDOWN){ toast("Slow down - wait a few seconds between posts."); return; }
-      const btn = el("forumNewBtn"); btn.disabled = true;
-      const u = who();
-      try{
-        await fbReady;
-        const ref = fbDb.ref("bv_forum/topics").push(); const TS = firebase.database.ServerValue.TIMESTAMP;
-        await ref.set({ title, body, author: u.name, authorKey: u.key, uid: fbUid, ts: TS, lastTs: TS, replies: 0 });
-        lastSend = Date.now();
-        el("forumNewTitle").value = ""; el("forumNewBody").value = "";
-        openTopic(ref.key);
-      }catch(err){ toast(friendlyErr(err)); }
-      btn.disabled = false;
-    }
-
-    function openForum(){ showPage("forum"); openList(); }
-    window.bvOpenForum = openForum;
-    window.bvForumStop = stopAll;
-    el("footerForumLink").addEventListener("click", (e) => { e.preventDefault(); openForum(); });
-    el("forumBackHome").addEventListener("click", () => showPage("home"));
-    el("forumNewOpen").addEventListener("click", () => { stopAll(); show("New"); });
-    el("forumNewCancel").addEventListener("click", openList);
-    el("forumTopicBack").addEventListener("click", openList);
-    el("forumNewBtn").addEventListener("click", createTopic);
-    el("forumReplyBtn").addEventListener("click", sendReply);
-  })();
 
   /* ---- mobile drawer (hamburger sidebar) ---- */
   function isMobileLayout(){ return window.innerWidth <= 700; }
