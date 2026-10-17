@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BlockVerse Forum</title>
+<meta name="theme-color" content="#0a0a0b">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{ --bg:#050506; --s1:#0e0e10; --s2:#151518; --s3:#1d1d21; --line:#26262b; --line2:#36363d; --t0:#f2f2f4; --t1:#c9c9d0; --t2:#8c8c95; --t3:#5f5f68; --danger:#ff8b8f; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; min-height:100%; background:var(--bg); color:var(--t0); font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  body{ min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+  a{ color:inherit; }
+  .hidden{ display:none !important; }
+  header.bar{ display:flex; align-items:center; gap:12px; padding:12px 18px; padding-top:calc(12px + env(safe-area-inset-top,0px)); border-bottom:1px solid var(--line); background:rgba(10,10,11,.92); position:sticky; top:0; z-index:5; backdrop-filter:blur(8px); }
+  .logo{ width:34px; height:34px; border-radius:9px; background:#000 url(icon-192.png) center/cover; border:1px solid var(--line2); flex-shrink:0; }
+  .brand{ font-weight:800; font-size:16px; letter-spacing:.2px; }
+  .brand small{ display:block; font-weight:500; font-size:11px; color:var(--t2); letter-spacing:0; }
+  .grow{ flex:1; }
+  .chip{ font-size:12.5px; color:var(--t1); padding:6px 11px; border:1px solid var(--line); border-radius:999px; background:var(--s1); max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .btn{ padding:8px 14px; border-radius:9px; border:1px solid var(--line2); background:var(--s2); color:var(--t0); font:600 13px inherit; font-family:inherit; cursor:pointer; text-decoration:none; display:inline-block; }
+  .btn:hover{ border-color:#55555e; }
+  .btn.primary{ background:#f2f2f4; color:#0a0a0b; border-color:#f2f2f4; }
+  .btn:disabled{ opacity:.5; cursor:default; }
+  main{ flex:1; width:100%; max-width:860px; margin:0 auto; padding:24px 18px 30px; display:flex; flex-direction:column; min-height:0; }
+  h1{ margin:0 0 4px; font-size:24px; }
+  .sub{ margin:0 0 22px; color:var(--t2); font-size:13.5px; }
+  .gate{ margin:auto; text-align:center; max-width:420px; padding:34px 26px; border:1px solid var(--line); background:var(--s1); border-radius:16px; }
+  .gate h2{ margin:0 0 8px; font-size:20px; }
+  .gate p{ margin:0 0 20px; color:var(--t2); font-size:13.5px; line-height:1.55; }
+  .forum-card{ display:flex; align-items:center; gap:14px; padding:15px 17px; border:1px solid var(--line); background:var(--s1); border-radius:14px; margin-bottom:10px; cursor:pointer; transition:border-color .15s, transform .15s, background .15s; }
+  .forum-card:hover{ border-color:var(--line2); background:var(--s2); transform:translateY(-1px); }
+  .fc-ic{ width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:linear-gradient(135deg,#34343b,#1a1a1f); border:1px solid var(--line2); flex-shrink:0; }
+  .fc-ic svg{ width:21px; height:21px; }
+  .fc-name{ font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .fc-desc{ color:var(--t2); font-size:12.5px; margin-top:3px; word-break:break-word; }
+  .tag{ font-size:9.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; padding:2px 7px; border-radius:6px; background:var(--s3); color:var(--t1); border:1px solid var(--line2); }
+  .tag.lock{ color:var(--danger); border-color:rgba(255,139,143,.35); }
+  .empty{ text-align:center; color:var(--t2); padding:46px 10px; font-size:13.5px; }
+  /* chat room */
+  #roomView{ flex:1; display:flex; flex-direction:column; min-height:0; }
+  .room-head{ display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .room-head h2{ margin:0; font-size:19px; }
+  .room-head p{ margin:2px 0 0; font-size:12.5px; color:var(--t2); }
+  #msgs{ flex:1; min-height:300px; max-height:calc(100dvh - 290px); overflow-y:auto; border:1px solid var(--line); background:var(--s1); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .msg{ max-width:88%; align-self:flex-start; }
+  .msg.me{ align-self:flex-end; }
+  .msg-h{ font-size:11.5px; color:var(--t2); margin:0 4px 3px; display:flex; gap:7px; align-items:center; }
+  .msg.me .msg-h{ justify-content:flex-end; }
+  .msg-h b{ color:var(--t1); font-weight:700; }
+  .bubble{ padding:9px 13px; border-radius:14px; background:var(--s3); border:1px solid var(--line); font-size:14px; line-height:1.45; word-break:break-word; white-space:pre-wrap; }
+  .msg.me .bubble{ background:#e8e8ec; color:#0a0a0b; border-color:#e8e8ec; }
+  .composer{ display:flex; gap:8px; margin-top:12px; }
+  .composer input{ flex:1; padding:12px 14px; border-radius:11px; border:1px solid var(--line2); background:var(--s1); color:var(--t0); font-size:14px; font-family:inherit; outline:none; }
+  .composer input:focus{ border-color:#6a6a74; }
+  .note{ font-size:11.5px; color:var(--t3); margin-top:8px; }
+  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); z-index:50; background:rgba(10,10,11,.96); border:1px solid var(--line2); padding:11px 16px; border-radius:10px; font-size:12.5px; max-width:90vw; }
+  footer.foot{ text-align:center; color:var(--t3); font-size:12px; padding:14px 10px calc(14px + env(safe-area-inset-bottom,0px)); border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="logo"></div>
+  <div class="brand">BlockVerse Forum<small>Share ideas &amp; chat with the community</small></div>
+  <div class="grow"></div>
+  <span class="chip hidden" id="userChip"></span>
+  <a class="btn" id="homeBtn" href="Index.html">BlockVerse</a>
+</header>
+
+<main>
+  <!-- not logged in -->
+  <div class="gate hidden" id="gateLogin">
+    <h2>Log in to see the forums</h2>
+    <p>The BlockVerse Forum is only for BlockVerse players. Log in to your account on BlockVerse, then come back to this page.</p>
+    <a class="btn primary" href="Index.html" id="gateBtn">Log in to BlockVerse</a>
+  </div>
+  <!-- banned / terminated -->
+  <div class="gate hidden" id="gateBlocked">
+    <h2>Forum unavailable</h2>
+    <p>This account can't use the forum right now.</p>
+  </div>
+  <div class="gate hidden" id="gateLoading"><p style="margin:0">Loading...</p></div>
+
+  <!-- forum list -->
+  <section id="listView" class="hidden">
+    <h1>Forums</h1>
+    <p class="sub">Pick a forum and chat with other players. Share ideas, give feedback and talk about what you like.</p>
+    <div id="forumList"></div>
+  </section>
+
+  <!-- chat room -->
+  <section id="roomView" class="hidden">
+    <div class="room-head">
+      <button class="btn" id="backBtn" type="button">&#8592; Forums</button>
+      <div style="min-width:0"><h2 id="roomName"></h2><p id="roomDesc"></p></div>
+    </div>
+    <div id="msgs"></div>
+    <form class="composer" id="composer" autocomplete="off">
+      <input id="msgInput" maxlength="300" placeholder="Write a message..." enterkeyhint="send">
+      <button class="btn primary" id="sendBtn" type="submit">Send</button>
+    </form>
+    <div class="note" id="roomNote">Be kind. Links and bad words are hidden automatically.</div>
+  </section>
+</main>
+
+<footer class="foot">&copy; 2026 BlockVerse. All rights reserved.</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script>
+(function(){
+  "use strict";
+  var STORE_KEY = "blockverse_accounts_v2", SESSION_KEY = "blockverse_session";
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---- same chat filter as the game (copied so the forum is just as clean) ---- */
+      const PROFANITY_LIST = [
+      // English
+      "fuck","fuk","fck","shit","bitch","bytch","cunt","dick","pussy","pussi",
+      "ass","asshole","asswhole","ass hole","nigger","nigga","faggot","fag","retard",
+      "whore","slut","cock","cok","bastard","motherfucker","mf","jerkoff","dumbass","dipshit",
+      "sex","porn","nude","nudes","rape",
+      "kys","kill yourself","kill urself","go die","go kill yourself","end yourself",
+      "neck yourself","unalive yourself",
+      // Arabic (common profanity, normalized form - diacritics/tatweel stripped before matching)
+      "كس","كسم","خرا","زبي","شرموطة","شرموط","قحبة","منيك","كلب ابن","ابن كلب","عرص","متناك",
+      // Spanish
+      "puta","puto","mierda","pendejo","pendeja","cabron","cabrón","gilipollas","joder","cono","coño",
+      // French
+      "putain","merde","connard","salope","enculé","encule","batard","bâtard",
+      // German
+      "scheisse","scheiße","hurensohn","fotze","wichser","arschloch",
+      // Portuguese
+      "porra","caralho","merda","puta","filho da puta","cacete",
+      // Russian (transliterated + common Cyrillic)
+      "блять","сука","хуй","пизда","бля"
+    ];
+
+    // separate word list from PROFANITY_LIST: not swear words, but terms
+    // this in-game chat doesn't want spelled out plainly - other platform/
+    // app names (which chat rules disallow mentioning, e.g. to steer kids
+    // off-platform) and a couple of safety-flag words. Matched and hashed
+    // the same way as PROFANITY_LIST (see buildProfanityPattern below).
+    const SENSITIVE_TERMS_LIST = [
+      "predator","predators","preditor","preditors","predetor","predetors","pred","preds",
+      "ped","peds","pedo","pedos","pedophile","pedophiles","paedophile","paedophiles",
+      "groomer","groomers","grooming",
+      "discord","youtube","yt","tiktok","tik tok","twitter","x.com","instagram","insta",
+      "snapchat","snap","facebook","reddit","telegram","whatsapp","kik","twitch","roblox condo","condo game"
+    ];
+
+    // strips accents/diacritics (Latin AND Arabic), Arabic tatweel, and
+    // normalizes alef variants - so a word typed with decorations still
+    // matches its plain form
+    function stripDiacritics(s){
+      return s
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")       // Latin combining accents
+        .replace(/[\u064B-\u0652\u0670]/g, "") // Arabic harakat/tanwin
+        .replace(/\u0640/g, "")                // Arabic tatweel (ـ)
+        .replace(/[إأآا]/g, "ا");               // unify alef variants
+    }
+
+    // Invisible/zero-width characters get dropped entirely (not treated as
+    // spaces) - sites that generate "filter-proof" text often sneak these
+    // between every letter (f<ZWSP>u<ZWSP>c<ZWSP>k) specifically because
+    // they're invisible and most naive filters only strip real whitespace.
+    const INVISIBLE_CHARS_RE = /[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+
+    // Homoglyph map: visually-identical letters from other scripts (mostly
+    // Cyrillic/Greek) that "letter changer" sites substitute in because they
+    // render the same but are different codepoints, so plain diacritic
+    // stripping and NFKD alone don't catch them. NFKD already folds things
+    // like fullwidth (ａｂｃ) and Mathematical Alphanumeric (𝓯𝓾𝓬𝓴, 𝔀𝓸𝔀) styles
+    // back to plain Latin on its own, so this map only needs to cover
+    // *cross-script* lookalikes that NFKD doesn't touch.
+    const HOMOGLYPH_MAP = {
+      "а":"a", "в":"b", "с":"c", "е":"e", "н":"h", "і":"i", "ѕ":"s", "ԁ":"d",
+      "к":"k", "м":"m", "о":"o", "р":"p", "т":"t", "х":"x", "у":"y", "ц":"u",
+      "ѡ":"w", "ɡ":"g", "ⅼ":"l", "ⅰ":"i", "ο":"o", "α":"a", "ρ":"p", "τ":"t",
+      "υ":"u", "ν":"v", "κ":"k", "ѵ":"v", "ⅴ":"v", "ⅹ":"x",
+      // non-decomposing Latin-extended letters ("letter changer" sites use
+      // these a lot because NFKD normalize() can't fold them the way it
+      // folds regular accented letters - they're distinct base letters in
+      // Unicode, not letter+accent, so stripDiacritics() alone never
+      // catches them
+      "đ":"d", "ð":"d", "ħ":"h", "ĸ":"k", "ł":"l", "ø":"o", "ø":"o",
+      "þ":"p", "ı":"i", "ĳ":"ij",
+      // capital I used as a lowercase L look-alike, and a multiplication
+      // sign used as an X look-alike - handled before lowercasing happens
+      // for I (since toLowerCase would otherwise turn I into i, not l)
+      "I":"l", "×":"x"
+    };
+    function foldHomoglyphs(s){
+      let out = "";
+      for(const ch of s) out += HOMOGLYPH_MAP[ch] || ch;
+      return out;
+    }
+
+    // collapses common leetspeak/symbol substitutions and squashes runs of
+    // the same letter ("fuuuuck" -> "fuck"), so obfuscated spellings still
+    // hit the same regex as the plain word
+    function normalizeForFilter(text){
+      let s = (text || "").replace(INVISIBLE_CHARS_RE, "");
+      s = foldHomoglyphs(s);
+      s = stripDiacritics(s.toLowerCase());
+      s = s
+        .replace(/[@]/g, "a").replace(/[4]/g, "a")
+        .replace(/[3]/g, "e")
+        .replace(/[1!|]/g, "i")
+        .replace(/[0]/g, "o")
+        .replace(/[$5]/g, "s")
+        .replace(/[7+]/g, "t")
+        .replace(/[8]/g, "b")
+        // any punctuation/symbol/separator character (not just the handful
+        // of ASCII ones we used to list) collapses to a single space - this
+        // is what actually defeats the "insert weird unicode spacing
+        // between every letter" trick, since \p{Z}/\p{P}/\p{S} covers the
+        // whole family of exotic space and punctuation codepoints, not just
+        // the few ASCII symbols we happened to think of
+        .replace(/[\p{Z}\p{P}\p{S}]/gu, " ")
+        .replace(/\s+/g, " ");
+      s = s.replace(/(.)\1{2,}/g, "$1$1"); // aaaa -> aa (keeps double letters like "ss" intact)
+      return s;
+    }
+
+    // Same as normalizeForFilter but with every space removed too, used as
+    // a second detection pass. This is what actually catches "f u c k" /
+    // "f-u-c-k" style spacing tricks (the site your friend found): the
+    // space-tolerant pattern only expects \s+ where a word already has an
+    // internal space (like "ass hole"), so a swear letter-spaced out with
+    // gaps between every character slides right past it. Stripping spaces
+    // entirely before matching closes that gap. It's only used for
+    // detection (looksLikeProfanity/looksLikeSensitiveTerm) - censoring
+    // still runs on the space-preserving version so legitimate sentences
+    // don't get mangled.
+    function normalizeForFilterNoSpaces(text){
+      return normalizeForFilter(text).replace(/\s+/g, "");
+    }
+
+    // builds the raw alternation pattern once (shared by both regexes
+    // below). "ass" gets Unicode-aware word boundaries (\p{L}/\p{N}, not
+    // JS's \b, which only understands [A-Za-z0-9_] and silently fails to
+    // bound non-Latin scripts like Arabic) so it doesn't false-positive on
+    // "class"/"password"/"assassin". Every other word is matched as a
+    // plain substring on purpose, so compound/concatenated profanity like
+    // "dogshit" or "fuckthis" still gets caught even though "shit"/"fuck"
+    // never appear as a standalone word there.
+    const BOUNDARY_PROTECTED = new Set(["ass","mf"]);   // "mf" only counts as a standalone word ("imf", "i am f" are fine)
+    function buildProfanityPattern(){
+      const parts = PROFANITY_LIST.map(w => {
+        const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+        return BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
+    }
+    const profanityPatternSrc = buildProfanityPattern();
+    // used only for replace() (censoring) - String.replace resets a global
+    // regex's lastIndex at the start of every call, so this one is safe to
+    // share across calls
+    const profanityRegex = new RegExp(profanityPatternSrc, "giu");
+
+    // no-space variant of the same word list, for matching against
+    // normalizeForFilterNoSpaces() output (see comment there) - internal
+    // spaces in multi-word entries like "ass hole" are just removed instead
+    // of turned into \s+, since there's nothing left to match against
+    function buildNoSpacePattern(list){
+      const long = [], short = [];
+      list.forEach(w => {
+        const norm = normalizeForFilter(w).replace(/\s+/g, "");
+        const esc = norm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const src = BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + esc + "(?![\\p{L}\\p{N}])" : esc;
+        ([...norm].length <= 3 ? short : long).push(src);
+      });
+      // With the spaces squashed out, a 2-3 letter term shows up by accident all the time
+      // ("i am f" -> "iamf" has "mf", "is exactly" has "sex", "my toy" has "yt"). So those short
+      // terms only count here when they ARE the whole message; the normal pass above still
+      // catches them as real words in a sentence. Longer terms keep the letter-spacing check.
+      return "(" + long.join("|") + ")" + (short.length ? "|^(?:" + short.join("|") + ")$" : "");
+    }
+    const profanityPatternNoSpaceSrc = buildNoSpacePattern(PROFANITY_LIST);
+
+    // short/ambiguous sensitive terms get word boundaries so they don't
+    // false-positive as substrings of unrelated words (e.g. "yt" inside
+    // "party", "snap" inside "snapshot", "insta" inside "instant")
+    const SENSITIVE_BOUNDARY_PROTECTED = new Set(["yt","snap","insta","kik","x.com","pred","preds","ped","peds"]);
+    function buildSensitivePattern(){
+      const parts = SENSITIVE_TERMS_LIST.map(w => {
+        const norm = normalizeForFilter(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+        return SENSITIVE_BOUNDARY_PROTECTED.has(w) ? "(?<![\\p{L}\\p{N}])" + norm + "(?![\\p{L}\\p{N}])" : norm;
+      });
+      return "(" + parts.join("|") + ")";
+    }
+    const sensitivePatternSrc = buildSensitivePattern();
+    const sensitivePatternNoSpaceSrc = buildNoSpacePattern(SENSITIVE_TERMS_LIST);
+
+    function looksLikeSensitiveTerm(text){
+      if(!text) return false;
+      if(new RegExp(sensitivePatternSrc, "iu").test(normalizeForFilter(text))) return true;
+      return new RegExp(sensitivePatternNoSpaceSrc, "iu").test(normalizeForFilterNoSpaces(text));
+    }
+
+    // true if ANY normalized substring of the text matches the filter -
+    // this is the "is this message bad" check used both to decide whether
+    // to censor a message and, in the report flow, as the automated check
+    // on a reported message. Builds a FRESH non-global regex every call on
+    // purpose: a shared global-flagged regex's .test() mutates .lastIndex
+    // as a side effect, so reusing one instance across many unrelated
+    // .test() calls (chat send, report check, moderation list...) could
+    // make a later call start searching mid-string and silently miss a
+    // real match. A fresh instance has no state to leak between calls.
+    //
+    // NOTE on "AI": this app is a static site with no backend, so there is
+    // no safe way to call a real language model from the client without
+    // exposing an API key to anyone who opens dev tools. This detector is
+    // the honest best-effort substitute - normalized, multi-language,
+    // substring-aware - not an actual model call.
+    function looksLikeProfanity(text){
+      if(!text) return false;
+      if(new RegExp(profanityPatternSrc, "iu").test(normalizeForFilter(text))) return true;
+      // catches letter-spaced-out spellings ("f u c k", "f.u.c.k" with
+      // exotic separators, etc.) that still have real letters between the
+      // gaps - see normalizeForFilterNoSpaces
+      return new RegExp(profanityPatternNoSpaceSrc, "iu").test(normalizeForFilterNoSpaces(text));
+    }
+
+    // each matched bad word gets replaced with hashtags matching its length
+    // (e.g. "shit" -> "####") - the rest of the message stays readable.
+    // looksLikeProfanity() catches obfuscated/leetspeak spellings via
+    // normalization, but replacement runs on the raw text to keep original
+    // formatting; if normalization caught something but no raw substring
+    // lines up (a heavily obfuscated spelling), hash the whole message as a
+    // safe fallback rather than let it through unmarked.
+    // matches links/URLs so kids can't be steered to an outside site via
+    // chat: "http(s)://...", "www.something", or a bare "word.tld" (e.g.
+    // "website.com", "join.gg/abc"). Requires a real-looking TLD (2+
+    // letters) so ordinary sentences with a period ("ok. sounds good") or
+    // decimals ("v2.0") don't get flagged.
+    const LINK_PATTERN_SRC = "\\b((https?:\\/\\/|www\\.)\\S+|[a-z0-9-]+\\.(?:com|net|org|io|gg|me|co|xyz|link|gl|tv|app|dev|to|us|info|biz|club|site|online|live|shop|fun)(?:\\/\\S*)?)\\b";
+    function looksLikeLink(text){
+      if(!text) return false;
+      return new RegExp(LINK_PATTERN_SRC, "i").test(text);
+    }
+
+    function censorText(text){
+      if(!text) return text;
+      let out = text;
+      if(looksLikeProfanity(out)){
+        const replaced = out.replace(new RegExp(profanityPatternSrc, "giu"), m => "#".repeat(m.length));
+        out = (replaced !== out) ? replaced : out.replace(/\S/g, "#");
+      }
+      if(looksLikeSensitiveTerm(out)){
+        const replaced = out.replace(new RegExp(sensitivePatternSrc, "giu"), m => "#".repeat(m.length));
+        if(replaced !== out) out = replaced;
+      }
+      if(looksLikeLink(out)){
+        const replaced = out.replace(new RegExp(LINK_PATTERN_SRC, "gi"), m => "#".repeat(m.length));
+        if(replaced !== out) out = replaced;
+      }
+      return out;
+    }
+
+  function show(id){ ["gateLogin","gateBlocked","gateLoading","listView","roomView"].forEach(function(x){ $(x).classList.toggle("hidden", x !== id); }); }
+  function toast(t){ var d = document.createElement("div"); d.className = "toast"; d.textContent = t; document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 3200); }
+
+  // the account is the BlockVerse account: this page lives on the same site, so it reads the same login
+  var key = null, username = "";
+  try{
+    key = localStorage.getItem(SESSION_KEY);
+    var accts = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+    if(key && accts[key]) username = accts[key].username || key; else key = null;
+  }catch(e){ key = null; }
+  if(!key){ show("gateLogin"); return; }
+  $("userChip").textContent = username; $("userChip").classList.remove("hidden");
+  show("gateLoading");
+
+  firebase.initializeApp({
+    apiKey: "AIzaSyDR0_RPdIPXfRV9M-2E_RCDpUPPs8Pc2qo",
+    authDomain: "blockverse-3526c.firebaseapp.com",
+    databaseURL: "https://blockverse-3526c-default-rtdb.firebaseio.com",
+    projectId: "blockverse-3526c",
+    storageBucket: "blockverse-3526c.firebasestorage.app",
+    messagingSenderId: "782192628812",
+    appId: "1:782192628812:web:79d50d2c34cd8ac969d0e9"
+  });
+  var db = firebase.database(), auth = firebase.auth(), TS = firebase.database.ServerValue.TIMESTAMP;
+  var uid = null, badges = {}, forums = {}, curFid = null, msgRef = null, lastSend = 0;
+
+  function tsText(ts){ if(!ts) return ""; var d = new Date(ts), n = new Date(); var t = d.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); return d.toDateString() === n.toDateString() ? t : d.toLocaleDateString() + " " + t; }
+  function permMsg(err){ return /permission/i.test((err && (err.code || err.message)) || "") ? "The forum isn't switched on yet - the owner needs to publish the new database rules." : "Couldn't reach the forum - check your connection."; }
+
+  function start(){
+    // banned / terminated accounts can't use the forum
+    Promise.all([ db.ref("blockverse_account_bans/" + key).once("value"), db.ref("blockverse_terminated/" + key).once("value"), db.ref("blockverse_bans/" + key).once("value") ])
+      .then(function(r){
+        var tmpBan = r[2].val();
+        if(r[0].exists() || r[1].exists() || (tmpBan && Number(tmpBan.until) > Date.now())){ show("gateBlocked"); return; }
+        db.ref("blockverse_badges").on("value", function(s){ badges = s.val() || {}; if(curFid) renderMsgs(lastSnap); });
+        db.ref("bv_forum/forums").on("value", function(s){ forums = s.val() || {}; if(!curFid) renderList(); else refreshRoomHead(); }, function(err){ show("listView"); $("forumList").innerHTML = ""; var d = document.createElement("div"); d.className = "empty"; d.textContent = permMsg(err); $("forumList").appendChild(d); });
+        show("listView"); renderList();
+      })
+      .catch(function(err){ show("listView"); $("forumList").innerHTML = ""; var d = document.createElement("div"); d.className = "empty"; d.textContent = permMsg(err); $("forumList").appendChild(d); });
+  }
+  auth.signInAnonymously().then(function(c){ uid = c.user.uid; start(); }).catch(function(){ show("gateBlocked"); });
+
+  var CHAT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-11.6 7.1L4 20.5l1.5-4.6A8 8 0 1121 12z"/></svg>';
+  function renderList(){
+    var box = $("forumList"); box.innerHTML = "";
+    var ids = Object.keys(forums).sort(function(a, b){ return (forums[a].ts || 0) - (forums[b].ts || 0); });
+    if(!ids.length){ var e = document.createElement("div"); e.className = "empty"; e.textContent = "No forums yet - check back soon!"; box.appendChild(e); return; }
+    ids.forEach(function(id){
+      var f = forums[id], card = document.createElement("div"); card.className = "forum-card";
+      var ic = document.createElement("div"); ic.className = "fc-ic"; ic.innerHTML = CHAT_ICON;
+      var mid = document.createElement("div"); mid.style.minWidth = "0";
+      var nm = document.createElement("div"); nm.className = "fc-name"; nm.appendChild(document.createTextNode(f.name || "Forum"));
+      if(f.locked){ var t = document.createElement("span"); t.className = "tag lock"; t.textContent = "Locked"; nm.appendChild(t); }
+      var ds = document.createElement("div"); ds.className = "fc-desc"; ds.textContent = f.description || "";
+      mid.appendChild(nm); if(f.description) mid.appendChild(ds);
+      card.appendChild(ic); card.appendChild(mid);
+      card.addEventListener("click", function(){ openRoom(id); });
+      box.appendChild(card);
+    });
+  }
+
+  var lastSnap = null;
+  function refreshRoomHead(){
+    var f = forums[curFid];
+    if(!f){ toast("That forum was removed."); closeRoom(); return; }
+    $("roomName").textContent = f.name || "Forum"; $("roomDesc").textContent = f.description || "";
+    $("msgInput").disabled = $("sendBtn").disabled = !!f.locked;
+    $("msgInput").placeholder = f.locked ? "This forum is locked" : "Write a message...";
+  }
+  function openRoom(fid){
+    curFid = fid; lastSnap = null; show("roomView"); $("msgs").innerHTML = "";
+    refreshRoomHead();
+    if(msgRef) msgRef.off();
+    msgRef = db.ref("bv_forum/messages/" + fid).orderByChild("ts").limitToLast(150);
+    msgRef.on("value", function(s){ lastSnap = s; renderMsgs(s); }, function(err){ toast(permMsg(err)); });
+    setTimeout(function(){ if(!$("msgInput").disabled) $("msgInput").focus(); }, 60);
+  }
+  function closeRoom(){ if(msgRef){ msgRef.off(); msgRef = null; } curFid = null; lastSnap = null; show("listView"); renderList(); }
+
+  function renderMsgs(snap){
+    var box = $("msgs"); if(!box || !snap) return;
+    var stick = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    var arr = []; snap.forEach(function(c){ var v = c.val(); if(v) arr.push(v); });
+    arr.sort(function(a, b){ return (a.ts || 0) - (b.ts || 0); });
+    box.innerHTML = "";
+    if(!arr.length){ var e = document.createElement("div"); e.className = "empty"; e.textContent = "No messages yet - say hi and share your idea!"; box.appendChild(e); return; }
+    arr.forEach(function(m){
+      var row = document.createElement("div"); row.className = "msg" + (m.uid === uid ? " me" : "");
+      var h = document.createElement("div"); h.className = "msg-h";
+      var b = document.createElement("b"); b.textContent = m.author || "Player"; h.appendChild(b);
+      var bd = m.authorKey && badges[m.authorKey];
+      if(bd && (bd.owner || bd.dev)){ var tg = document.createElement("span"); tg.className = "tag"; tg.textContent = bd.owner ? "Owner" : "Dev"; h.appendChild(tg); }
+      var tm = document.createElement("span"); tm.textContent = tsText(m.ts); h.appendChild(tm);
+      var bu = document.createElement("div"); bu.className = "bubble"; bu.textContent = m.text || "";
+      row.appendChild(h); row.appendChild(bu); box.appendChild(row);
+    });
+    if(stick) box.scrollTop = box.scrollHeight;
+  }
+
+  $("composer").addEventListener("submit", function(e){
+    e.preventDefault();
+    var inp = $("msgInput"), text = inp.value.trim().slice(0, 300);
+    if(!text || !curFid || !uid) return;
+    if(forums[curFid] && forums[curFid].locked){ toast("This forum is locked."); return; }
+    if(Date.now() - lastSend < 1500){ toast("Slow down a little."); return; }
+    lastSend = Date.now(); inp.value = "";
+    var clean = censorText(text);
+    db.ref("bv_forum/messages/" + curFid).push().set({ uid: uid, authorKey: key, author: username.slice(0, 24), text: clean, ts: TS })
+      .then(function(){ var b = $("msgs"); b.scrollTop = b.scrollHeight; })
+      .catch(function(err){ toast(permMsg(err)); inp.value = text; });
+  });
+  $("backBtn").addEventListener("click", closeRoom);
+})();
+</script>
+</body>
+</html>
