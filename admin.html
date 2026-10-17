@@ -400,6 +400,7 @@
       <button class="nav-item" data-tab="games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3L12 2.5z"/><path d="M12 12l8.5-4.7M12 12v9.5M12 12L3.5 7.3"/></svg><span>Games</span><em class="cnt" id="cntGames">-</em></button>
       <button class="nav-item" data-tab="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-1.5 4L16 12H5"/></svg><span>Reports</span><em class="cnt" id="cntReports">-</em></button>
       <button class="nav-item" data-tab="chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-11.6 7.1L4 20.5l1.5-4.6A8 8 0 1121 12z"/></svg><span>Chat logs</span></button>
+      <button class="nav-item" data-tab="forums"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4V5z"/><path d="M8 9.5h8M8 12.5h5"/></svg><span>Forums</span><em class="cnt" id="cntForums">-</em></button>
     </nav>
     <div class="side-foot"><b id="roleText">-</b><span id="roleSub">-</span></div>
   </aside>
@@ -488,6 +489,20 @@
       <!-- Chat logs -->
       <div class="panel" data-panel="chats">
         <div id="chatRoot"></div>
+      </div>
+
+      <!-- Forums -->
+      <div class="panel" data-panel="forums">
+        <div class="toolbar">
+          <span class="pill" id="forumsPill">-</span>
+          <button class="btn primary owner-only" id="newForumBtn" style="margin-left:auto">+ New forum</button>
+        </div>
+        <div class="list" id="forumsList"></div>
+        <p class="note">Players open the forums on the forum website (forum.html) after logging in with their BlockVerse account, and chat inside the forum you create here. Lock stops new messages. Open a forum to read its chat and delete messages.</p>
+        <div id="forumChatBox" class="hidden">
+          <div class="section-h" id="forumChatTitle">Messages</div>
+          <div class="list" id="forumMsgs"></div>
+        </div>
       </div>
 
     </div>
@@ -681,7 +696,8 @@ const TITLES = {
   banned:["Banned","Accounts currently blocked from logging in"],
   games:["Games","Review submissions and manage live games"],
   reports:["Reports","Player, chat and game reports from the community"],
-  chats:["Chat logs","Every game, every server, every message - whispers included"]
+  chats:["Chat logs","Every game, every server, every message - whispers included"],
+  forums:["Forums","Create forums for the community and moderate their chat"]
 };
 function moveIndicator(){
   const a = $(".nav-item.active"), ind = $("#navInd");
@@ -700,6 +716,7 @@ function go(tab, silent){
   moveIndicator();
   const c = $(".content"); if(c) window.scrollTo({ top:0 });
   if(tab === "chats") clEnter();
+  if(tab === "forums") forumsEnter();
 }
 $("#nav").addEventListener("click", e => { const b = e.target.closest(".nav-item"); if(b) go(b.getAttribute("data-tab")); });
 window.addEventListener("resize", moveIndicator);
@@ -718,8 +735,100 @@ async function refreshAll(manual){
   await loadAccounts();
   listenGames();
   listenReports();
+  forumsEnter();
   if(manual && $(".panel.active[data-panel='chats']")) clLoadGames(true);
 }
+
+
+/* ====================== forums ====================== */
+let forumsRef = null, forumMsgRef = null, forumsData = {}, openForumId = null;
+function forumsEnter(){
+  if(!forumsRef){
+    forumsRef = db.ref("bv_forum/forums");
+    forumsRef.on("value", snap => { forumsData = snap.val() || {}; renderForums(); if(openForumId && !forumsData[openForumId]) closeForumChat(); }, err => { permErr(err); });
+  }
+}
+function renderForums(){
+  const ids = Object.keys(forumsData).sort((a, b) => (forumsData[a].ts || 0) - (forumsData[b].ts || 0));
+  $("#forumsPill").textContent = ids.length + (ids.length === 1 ? " forum" : " forums");
+  $("#cntForums").textContent = ids.length;
+  const list = $("#forumsList");
+  if(!ids.length){ list.innerHTML = emptyBox("No forums yet. Press + New forum to make the first one."); moveIndicator(); return; }
+  list.innerHTML = ids.map(id => {
+    const f = forumsData[id];
+    return '<div class="row anim-item" data-fid="' + esc(id) + '"><div class="avatar">' + esc((f.name || "F").slice(0, 2).toUpperCase()) + '</div>' +
+      '<div class="r-main"><div class="r-title">' + esc(f.name || "Forum") + (f.locked ? '<span class="badge red">Locked</span>' : '<span class="badge green">Open</span>') + '</div>' +
+      '<div class="r-sub">' + esc(f.description || "No description") + '</div>' +
+      '<div class="r-meta">Created ' + (f.ts ? esc(ago(f.ts)) : "") + '</div></div>' +
+      '<div class="r-actions"><button class="mini" data-fa="open">Messages</button>' +
+      '<button class="mini warn owner-only" data-fa="lock">' + (f.locked ? "Unlock" : "Lock") + '</button>' +
+      '<button class="mini owner-only" data-fa="edit">Edit</button>' +
+      '<button class="mini red owner-only" data-fa="delete">Delete</button></div></div>';
+  }).join("");
+  stagger(list); moveIndicator();
+}
+$("#newForumBtn").addEventListener("click", async () => {
+  const name = await askText("New forum", "The name players see on the forum website.", "Forum name (e.g. Game ideas)", "Next");
+  if(!name) return;
+  const description = await askText("Describe \"" + name + "\"", "A short line about what this forum is for. You can leave it empty.", "Description...", "Create forum", true);
+  if(description === null) return;
+  try{
+    await ensureAuth();
+    const ref = db.ref("bv_forum/forums").push();
+    await ref.set({ name: name.slice(0, 60), description: (description || "").slice(0, 300), locked: false, by: role, ts: SV });
+    toast('Forum "' + name + '" created', "ok");
+  }catch(err){ permErr(err); }
+});
+$("#forumsList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-fa]"); if(!b) return;
+  const id = b.closest("[data-fid]").getAttribute("data-fid"), f = forumsData[id]; if(!f) return;
+  const act = b.getAttribute("data-fa");
+  try{
+    if(act === "open"){ openForumChat(id); }
+    else if(act === "lock"){ await db.ref("bv_forum/forums/" + id + "/locked").set(!f.locked); toast(f.locked ? "Forum unlocked" : "Forum locked", "ok"); }
+    else if(act === "edit"){
+      const name = await askText("Rename forum", "", f.name || "", "Next"); if(!name) return;
+      const desc = await askText("Description", "", f.description || "", "Save", true); if(desc === null) return;
+      await db.ref("bv_forum/forums/" + id).update({ name: name.slice(0, 60), description: desc.slice(0, 300) });
+      toast("Forum updated", "ok");
+    }else if(act === "delete"){
+      if(!(await askConfirm('Delete "' + f.name + '"?', "The forum and every message in it are removed for good.", "Delete forum", true))) return;
+      await db.ref("bv_forum/messages/" + id).remove();
+      await db.ref("bv_forum/forums/" + id).remove();
+      toast("Forum deleted", "ok");
+    }
+  }catch(err){ permErr(err); }
+});
+function closeForumChat(){
+  if(forumMsgRef){ forumMsgRef.off(); forumMsgRef = null; }
+  openForumId = null; $("#forumChatBox").classList.add("hidden");
+}
+function openForumChat(id){
+  closeForumChat(); openForumId = id;
+  const f = forumsData[id] || {};
+  $("#forumChatTitle").textContent = "Messages in " + (f.name || "forum");
+  $("#forumChatBox").classList.remove("hidden");
+  const list = $("#forumMsgs"); list.innerHTML = emptyBox("Loading...");
+  forumMsgRef = db.ref("bv_forum/messages/" + id).orderByChild("ts").limitToLast(150);
+  forumMsgRef.on("value", snap => {
+    const arr = []; snap.forEach(c => { const v = c.val(); if(v) arr.push(Object.assign({ id: c.key }, v)); });
+    arr.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    if(!arr.length){ list.innerHTML = emptyBox("No messages in this forum yet."); return; }
+    list.innerHTML = arr.map(m =>
+      '<div class="row anim-item" data-mid="' + esc(m.id) + '"><div class="avatar sm">' + esc(initials(m.author || "?")) + '</div>' +
+      '<div class="r-main"><div class="r-title">' + esc(m.author || "Player") + '</div><div class="r-sub">' + esc(m.text || "") + '</div>' +
+      '<div class="r-meta">' + (m.ts ? esc(ago(m.ts)) : "") + '</div></div>' +
+      '<div class="r-actions"><button class="mini red" data-fm="del">Delete</button></div></div>'
+    ).join("");
+    stagger(list);
+  }, err => permErr(err));
+  $("#forumChatBox").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("#forumMsgs").addEventListener("click", async e => {
+  const b = e.target.closest("[data-fm]"); if(!b || !openForumId) return;
+  const mid = b.closest("[data-mid]").getAttribute("data-mid");
+  try{ await db.ref("bv_forum/messages/" + openForumId + "/" + mid).remove(); toast("Message deleted", "ok"); }catch(err){ permErr(err); }
+});
 
 /* ====================== stats / dashboard ====================== */
 function renderStats(){
